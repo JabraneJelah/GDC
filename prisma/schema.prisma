@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Utilisateurs RH - Personnel RH qui utilise l'application
+model UtilisateurRH {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  mot_de_passe String   // Hash bcrypt
+  nom_complet  String
+  cree_le      DateTime @default(now())
+
+  // Relations
+  conges_crees Conge[]
+
+  @@map("utilisateurs_rh")
+}
+
+// Catégories de Personnel
+model CategoriePersonnel {
+  id    Int    @id @default(autoincrement())
+  nom   String @unique
+
+  // Relations
+  professeurs Professeur[]
+
+  @@map("categories_personnel")
+}
+
+// Spécialités
+model Specialite {
+  id    Int    @id @default(autoincrement())
+  nom   String @unique
+
+  // Relations
+  professeurs Professeur[]
+
+  @@map("specialites")
+}
+
+// Titres
+model Titre {
+  id    Int    @id @default(autoincrement())
+  nom   String @unique
+
+  // Relations
+  professeurs Professeur[]
+
+  @@map("titres")
+}
+
+// Professeurs - Identités des professeurs
+model Professeur {
+  id                      String              @id @default(uuid())
+  nom                     String
+  prenom                  String
+  ppr                     String              @unique // Numéro PPR unique
+  cin                     String
+  specialite_id           Int
+  categorie_personnel_id  Int
+  titre_id                Int
+  telephone               String?
+  cree_le                 DateTime            @default(now())
+
+  // Relations
+  specialite              Specialite          @relation(fields: [specialite_id], references: [id])
+  categorie_personnel     CategoriePersonnel  @relation(fields: [categorie_personnel_id], references: [id])
+  titre                   Titre               @relation(fields: [titre_id], references: [id])
+  conges                  Conge[]
+  soldes                  SoldeConge[]
+
+  @@map("professeurs")
+}
+
+// Types de Congé
+model TypeConge {
+  id                   Int    @id @default(autoincrement())
+  nom                  String // Annuel, Maladie, Exceptionnel
+  document_obligatoire Boolean @default(false)
+
+  // Relations
+  conges               Conge[]
+
+  @@map("types_conge")
+}
+
+// Soldes de Congé - Gestion automatique des soldes annuels
+model SoldeConge {
+  id            String    @id @default(uuid())
+  professeur_id String
+  annee         Int       // Année du solde
+  jours_total   Int       @default(22) // 22 jours par défaut
+  jours_restants Int      // Jours restants
+  expire_le     DateTime  // Fin d'année + 2 ans
+
+  // Relations
+  professeur    Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+
+  @@unique([professeur_id, annee])
+  @@map("soldes_conge")
+}
+
+// Congés - Enregistrements des congés
+model Conge {
+  id              String        @id @default(uuid())
+  professeur_id   String
+  type_conge_id   Int
+  date_debut      DateTime
+  date_fin        DateTime
+  duree_jours     Int
+  reference_doc   String?       // Référence du document papier
+  cree_par_rh_id  String
+  cree_le         DateTime      @default(now())
+
+  // Relations
+  professeur      Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+  type_conge      TypeConge     @relation(fields: [type_conge_id], references: [id])
+  cree_par_rh     UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
+
+  @@map("conges")
+}

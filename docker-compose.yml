@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: conge_postgres
+    environment:
+      POSTGRES_USER: conge
+      POSTGRES_PASSWORD: conge123
+      POSTGRES_DB: congedb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: conge_app
+    env_file:
+      - .env
+    environment:
+      # DATABASE_URL uses 'postgres' hostname (Docker service name) for container networking
+      DATABASE_URL: postgresql://conge:conge123@postgres:5432/congedb
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "sleep 5 && npx prisma migrate deploy && npm run db:seed && node server.js"
+
+volumes:
+  postgres_data:
+
