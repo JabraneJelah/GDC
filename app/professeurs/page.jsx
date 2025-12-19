@@ -28,12 +28,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import Link from 'next/link'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 export default function ProfesseursPage() {
   const [professeurs, setProfesseurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [categories, setCategories] = useState([])
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
@@ -52,6 +58,7 @@ export default function ProfesseursPage() {
   useEffect(() => {
     fetchProfesseurs()
     fetchOptions()
+    setCurrentPage(1)
   }, [search])
 
   const fetchOptions = async () => {
@@ -120,14 +127,17 @@ export default function ProfesseursPage() {
           telephone: '',
           solde_jours: '22',
         })
+        setCurrentPage(1)
         fetchProfesseurs()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la création')
+        setErrorMessage(data.error || 'Erreur lors de la création')
+        setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la création')
+      setErrorMessage('Erreur lors de la création')
+      setErrorDialogOpen(true)
     }
   }
 
@@ -135,13 +145,18 @@ export default function ProfesseursPage() {
     return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
   }
 
+  const totalPages = Math.ceil(professeurs.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedProfesseurs = professeurs.slice(startIndex, endIndex)
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Professeurs</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Professeurs</h1>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>Nouveau Professeur</Button>
+            <Button className="w-full sm:w-auto">Nouveau Professeur</Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
@@ -299,11 +314,11 @@ export default function ProfesseursPage() {
           placeholder="Rechercher par nom, prénom ou PPR..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
+          className="w-full sm:max-w-sm"
         />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border border-slate-200">
         <Table>
           <TableHeader>
             <TableRow>
@@ -325,7 +340,7 @@ export default function ProfesseursPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              professeurs.map((professeur) => {
+              paginatedProfesseurs.map((professeur) => {
                 const soldeActuel = professeur.soldes && professeur.soldes.length > 0 
                   ? professeur.soldes[0] 
                   : null
@@ -350,7 +365,7 @@ export default function ProfesseursPage() {
                     <TableCell>{professeur._count.conges}</TableCell>
                     <TableCell>
                       <Link href={`/professeurs/${professeur.id}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto">
                           Voir détails
                         </Button>
                       </Link>
@@ -361,7 +376,30 @@ export default function ProfesseursPage() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Erreur</DialogTitle>
+            <DialogDescription className="text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setErrorDialogOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

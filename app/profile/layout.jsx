@@ -1,6 +1,6 @@
 import { Nav } from '@/components/layout/nav'
 
-export default function TypesCongeLayout({ children }) {
+export default function ProfileLayout({ children }) {
   return (
     <>
       <Nav />

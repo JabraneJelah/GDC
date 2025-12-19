@@ -20,12 +20,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 export default function TitresPage() {
   const [titres, setTitres] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [titreToDelete, setTitreToDelete] = useState(null)
   const [editingTitre, setEditingTitre] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
     nom: '',
   })
@@ -68,14 +76,17 @@ export default function TitresPage() {
         setOpen(false)
         setEditingTitre(null)
         setFormData({ nom: '' })
+        setCurrentPage(1)
         fetchTitres()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la sauvegarde')
+        setErrorMessage(data.error || 'Erreur lors de la sauvegarde')
+        setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la sauvegarde')
+      setErrorMessage('Erreur lors de la sauvegarde')
+      setErrorDialogOpen(true)
     }
   }
 
@@ -85,25 +96,37 @@ export default function TitresPage() {
     setOpen(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce titre ?')) {
-      return
-    }
+  const handleDeleteClick = (titre) => {
+    setTitreToDelete(titre)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!titreToDelete) return
 
     try {
-      const response = await fetch(`/api/titres/${id}`, {
+      const response = await fetch(`/api/titres/${titreToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
+        setCurrentPage(1)
+        setDeleteDialogOpen(false)
+        setTitreToDelete(null)
         fetchTitres()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la suppression')
+        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorDialogOpen(true)
+        setDeleteDialogOpen(false)
+        setTitreToDelete(null)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la suppression')
+      setErrorMessage('Erreur lors de la suppression')
+      setErrorDialogOpen(true)
+      setDeleteDialogOpen(false)
+      setTitreToDelete(null)
     }
   }
 
@@ -123,13 +146,18 @@ export default function TitresPage() {
     )
   }
 
+  const totalPages = Math.ceil(titres.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTitres = titres.slice(startIndex, endIndex)
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Titres</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Titres</h1>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button>Nouveau Titre</Button>
+            <Button className="w-full sm:w-auto">Nouveau Titre</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -163,7 +191,7 @@ export default function TitresPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border border-slate-200">
         <Table>
           <TableHeader>
             <TableRow>
@@ -180,22 +208,22 @@ export default function TitresPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              titres.map((titre) => (
+              paginatedTitres.map((titre) => (
                 <TableRow key={titre.id}>
                   <TableCell>{titre.id}</TableCell>
                   <TableCell className="font-medium">{titre.nom}</TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-1.5">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="xs"
                         onClick={() => handleEdit(titre)}
                       >
                         Modifier
                       </Button>
                       <Button
                         variant="destructive"
-                        size="sm"
+                        size="xs"
                         onClick={() => handleDelete(titre.id)}
                       >
                         Supprimer
@@ -207,7 +235,60 @@ export default function TitresPage() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer le titre "{titreToDelete?.nom}" ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setTitreToDelete(null)
+              }}
+              className="w-full sm:w-auto"
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              className="w-full sm:w-auto"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Erreur</DialogTitle>
+            <DialogDescription className="text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setErrorDialogOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

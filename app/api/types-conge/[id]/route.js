@@ -10,12 +10,31 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
+    // Handle both sync and async params (Next.js 15+)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const id = resolvedParams?.id
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID du type de congé manquant' },
+        { status: 400 }
+      )
+    }
+
     const body = await request.json()
     const { nom, document_obligatoire } = body
 
+    const typeId = parseInt(id, 10)
+    if (isNaN(typeId)) {
+      return NextResponse.json(
+        { error: 'ID invalide' },
+        { status: 400 }
+      )
+    }
+
     // Vérifier si le type existe
     const existing = await prisma.typeConge.findUnique({
-      where: { id: parseInt(params.id) },
+      where: { id: typeId },
     })
 
     if (!existing) {
@@ -30,7 +49,7 @@ export async function PUT(request, { params }) {
       const nomExists = await prisma.typeConge.findFirst({
         where: {
           nom: { equals: nom, mode: 'insensitive' },
-          NOT: { id: parseInt(params.id) },
+          NOT: { id: typeId },
         },
       })
 
@@ -44,7 +63,7 @@ export async function PUT(request, { params }) {
 
     // Mettre à jour le type
     const typeConge = await prisma.typeConge.update({
-      where: { id: parseInt(params.id) },
+      where: { id: typeId },
       data: {
         nom: nom || existing.nom,
         document_obligatoire:
@@ -72,7 +91,24 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const typeId = parseInt(params.id)
+    // Handle both sync and async params (Next.js 15+)
+    const resolvedParams = params instanceof Promise ? await params : params
+    const id = resolvedParams?.id
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID du type de congé manquant' },
+        { status: 400 }
+      )
+    }
+
+    const typeId = parseInt(id, 10)
+    if (isNaN(typeId)) {
+      return NextResponse.json(
+        { error: 'ID invalide' },
+        { status: 400 }
+      )
+    }
 
     // Vérifier si le type existe
     const existing = await prisma.typeConge.findUnique({

@@ -36,9 +36,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Tableau de bord</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Tableau de bord</h1>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -49,7 +49,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalProfesseurs || 0}</div>
+            <div className="text-xl font-semibold">{stats?.totalProfesseurs || 0}</div>
           </CardContent>
         </Card>
 
@@ -58,7 +58,7 @@ export default function DashboardPage() {
             <CardTitle className="text-sm font-medium">Total Congés</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalConges || 0}</div>
+            <div className="text-xl font-semibold">{stats?.totalConges || 0}</div>
           </CardContent>
         </Card>
 
@@ -69,7 +69,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl font-semibold">
               {stats?.congesCetteAnnee || 0}
             </div>
           </CardContent>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl font-semibold">
               {stats?.totalUtilisateursRH || 0}
             </div>
           </CardContent>
@@ -98,22 +98,22 @@ export default function DashboardPage() {
             {stats?.congesParType.map((item, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-2 rounded-md bg-gray-50"
+                className="flex items-center justify-between p-2 rounded-md bg-slate-50"
               >
-                <span className="font-medium">{item.type}</span>
-                <span className="text-gray-600">{item.count}</span>
+                <span className="text-sm font-medium">{item.type}</span>
+                <span className="text-sm text-slate-700">{item.count}</span>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex gap-4">
-        <Link href="/professeurs">
-          <Button>Gérer les Professeurs</Button>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Link href="/professeurs" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto">Gérer les Professeurs</Button>
         </Link>
-        <Link href="/conges">
-          <Button variant="outline">Gérer les Congés</Button>
+        <Link href="/conges" className="w-full sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto">Gérer les Congés</Button>
         </Link>
       </div>
     </div>

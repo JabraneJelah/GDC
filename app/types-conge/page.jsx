@@ -20,12 +20,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 export default function TypesCongePage() {
   const [typesConge, setTypesConge] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [typeToDelete, setTypeToDelete] = useState(null)
   const [editingType, setEditingType] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
     nom: '',
     document_obligatoire: false,
@@ -72,14 +80,17 @@ export default function TypesCongePage() {
           nom: '',
           document_obligatoire: false,
         })
+        setCurrentPage(1)
         fetchTypesConge()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la sauvegarde')
+        setErrorMessage(data.error || 'Erreur lors de la sauvegarde')
+        setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la sauvegarde')
+      setErrorMessage('Erreur lors de la sauvegarde')
+      setErrorDialogOpen(true)
     }
   }
 
@@ -92,25 +103,37 @@ export default function TypesCongePage() {
     setOpen(true)
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce type de congé ?')) {
-      return
-    }
+  const handleDeleteClick = (type) => {
+    setTypeToDelete(type)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!typeToDelete) return
 
     try {
-      const response = await fetch(`/api/types-conge/${id}`, {
+      const response = await fetch(`/api/types-conge/${typeToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
+        setCurrentPage(1)
+        setDeleteDialogOpen(false)
+        setTypeToDelete(null)
         fetchTypesConge()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la suppression')
+        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorDialogOpen(true)
+        setDeleteDialogOpen(false)
+        setTypeToDelete(null)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la suppression')
+      setErrorMessage('Erreur lors de la suppression')
+      setErrorDialogOpen(true)
+      setDeleteDialogOpen(false)
+      setTypeToDelete(null)
     }
   }
 
@@ -133,13 +156,18 @@ export default function TypesCongePage() {
     )
   }
 
+  const totalPages = Math.ceil(typesConge.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTypesConge = typesConge.slice(startIndex, endIndex)
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Types de Congé</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Types de Congé</h1>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button>Nouveau Type</Button>
+            <Button className="w-full sm:w-auto">Nouveau Type</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -190,7 +218,7 @@ export default function TypesCongePage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border border-slate-200">
         <Table>
           <TableHeader>
             <TableRow>
@@ -208,7 +236,7 @@ export default function TypesCongePage() {
                 </TableCell>
               </TableRow>
             ) : (
-              typesConge.map((type) => (
+              paginatedTypesConge.map((type) => (
                 <TableRow key={type.id}>
                   <TableCell>{type.id}</TableCell>
                   <TableCell className="font-medium">{type.nom}</TableCell>
@@ -220,18 +248,18 @@ export default function TypesCongePage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-1.5">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="xs"
                         onClick={() => handleEdit(type)}
                       >
                         Modifier
                       </Button>
                       <Button
                         variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(type.id)}
+                        size="xs"
+                        onClick={() => handleDeleteClick(type)}
                       >
                         Supprimer
                       </Button>
@@ -242,7 +270,60 @@ export default function TypesCongePage() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer le type de congé "{typeToDelete?.nom}" ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setTypeToDelete(null)
+              }}
+              className="w-full sm:w-auto"
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              className="w-full sm:w-auto"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Erreur</DialogTitle>
+            <DialogDescription className="text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setErrorDialogOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

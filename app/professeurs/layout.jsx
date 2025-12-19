@@ -4,7 +4,7 @@ export default function ProfesseursLayout({ children }) {
   return (
     <>
       <Nav />
-      <main className="container mx-auto max-w-7xl px-4 py-8">{children}</main>
+      <main className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">{children}</main>
     </>
   )
 }

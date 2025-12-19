@@ -27,6 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 export default function CongesPage() {
   const [conges, setConges] = useState([])
@@ -34,6 +37,9 @@ export default function CongesPage() {
   const [typesConge, setTypesConge] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
     professeur_id: '',
     type_conge_id: '',
@@ -111,14 +117,17 @@ export default function CongesPage() {
           duree_jours: '',
           reference_doc: '',
         })
+        setCurrentPage(1)
         fetchData()
       } else {
         const data = await response.json()
-        alert(data.error || 'Erreur lors de la création')
+        setErrorMessage(data.error || 'Erreur lors de la création')
+        setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la création')
+      setErrorMessage('Erreur lors de la création')
+      setErrorDialogOpen(true)
     }
   }
 
@@ -126,13 +135,18 @@ export default function CongesPage() {
     return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
   }
 
+  const totalPages = Math.ceil(conges.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedConges = conges.slice(startIndex, endIndex)
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Congés</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Congés</h1>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button>Nouveau Congé</Button>
+            <Button className="w-full sm:w-auto">Nouveau Congé</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -184,7 +198,7 @@ export default function CongesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date_debut">Date début *</Label>
                   <Input
@@ -243,7 +257,7 @@ export default function CongesPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border border-slate-200">
         <Table>
           <TableHeader>
             <TableRow>
@@ -264,7 +278,7 @@ export default function CongesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              conges.map((conge) => (
+              paginatedConges.map((conge) => (
                 <TableRow key={conge.id}>
                   <TableCell>
                     {conge.professeur.prenom} {conge.professeur.nom}
@@ -284,7 +298,30 @@ export default function CongesPage() {
             )}
           </TableBody>
         </Table>
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
+
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Erreur</DialogTitle>
+            <DialogDescription className="text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setErrorDialogOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
