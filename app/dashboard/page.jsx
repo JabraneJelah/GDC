@@ -1,17 +1,47 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
+import { X } from 'lucide-react'
 import Link from 'next/link'
+
+const ITEMS_PER_PAGE = 10
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null)
+  const [historique, setHistorique] = useState([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchStats()
-  }, [])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [services, setServices] = useState([])
+  const [typesConge, setTypesConge] = useState([])
+  const [filters, setFilters] = useState({
+    service_id: 'all',
+    type_conge_id: 'all',
+    date_debut: '',
+    date_fin: '',
+    nom: '',
+    prenom: '',
+    ppr: '',
+  })
 
   const fetchStats = async () => {
     try {
@@ -22,12 +52,121 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
-  if (loading) {
+  const fetchOptions = async () => {
+    try {
+      const [servicesRes, typesCongeRes] = await Promise.all([
+        fetch('/api/services'),
+        fetch('/api/types-conge'),
+      ])
+
+      if (servicesRes.ok) {
+        const data = await servicesRes.json()
+        setServices(data)
+      }
+      if (typesCongeRes.ok) {
+        const data = await typesCongeRes.json()
+        setTypesConge(data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des options:', error)
+    }
+  }
+
+  const fetchHistorique = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      
+      if (filters.service_id && filters.service_id !== 'all') params.append('service_id', filters.service_id)
+      if (filters.type_conge_id && filters.type_conge_id !== 'all') params.append('type_conge_id', filters.type_conge_id)
+      if (filters.date_debut) params.append('date_debut', filters.date_debut)
+      if (filters.date_fin) params.append('date_fin', filters.date_fin)
+      if (filters.nom) params.append('nom', filters.nom)
+      if (filters.prenom) params.append('prenom', filters.prenom)
+      if (filters.ppr) params.append('ppr', filters.ppr)
+
+      const url = `/api/dashboard/historique-conges${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await fetch(url)
+      if (response.ok) {
+        const data = await response.json()
+        setHistorique(data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement de l\'historique:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [filters])
+
+  useEffect(() => {
+    fetchStats()
+    fetchOptions()
+    // Chargement initial sans filtres
+    const loadInitial = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/dashboard/historique-conges')
+        if (response.ok) {
+          const data = await response.json()
+          setHistorique(data)
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement de l\'historique:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadInitial()
+  }, [])
+
+  useEffect(() => {
+    // Debounce pour les champs de texte (nom, prenom, ppr)
+    const timeoutId = setTimeout(() => {
+      fetchHistorique()
+      setCurrentPage(1)
+    }, filters.nom || filters.prenom || filters.ppr ? 500 : 0) // 500ms de délai pour les champs texte
+
+    return () => clearTimeout(timeoutId)
+  }, [filters, fetchHistorique])
+
+  const handleClearFilters = () => {
+    setFilters({
+      service_id: 'all',
+      type_conge_id: 'all',
+      date_debut: '',
+      date_fin: '',
+      nom: '',
+      prenom: '',
+      ppr: '',
+    })
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (key === 'service_id' || key === 'type_conge_id') {
+      return value !== 'all'
+    }
+    return value !== ''
+  })
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }
+
+  const totalPages = Math.ceil(historique.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedHistorique = historique.slice(startIndex, endIndex)
+
+  if (loading && historique.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p>Chargement...</p>
@@ -38,72 +177,219 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Tableau de bord</h1>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Professeurs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{stats?.totalProfesseurs || 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Congés</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">{stats?.totalConges || 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Congés cette année
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">
-              {stats?.congesCetteAnnee || 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Utilisateurs RH
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-semibold">
-              {stats?.totalUtilisateursRH || 0}
-            </div>
-          </CardContent>
-        </Card>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Tableau de suivi des congés des professeurs – CHU Tanger
+        </h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Congés par type</CardTitle>
+          <CardTitle>Historique des Congés</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {stats?.congesParType.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 rounded-md bg-slate-50"
-              >
-                <span className="text-sm font-medium">{item.type}</span>
-                <span className="text-sm text-slate-700">{item.count}</span>
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 mb-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="filter-service" className="text-xs text-slate-600">
+                    Service
+                  </Label>
+                  <Select
+                    value={filters.service_id || 'all'}
+                    onValueChange={(value) =>
+                      setFilters({ ...filters, service_id: value })
+                    }
+                  >
+                    <SelectTrigger id="filter-service" className="h-9">
+                      <SelectValue placeholder="Tous les services" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les services</SelectItem>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.id.toString()}>
+                          {service.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="filter-type" className="text-xs text-slate-600">
+                    Type de Congé
+                  </Label>
+                  <Select
+                    value={filters.type_conge_id || 'all'}
+                    onValueChange={(value) =>
+                      setFilters({ ...filters, type_conge_id: value })
+                    }
+                  >
+                    <SelectTrigger id="filter-type" className="h-9">
+                      <SelectValue placeholder="Tous les types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les types</SelectItem>
+                      {typesConge.map((type) => (
+                        <SelectItem key={type.id} value={type.id.toString()}>
+                          {type.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="filter-nom" className="text-xs text-slate-600">
+                    Nom
+                  </Label>
+                  <Input
+                    id="filter-nom"
+                    placeholder="Nom..."
+                    value={filters.nom}
+                    onChange={(e) => setFilters({ ...filters, nom: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="filter-prenom" className="text-xs text-slate-600">
+                    Prénom
+                  </Label>
+                  <Input
+                    id="filter-prenom"
+                    placeholder="Prénom..."
+                    value={filters.prenom}
+                    onChange={(e) => setFilters({ ...filters, prenom: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
               </div>
-            ))}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="filter-ppr" className="text-xs text-slate-600">
+                    PPR
+                  </Label>
+                  <Input
+                    id="filter-ppr"
+                    placeholder="PPR..."
+                    value={filters.ppr}
+                    onChange={(e) => setFilters({ ...filters, ppr: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="filter-date-debut" className="text-xs text-slate-600">
+                    Date Début
+                  </Label>
+                  <Input
+                    id="filter-date-debut"
+                    type="date"
+                    value={filters.date_debut}
+                    onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="filter-date-fin" className="text-xs text-slate-600">
+                    Date Fin
+                  </Label>
+                  <Input
+                    id="filter-date-fin"
+                    type="date"
+                    value={filters.date_fin}
+                    onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-2 flex items-end">
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearFilters}
+                      className="w-full h-9"
+                    >
+                      <X className="h-4 w-4 mr-1.5" />
+                      Effacer
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Prénom</TableHead>
+                  <TableHead>PPR</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Type de Congé</TableHead>
+                  <TableHead>Période</TableHead>
+                  <TableHead>Jours</TableHead>
+                  <TableHead>Solde Restant</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center">
+                      Chargement...
+                    </TableCell>
+                  </TableRow>
+                ) : historique.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center">
+                      Aucun congé enregistré
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedHistorique.map((conge) => (
+                    <TableRow key={conge.id}>
+                      <TableCell className="font-medium">{conge.nom}</TableCell>
+                      <TableCell>{conge.prenom}</TableCell>
+                      <TableCell>{conge.ppr}</TableCell>
+                      <TableCell>{conge.service}</TableCell>
+                      <TableCell>{conge.type_conge}</TableCell>
+                      <TableCell>
+                        {formatDate(conge.date_debut)} - {formatDate(conge.date_fin)}
+                      </TableCell>
+                      <TableCell>{conge.duree_jours} jour(s)</TableCell>
+                      <TableCell>
+                        {conge.soldes && conge.soldes.length > 0 ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              Total: {conge.solde_restant_total} jour(s)
+                            </div>
+                            <div className="text-xs text-slate-600 space-y-0.5">
+                              {conge.soldes.map((solde) => (
+                                <div key={solde.annee}>
+                                  {solde.annee}: {solde.jours_restants} / {solde.jours_total} jours
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
           </div>
         </CardContent>
       </Card>

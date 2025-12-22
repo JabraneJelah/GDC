@@ -40,6 +40,15 @@ export async function POST(request) {
       )
     }
 
+    // Vérifier si le compte est actif
+    if (utilisateur.actif === false) {
+      console.log("Account is deactivated for user:", email)
+      return NextResponse.json(
+        { error: 'Ce compte est désactivé. Veuillez contacter l\'administrateur.' },
+        { status: 403 }
+      )
+    }
+
     const token = generateToken({
       userId: utilisateur.id,
       email: utilisateur.email,

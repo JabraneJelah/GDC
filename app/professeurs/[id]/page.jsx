@@ -41,6 +41,7 @@ export default function ProfesseurDetailsPage() {
   const [categories, setCategories] = useState([])
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
+  const [services, setServices] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -49,6 +50,7 @@ export default function ProfesseurDetailsPage() {
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
+    service_id: '',
     telephone: '',
   })
 
@@ -61,10 +63,11 @@ export default function ProfesseurDetailsPage() {
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
+        fetch('/api/services'),
       ])
 
       if (categoriesRes.ok) {
@@ -78,6 +81,10 @@ export default function ProfesseurDetailsPage() {
       if (titresRes.ok) {
         const data = await titresRes.json()
         setTitres(data)
+      }
+      if (servicesRes.ok) {
+        const data = await servicesRes.json()
+        setServices(data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
@@ -99,6 +106,7 @@ export default function ProfesseurDetailsPage() {
           specialite_id: data.specialite_id?.toString() || '',
           categorie_personnel_id: data.categorie_personnel_id?.toString() || '',
           titre_id: data.titre_id?.toString() || '',
+          service_id: data.service_id?.toString() || '',
           telephone: data.telephone || '',
         })
       } else {
@@ -127,6 +135,7 @@ export default function ProfesseurDetailsPage() {
           specialite_id: formData.specialite_id ? parseInt(formData.specialite_id, 10) : undefined,
           categorie_personnel_id: formData.categorie_personnel_id ? parseInt(formData.categorie_personnel_id, 10) : undefined,
           titre_id: formData.titre_id ? parseInt(formData.titre_id, 10) : undefined,
+          service_id: formData.service_id ? parseInt(formData.service_id, 10) : undefined,
         }),
       })
 
@@ -153,7 +162,11 @@ export default function ProfesseurDetailsPage() {
     return <div>Professeur non trouvé</div>
   }
 
-  const soldeActuel = professeur.soldes[0] || null
+  const soldesNonExpires = professeur.soldes || []
+  const maintenant = new Date()
+  const soldesValides = soldesNonExpires.filter(
+    (solde) => new Date(solde.expire_le) >= maintenant && solde.jours_restants > 0
+  )
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -284,6 +297,27 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="service_id">Service *</Label>
+                  <Select
+                    value={formData.service_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, service_id: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {services.map((service) => (
+                        <SelectItem key={service.id} value={service.id.toString()}>
+                          {service.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="telephone">Téléphone</Label>
                   <Input
                     id="telephone"
@@ -336,6 +370,12 @@ export default function ProfesseurDetailsPage() {
                 {professeur.titre?.nom || '-'}
               </p>
             </div>
+            <div>
+              <p className="text-sm text-slate-700">Service</p>
+              <p className="font-medium">
+                {professeur.service?.nom || '-'}
+              </p>
+            </div>
             {professeur.telephone && (
               <div>
                 <p className="text-sm text-slate-700">Téléphone</p>
@@ -346,28 +386,47 @@ export default function ProfesseurDetailsPage() {
         </CardContent>
       </Card>
 
-      {soldeActuel && (
+      {soldesValides.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Solde de Congé ({soldeActuel.annee})</CardTitle>
+            <CardTitle>Soldes de Congé</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-slate-700">Jours totaux</p>
-                <p className="text-xl font-semibold">{soldeActuel.jours_total}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-700">Jours restants</p>
-                <p className="text-xl font-semibold text-green-600">
-                  {soldeActuel.jours_restants}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-700">Expire le</p>
-                <p className="font-medium">
-                  {new Date(soldeActuel.expire_le).toLocaleDateString('fr-FR')}
-                </p>
+            <div className="space-y-4">
+              {soldesValides.map((solde) => (
+                <div
+                  key={solde.id}
+                  className="border border-slate-200 rounded-lg p-4 bg-slate-50"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-base font-semibold text-slate-700">
+                      Solde {solde.annee}
+                    </h3>
+                    <span className="text-xs text-slate-500">
+                      Expire le {new Date(solde.expire_le).toLocaleDateString('fr-FR')}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-slate-600">Jours totaux</p>
+                      <p className="text-lg font-semibold">{solde.jours_total}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600">Jours restants</p>
+                      <p className="text-lg font-semibold text-green-600">
+                        {solde.jours_restants}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-700">Total disponible</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    {soldesValides.reduce((sum, solde) => sum + solde.jours_restants, 0)} jours
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

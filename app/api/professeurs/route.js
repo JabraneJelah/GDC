@@ -12,31 +12,79 @@ export async function GET(request) {
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
+    const ppr = searchParams.get('ppr') || ''
+    const cin = searchParams.get('cin') || ''
 
-    const anneeActuelle = new Date().getFullYear()
+    const maintenant = new Date()
+    
+    let whereClause = undefined
+    if (ppr) {
+      whereClause = {
+        ppr: { contains: ppr, mode: 'insensitive' },
+      }
+    } else if (cin) {
+      whereClause = {
+        cin: { contains: cin, mode: 'insensitive' },
+      }
+    } else if (search) {
+      whereClause = {
+        OR: [
+          { nom: { contains: search, mode: 'insensitive' } },
+          { prenom: { contains: search, mode: 'insensitive' } },
+          { ppr: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    }
     
     const professeurs = await prisma.professeur.findMany({
-      where: search
-        ? {
-            OR: [
-              { nom: { contains: search, mode: 'insensitive' } },
-              { prenom: { contains: search, mode: 'insensitive' } },
-              { ppr: { contains: search, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
-      include: {
+      where: whereClause,
+      select: {
+        id: true,
+        nom: true,
+        prenom: true,
+        ppr: true,
+        cin: true,
+        telephone: true,
         _count: {
           select: { conges: true },
         },
-        specialite: true,
-        categorie_personnel: true,
-        titre: true,
+        specialite: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
+        categorie_personnel: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
+        titre: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
+        service: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
         soldes: {
           where: {
-            annee: anneeActuelle,
+            expire_le: { gte: maintenant }, // Seulement les soldes non expirés
+            jours_restants: { gt: 0 }, // Seulement ceux avec des jours restants
           },
-          take: 1,
+          orderBy: { annee: 'asc' }, // Plus ancien en premier
+          select: {
+            id: true,
+            annee: true,
+            jours_restants: true,
+            jours_total: true,
+            expire_le: true,
+          },
         },
       },
       orderBy: { nom: 'asc' },
@@ -69,6 +117,7 @@ export async function POST(request) {
       specialite_id,
       categorie_personnel_id,
       titre_id,
+      service_id,
       telephone,
       solde_jours,
     } = body
@@ -80,7 +129,8 @@ export async function POST(request) {
       !cin ||
       !specialite_id ||
       !categorie_personnel_id ||
-      !titre_id
+      !titre_id ||
+      !service_id
     ) {
       return NextResponse.json(
         { error: 'Tous les champs obligatoires doivent être remplis' },
@@ -92,31 +142,32 @@ export async function POST(request) {
     const specialiteId = parseInt(specialite_id, 10)
     const categoriePersonnelId = parseInt(categorie_personnel_id, 10)
     const titreId = parseInt(titre_id, 10)
+    const serviceId = parseInt(service_id, 10)
 
-    if (isNaN(specialiteId) || isNaN(categoriePersonnelId) || isNaN(titreId)) {
+    if (isNaN(specialiteId) || isNaN(categoriePersonnelId) || isNaN(titreId) || isNaN(serviceId)) {
       return NextResponse.json(
-        { error: 'IDs invalides pour spécialité, catégorie ou titre' },
+        { error: 'IDs invalides pour spécialité, catégorie, titre ou service' },
         { status: 400 }
       )
     }
 
     // Vérifier que les entités existent
-    const [specialite, categorie, titre] = await Promise.all([
+    const [specialite, categorie, titre, service] = await Promise.all([
       prisma.specialite.findUnique({ where: { id: specialiteId } }),
       prisma.categoriePersonnel.findUnique({
         where: { id: categoriePersonnelId },
       }),
       prisma.titre.findUnique({ where: { id: titreId } }),
+      prisma.service.findUnique({ where: { id: serviceId } }),
     ])
 
-    if (!specialite || !categorie || !titre) {
+    if (!specialite || !categorie || !titre || !service) {
       return NextResponse.json(
-        { error: 'Spécialité, catégorie ou titre non trouvé' },
+        { error: 'Spécialité, catégorie, titre ou service non trouvé' },
         { status: 404 }
       )
     }
 
-    // Vérifier si le PPR existe déjà
     const existing = await prisma.professeur.findUnique({
       where: { ppr },
     })
@@ -138,6 +189,7 @@ export async function POST(request) {
         specialite_id: specialiteId,
         categorie_personnel_id: categoriePersonnelId,
         titre_id: titreId,
+        service_id: serviceId,
         telephone: telephone || null,
       },
     })

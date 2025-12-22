@@ -25,34 +25,33 @@ import { Pencil, Trash2 } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
-export default function TypesCongePage() {
-  const [typesConge, setTypesConge] = useState([])
+export default function ServicesPage() {
+  const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [typeToDelete, setTypeToDelete] = useState(null)
-  const [editingType, setEditingType] = useState(null)
+  const [serviceToDelete, setServiceToDelete] = useState(null)
+  const [editingService, setEditingService] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
     nom: '',
-    document_obligatoire: false,
   })
 
   useEffect(() => {
-    fetchTypesConge()
+    fetchServices()
   }, [])
 
-  const fetchTypesConge = async () => {
+  const fetchServices = async () => {
     try {
-      const response = await fetch('/api/types-conge')
+      const response = await fetch('/api/services')
       if (response.ok) {
         const data = await response.json()
-        setTypesConge(data)
+        setServices(data)
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des types de congé:', error)
+      console.error('Erreur lors du chargement des services:', error)
     } finally {
       setLoading(false)
     }
@@ -61,10 +60,10 @@ export default function TypesCongePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const url = editingType
-        ? `/api/types-conge/${editingType.id}`
-        : '/api/types-conge'
-      const method = editingType ? 'PUT' : 'POST'
+      const url = editingService
+        ? `/api/services/${editingService.id}`
+        : '/api/services'
+      const method = editingService ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
@@ -76,13 +75,10 @@ export default function TypesCongePage() {
 
       if (response.ok) {
         setOpen(false)
-        setEditingType(null)
-        setFormData({
-          nom: '',
-          document_obligatoire: false,
-        })
+        setEditingService(null)
+        setFormData({ nom: '' })
         setCurrentPage(1)
-        fetchTypesConge()
+        fetchServices()
       } else {
         const data = await response.json()
         setErrorMessage(data.error || 'Erreur lors de la sauvegarde')
@@ -95,57 +91,51 @@ export default function TypesCongePage() {
     }
   }
 
-  const handleEdit = (type) => {
-    setEditingType(type)
-    setFormData({
-      nom: type.nom,
-      document_obligatoire: type.document_obligatoire,
-    })
+  const handleEdit = (service) => {
+    setEditingService(service)
+    setFormData({ nom: service.nom })
     setOpen(true)
   }
 
-  const handleDeleteClick = (type) => {
-    setTypeToDelete(type)
+  const handleDeleteClick = (service) => {
+    setServiceToDelete(service)
     setDeleteDialogOpen(true)
   }
 
   const handleDeleteConfirm = async () => {
-    if (!typeToDelete) return
+    if (!serviceToDelete) return
 
     try {
-      const response = await fetch(`/api/types-conge/${typeToDelete.id}`, {
+      const response = await fetch(`/api/services/${serviceToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
         setCurrentPage(1)
         setDeleteDialogOpen(false)
-        setTypeToDelete(null)
-        fetchTypesConge()
+        setServiceToDelete(null)
+        fetchServices()
       } else {
         const data = await response.json()
         setErrorMessage(data.error || 'Erreur lors de la suppression')
         setErrorDialogOpen(true)
         setDeleteDialogOpen(false)
-        setTypeToDelete(null)
+        setServiceToDelete(null)
       }
     } catch (error) {
       console.error('Erreur:', error)
       setErrorMessage('Erreur lors de la suppression')
       setErrorDialogOpen(true)
       setDeleteDialogOpen(false)
-      setTypeToDelete(null)
+      setServiceToDelete(null)
     }
   }
 
   const handleOpenChange = (open) => {
     setOpen(open)
     if (!open) {
-      setEditingType(null)
-      setFormData({
-        nom: '',
-        document_obligatoire: false,
-      })
+      setEditingService(null)
+      setFormData({ nom: '' })
     }
   }
 
@@ -157,28 +147,28 @@ export default function TypesCongePage() {
     )
   }
 
-  const totalPages = Math.ceil(typesConge.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(services.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedTypesConge = typesConge.slice(startIndex, endIndex)
+  const paginatedServices = services.slice(startIndex, endIndex)
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Types de Congé</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Services</h1>
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">Nouveau Type</Button>
+            <Button className="w-full sm:w-auto">Nouveau Service</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingType ? 'Modifier le Type' : 'Nouveau Type de Congé'}
+                {editingService ? 'Modifier le Service' : 'Nouveau Service'}
               </DialogTitle>
               <DialogDescription>
-                {editingType
-                  ? 'Modifier les informations du type de congé'
-                  : 'Créer un nouveau type de congé'}
+                {editingService
+                  ? 'Modifier les informations du service'
+                  : 'Créer un nouveau service'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -190,29 +180,12 @@ export default function TypesCongePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, nom: e.target.value })
                   }
-                  placeholder="Ex: Congé de Maternité"
+                  placeholder="Ex: Cardiologie, Pédiatrie, etc."
                   required
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="document_obligatoire"
-                  checked={formData.document_obligatoire}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      document_obligatoire: e.target.checked,
-                    })
-                  }
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="document_obligatoire" className="cursor-pointer">
-                  Document obligatoire
-                </Label>
-              </div>
               <Button type="submit" className="w-full">
-                {editingType ? 'Modifier' : 'Créer'}
+                {editingService ? 'Modifier' : 'Créer'}
               </Button>
             </form>
           </DialogContent>
@@ -225,35 +198,27 @@ export default function TypesCongePage() {
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Nom</TableHead>
-              <TableHead>Document Obligatoire</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {typesConge.length === 0 ? (
+            {services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Aucun type de congé trouvé
+                <TableCell colSpan={3} className="text-center">
+                  Aucun service trouvé
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedTypesConge.map((type) => (
-                <TableRow key={type.id}>
-                  <TableCell>{type.id}</TableCell>
-                  <TableCell className="font-medium">{type.nom}</TableCell>
-                  <TableCell>
-                    {type.document_obligatoire ? (
-                      <span className="text-green-600">Oui</span>
-                    ) : (
-                      <span className="text-gray-500">Non</span>
-                    )}
-                  </TableCell>
+              paginatedServices.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell>{service.id}</TableCell>
+                  <TableCell className="font-medium">{service.nom}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <Button
                         variant="outline"
                         size="xs"
-                        onClick={() => handleEdit(type)}
+                        onClick={() => handleEdit(service)}
                         title="Modifier"
                         className="h-7 w-7 p-0"
                       >
@@ -262,7 +227,7 @@ export default function TypesCongePage() {
                       <Button
                         variant="destructive"
                         size="xs"
-                        onClick={() => handleDeleteClick(type)}
+                        onClick={() => handleDeleteClick(service)}
                         title="Supprimer"
                         className="h-7 w-7 p-0"
                       >
@@ -289,7 +254,7 @@ export default function TypesCongePage() {
           <DialogHeader>
             <DialogTitle>Confirmer la suppression</DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer le type de congé "{typeToDelete?.nom}" ? Cette action est irréversible.
+              Êtes-vous sûr de vouloir supprimer le service "{serviceToDelete?.nom}" ? Cette action est irréversible.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
@@ -297,7 +262,7 @@ export default function TypesCongePage() {
               variant="outline"
               onClick={() => {
                 setDeleteDialogOpen(false)
-                setTypeToDelete(null)
+                setServiceToDelete(null)
               }}
               className="w-full sm:w-auto"
             >

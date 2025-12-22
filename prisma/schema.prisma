@@ -16,11 +16,14 @@ model UtilisateurRH {
   email        String   @unique
   mot_de_passe String   // Hash bcrypt
   nom_complet  String
+  actif        Boolean  @default(true)
   cree_le      DateTime @default(now())
 
   // Relations
   conges_crees Conge[]
 
+  @@index([actif])
+  @@index([email, actif])
   @@map("utilisateurs_rh")
 }
 
@@ -57,6 +60,17 @@ model Titre {
   @@map("titres")
 }
 
+// Services
+model Service {
+  id    Int    @id @default(autoincrement())
+  nom   String @unique
+
+  // Relations
+  professeurs Professeur[]
+
+  @@map("services")
+}
+
 // Professeurs - Identités des professeurs
 model Professeur {
   id                      String              @id @default(uuid())
@@ -67,6 +81,7 @@ model Professeur {
   specialite_id           Int
   categorie_personnel_id  Int
   titre_id                Int
+  service_id              Int
   telephone               String?
   cree_le                 DateTime            @default(now())
 
@@ -74,9 +89,14 @@ model Professeur {
   specialite              Specialite          @relation(fields: [specialite_id], references: [id])
   categorie_personnel     CategoriePersonnel  @relation(fields: [categorie_personnel_id], references: [id])
   titre                   Titre               @relation(fields: [titre_id], references: [id])
+  service                 Service             @relation(fields: [service_id], references: [id])
   conges                  Conge[]
   soldes                  SoldeConge[]
 
+  @@index([nom])
+  @@index([prenom])
+  @@index([cin])
+  @@index([nom, prenom])
   @@map("professeurs")
 }
 
@@ -105,6 +125,9 @@ model SoldeConge {
   professeur    Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
 
   @@unique([professeur_id, annee])
+  @@index([professeur_id, annee])
+  @@index([annee])
+  @@index([expire_le])
   @@map("soldes_conge")
 }
 
@@ -125,5 +148,10 @@ model Conge {
   type_conge      TypeConge     @relation(fields: [type_conge_id], references: [id])
   cree_par_rh     UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
 
+  @@index([professeur_id])
+  @@index([date_debut])
+  @@index([date_fin])
+  @@index([type_conge_id])
+  @@index([date_debut, date_fin])
   @@map("conges")
 }

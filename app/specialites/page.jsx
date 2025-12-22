@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Pagination } from '@/components/ui/pagination'
+import { Pencil, Trash2 } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
@@ -218,15 +219,19 @@ export default function SpecialitesPage() {
                         variant="outline"
                         size="xs"
                         onClick={() => handleEdit(specialite)}
+                        title="Modifier"
+                        className="h-7 w-7 p-0"
                       >
-                        Modifier
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="destructive"
                         size="xs"
                         onClick={() => handleDeleteClick(specialite)}
+                        title="Supprimer"
+                        className="h-7 w-7 p-0"
                       >
-                        Supprimer
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>

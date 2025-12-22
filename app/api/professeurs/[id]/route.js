@@ -27,6 +27,7 @@ export async function GET(request, { params }) {
         specialite: true,
         categorie_personnel: true,
         titre: true,
+        service: true,
         conges: {
           include: {
             type_conge: true,
@@ -39,7 +40,10 @@ export async function GET(request, { params }) {
           orderBy: { date_debut: 'desc' },
         },
         soldes: {
-          orderBy: { annee: 'desc' },
+          where: {
+            expire_le: { gte: new Date() }, // Seulement les soldes non expirés
+          },
+          orderBy: { annee: 'asc' }, // Plus ancien en premier
         },
       },
     })
@@ -89,6 +93,7 @@ export async function PUT(request, { params }) {
       specialite_id,
       categorie_personnel_id,
       titre_id,
+      service_id,
       telephone,
     } = body
 
@@ -160,6 +165,18 @@ export async function PUT(request, { params }) {
         })
         if (titreExists) {
           updateData.titre_id = titreIdInt
+        }
+      }
+    }
+
+    if (service_id) {
+      const serviceIdInt = parseInt(service_id, 10)
+      if (!isNaN(serviceIdInt)) {
+        const serviceExists = await prisma.service.findUnique({
+          where: { id: serviceIdInt },
+        })
+        if (serviceExists) {
+          updateData.service_id = serviceIdInt
         }
       }
     }

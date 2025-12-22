@@ -9,26 +9,36 @@ export async function GET() {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
-    const totalProfesseurs = await prisma.professeur.count()
-    const totalConges = await prisma.conge.count()
-    const totalUtilisateursRH = await prisma.utilisateurRH.count()
-
     const anneeActuelle = new Date().getFullYear()
-    const congesCetteAnnee = await prisma.conge.count({
-      where: {
-        date_debut: {
-          gte: new Date(anneeActuelle, 0, 1),
-          lte: new Date(anneeActuelle, 11, 31),
+    const dateDebutAnnee = new Date(anneeActuelle, 0, 1)
+    const dateFinAnnee = new Date(anneeActuelle, 11, 31, 23, 59, 59)
+
+    // Exécuter toutes les requêtes en parallèle pour améliorer les performances
+    const [
+      totalProfesseurs,
+      totalConges,
+      totalUtilisateursRH,
+      congesCetteAnnee,
+      congesParType,
+      typesConge,
+    ] = await Promise.all([
+      prisma.professeur.count(),
+      prisma.conge.count(),
+      prisma.utilisateurRH.count(),
+      prisma.conge.count({
+        where: {
+          date_debut: {
+            gte: dateDebutAnnee,
+            lte: dateFinAnnee,
+          },
         },
-      },
-    })
-
-    const congesParType = await prisma.conge.groupBy({
-      by: ['type_conge_id'],
-      _count: true,
-    })
-
-    const typesConge = await prisma.typeConge.findMany()
+      }),
+      prisma.conge.groupBy({
+        by: ['type_conge_id'],
+        _count: true,
+      }),
+      prisma.typeConge.findMany(),
+    ])
     const congesParTypeNom = congesParType.map((item) => {
       const type = typesConge.find((t) => t.id === item.type_conge_id)
       return {

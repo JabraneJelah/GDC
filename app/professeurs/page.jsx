@@ -29,13 +29,15 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { Pagination } from '@/components/ui/pagination'
+import { X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
 export default function ProfesseursPage() {
   const [professeurs, setProfesseurs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState('nom_prenom')
+  const [filterValue, setFilterValue] = useState('')
   const [open, setOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -43,6 +45,7 @@ export default function ProfesseursPage() {
   const [categories, setCategories] = useState([])
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
+  const [services, setServices] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -51,6 +54,7 @@ export default function ProfesseursPage() {
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
+    service_id: '',
     telephone: '',
     solde_jours: '22',
   })
@@ -59,14 +63,15 @@ export default function ProfesseursPage() {
     fetchProfesseurs()
     fetchOptions()
     setCurrentPage(1)
-  }, [search])
+  }, [filterType, filterValue])
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
+        fetch('/api/services'),
       ])
 
       if (categoriesRes.ok) {
@@ -81,6 +86,10 @@ export default function ProfesseursPage() {
         const data = await titresRes.json()
         setTitres(data)
       }
+      if (servicesRes.ok) {
+        const data = await servicesRes.json()
+        setServices(data)
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
     }
@@ -88,9 +97,18 @@ export default function ProfesseursPage() {
 
   const fetchProfesseurs = async () => {
     try {
-      const url = search
-        ? `/api/professeurs?search=${encodeURIComponent(search)}`
-        : '/api/professeurs'
+      let url = '/api/professeurs'
+      if (filterValue.trim()) {
+        const params = new URLSearchParams()
+        if (filterType === 'ppr') {
+          params.append('ppr', filterValue.trim())
+        } else if (filterType === 'cin') {
+          params.append('cin', filterValue.trim())
+        } else if (filterType === 'nom_prenom') {
+          params.append('search', filterValue.trim())
+        }
+        url += `?${params.toString()}`
+      }
       const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
@@ -101,6 +119,12 @@ export default function ProfesseursPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleClearFilter = () => {
+    setFilterValue('')
+    setFilterType('nom_prenom')
+    setCurrentPage(1)
   }
 
   const handleSubmit = async (e) => {
@@ -124,6 +148,7 @@ export default function ProfesseursPage() {
           specialite_id: '',
           categorie_personnel_id: '',
           titre_id: '',
+          service_id: '',
           telephone: '',
           solde_jours: '22',
         })
@@ -166,7 +191,91 @@ export default function ProfesseursPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">       
+              <div className="space-y-2">
+                <Label htmlFor="titre_id">Titre *</Label>
+                <Select
+                  value={formData.titre_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, titre_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un titre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {titres.map((titre) => (
+                      <SelectItem key={titre.id} value={titre.id.toString()}>
+                        {titre.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="service_id">Service *</Label>
+                <Select
+                  value={formData.service_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, service_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={service.id.toString()}>
+                        {service.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>       
+                <div className="space-y-2">
+                <Label htmlFor="categorie_personnel_id">Catégorie Personnel *</Label>
+                <Select
+                  value={formData.categorie_personnel_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, categorie_personnel_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id.toString()}>
+                        {cat.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="specialite_id">Spécialité *</Label>
+                <Select
+                  value={formData.specialite_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, specialite_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une spécialité" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {specialites.map((spec) => (
+                      <SelectItem key={spec.id} value={spec.id.toString()}>
+                        {spec.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="nom">Nom *</Label>
                 <Input
@@ -211,69 +320,8 @@ export default function ProfesseursPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="categorie_personnel_id">Catégorie Personnel *</Label>
-                <Select
-                  value={formData.categorie_personnel_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, categorie_personnel_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une catégorie" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="specialite_id">Spécialité *</Label>
-                <Select
-                  value={formData.specialite_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, specialite_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une spécialité" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {specialites.map((spec) => (
-                      <SelectItem key={spec.id} value={spec.id.toString()}>
-                        {spec.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="titre_id">Titre *</Label>
-                <Select
-                  value={formData.titre_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, titre_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un titre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {titres.map((titre) => (
-                      <SelectItem key={titre.id} value={titre.id.toString()}>
-                        {titre.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
+            
               <div className="space-y-2">
                 <Label htmlFor="telephone">Téléphone</Label>
                 <Input
@@ -309,13 +357,56 @@ export default function ProfesseursPage() {
         </Dialog>
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Input
-          placeholder="Rechercher par nom, prénom ou PPR..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:max-w-sm"
-        />
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex-1 w-full sm:w-auto">
+            <Label htmlFor="filter-type" className="text-xs text-slate-600 mb-1.5 block">
+              Filtrer par
+            </Label>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nom_prenom">Nom / Prénom</SelectItem>
+                <SelectItem value="ppr">PPR</SelectItem>
+                <SelectItem value="cin">CIN</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 w-full sm:flex-initial sm:w-[300px]">
+            <Label htmlFor="filter-value" className="text-xs text-slate-600 mb-1.5 block">
+              {filterType === 'ppr' ? 'PPR' : filterType === 'cin' ? 'CIN' : 'Nom ou Prénom'}
+            </Label>
+            <Input
+              id="filter-value"
+              placeholder={
+                filterType === 'ppr'
+                  ? 'Entrez le PPR...'
+                  : filterType === 'cin'
+                  ? 'Entrez le CIN...'
+                  : 'Entrez le nom ou prénom...'
+              }
+              value={filterValue}
+              onChange={(e) => {
+                setFilterValue(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full"
+            />
+          </div>
+          {filterValue && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearFilter}
+              className="w-full sm:w-auto"
+            >
+              <X className="h-4 w-4 mr-1.5" />
+              Effacer
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="rounded-md border border-slate-200">
@@ -341,9 +432,11 @@ export default function ProfesseursPage() {
               </TableRow>
             ) : (
               paginatedProfesseurs.map((professeur) => {
-                const soldeActuel = professeur.soldes && professeur.soldes.length > 0 
-                  ? professeur.soldes[0] 
-                  : null
+                const soldesNonExpires = professeur.soldes || []
+                const totalJoursRestants = soldesNonExpires.reduce(
+                  (sum, solde) => sum + solde.jours_restants,
+                  0
+                )
                 return (
                   <TableRow key={professeur.id}>
                     <TableCell>{professeur.nom}</TableCell>
@@ -354,10 +447,19 @@ export default function ProfesseursPage() {
                       {professeur.specialite?.nom || '-'}
                     </TableCell>
                     <TableCell>
-                      {soldeActuel ? (
-                        <span className="font-medium">
-                          {soldeActuel.jours_restants} / {soldeActuel.jours_total} jours
-                        </span>
+                      {soldesNonExpires.length > 0 ? (
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            Total: {totalJoursRestants} jours
+                          </div>
+                          <div className="text-xs text-slate-600 space-y-0.5">
+                            {soldesNonExpires.map((solde) => (
+                              <div key={solde.id}>
+                                {solde.annee}: {solde.jours_restants} / {solde.jours_total} jours
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}

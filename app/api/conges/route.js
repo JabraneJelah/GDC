@@ -15,7 +15,15 @@ export async function GET(request) {
 
     const conges = await prisma.conge.findMany({
       where: professeurId ? { professeur_id: professeurId } : undefined,
-      include: {
+      select: {
+        id: true,
+        professeur_id: true,
+        type_conge_id: true,
+        date_debut: true,
+        date_fin: true,
+        duree_jours: true,
+        reference_doc: true,
+        cree_le: true,
         professeur: {
           select: {
             id: true,
@@ -24,7 +32,13 @@ export async function GET(request) {
             ppr: true,
           },
         },
-        type_conge: true,
+        type_conge: {
+          select: {
+            id: true,
+            nom: true,
+            document_obligatoire: true,
+          },
+        },
         cree_par_rh: {
           select: {
             nom_complet: true,
@@ -117,67 +131,91 @@ export async function POST(request) {
       )
     }
 
-    // Mettre à jour le solde pour tous les congés
-    // (Vous pouvez personnaliser cette logique pour exclure certains types si nécessaire)
-      const annee = new Date(date_debut).getFullYear()
-      const solde = await prisma.soldeConge.findUnique({
-        where: {
-          professeur_id_annee: {
-            professeur_id: professeur_id,
-            annee: annee,
-          },
+    // Gestion des soldes : consommer d'abord les soldes de l'année la plus ancienne (non expirés)
+    const maintenant = new Date()
+    const annee = new Date(date_debut).getFullYear()
+    
+    // Récupérer tous les soldes non expirés, triés par année (plus ancien en premier)
+    const soldesDisponibles = await prisma.soldeConge.findMany({
+      where: {
+        professeur_id: professeur_id,
+        expire_le: { gte: maintenant }, // Non expirés
+        jours_restants: { gt: 0 }, // Avec des jours restants
+      },
+      orderBy: { annee: 'asc' }, // Plus ancien en premier
+    })
+
+    // Calculer le total des jours disponibles
+    const totalJoursDisponibles = soldesDisponibles.reduce(
+      (sum, solde) => sum + solde.jours_restants,
+      0
+    )
+
+    if (totalJoursDisponibles < dureeJoursInt) {
+      return NextResponse.json(
+        {
+          error: `Solde insuffisant. Jours restants: ${totalJoursDisponibles}`,
         },
-      })
+        { status: 400 }
+      )
+    }
 
-      if (!solde) {
-        // Créer le solde pour cette année si inexistant
-        // Récupérer le solde initial du professeur (22 par défaut ou celui défini à la création)
-        const soldeInitial = await prisma.soldeConge.findFirst({
-          where: { professeur_id: professeur_id },
-          orderBy: { annee: 'desc' },
-        })
-        
-        const joursTotal = soldeInitial?.jours_total || 22
-        const expireLe = new Date(annee + 2, 11, 31) // 31 décembre de l'année + 2
-        
-        // Vérifier si le solde initial est suffisant
-        if (joursTotal < dureeJoursInt) {
-          return NextResponse.json(
-            {
-              error: `Solde insuffisant. Jours disponibles: ${joursTotal}`,
-            },
-            { status: 400 }
-          )
-        }
-        
-        await prisma.soldeConge.create({
-          data: {
-            professeur_id: professeur_id,
-            annee: annee,
-            jours_total: joursTotal,
-            jours_restants: joursTotal - dureeJoursInt,
-            expire_le: expireLe,
-          },
-        })
-      } else {
-        // Vérifier si le solde est suffisant
-        if (solde.jours_restants < dureeJoursInt) {
-          return NextResponse.json(
-            {
-              error: `Solde insuffisant. Jours restants: ${solde.jours_restants}`,
-            },
-            { status: 400 }
-          )
-        }
+    // Consommer les jours en commençant par le solde le plus ancien
+    let joursRestantsAConsommer = dureeJoursInt
+    for (const solde of soldesDisponibles) {
+      if (joursRestantsAConsommer <= 0) break
 
-        // Mettre à jour le solde en réduisant les jours restants
+      if (solde.jours_restants >= joursRestantsAConsommer) {
+        // Ce solde peut couvrir tout le reste
         await prisma.soldeConge.update({
           where: { id: solde.id },
           data: {
-            jours_restants: solde.jours_restants - dureeJoursInt,
+            jours_restants: solde.jours_restants - joursRestantsAConsommer,
+          },
+        })
+        joursRestantsAConsommer = 0
+      } else {
+        // Consommer tout ce solde et passer au suivant
+        joursRestantsAConsommer -= solde.jours_restants
+        await prisma.soldeConge.update({
+          where: { id: solde.id },
+          data: {
+            jours_restants: 0,
           },
         })
       }
+    }
+
+    // Si aucun solde n'existe pour l'année du congé, créer un nouveau solde
+    const soldeAnneeActuelle = await prisma.soldeConge.findUnique({
+      where: {
+        professeur_id_annee: {
+          professeur_id: professeur_id,
+          annee: annee,
+        },
+      },
+    })
+
+    if (!soldeAnneeActuelle) {
+      // Récupérer le solde initial du professeur (22 par défaut ou celui défini à la création)
+      const soldeInitial = await prisma.soldeConge.findFirst({
+        where: { professeur_id: professeur_id },
+        orderBy: { annee: 'desc' },
+      })
+      
+      const joursTotal = soldeInitial?.jours_total || 22
+      const expireLe = new Date(annee + 2, 11, 31) // 31 décembre de l'année + 2
+      
+      await prisma.soldeConge.create({
+        data: {
+          professeur_id: professeur_id,
+          annee: annee,
+          jours_total: joursTotal,
+          jours_restants: joursTotal, // Le solde de l'année actuelle n'a pas encore été consommé
+          expire_le: expireLe,
+        },
+      })
+    }
 
     // Créer le congé
     const conge = await prisma.conge.create({

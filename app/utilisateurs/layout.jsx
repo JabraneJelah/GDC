@@ -1,7 +1,7 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { Footer } from '@/components/layout/footer'
 
-export default function CongesLayout({ children }) {
+export default function UtilisateursLayout({ children }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -14,4 +14,5 @@ export default function CongesLayout({ children }) {
     </div>
   )
 }
+
 

@@ -30,6 +30,8 @@ export function Nav() {
     { href: '/categories-personnel', label: 'Catégories' },
     { href: '/specialites', label: 'Spécialités' },
     { href: '/titres', label: 'Titres' },
+    { href: '/services', label: 'Services' },
+    { href: '/utilisateurs', label: 'Utilisateurs RH' },
   ]
 
   // Fermer le dropdown quand on clique en dehors
