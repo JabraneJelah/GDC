@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
+import { Badge } from '@/components/ui/badge'
 
 const ITEMS_PER_PAGE = 10
 
@@ -283,7 +284,11 @@ export default function CongesPage() {
                   <TableCell>
                     {conge.professeur.prenom} {conge.professeur.nom}
                   </TableCell>
-                  <TableCell>{conge.type_conge.nom}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {conge.type_conge.nom}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     {new Date(conge.date_debut).toLocaleDateString('fr-FR')}
                   </TableCell>

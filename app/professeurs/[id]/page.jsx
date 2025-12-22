@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Pencil, Trash2, Plus } from 'lucide-react'
 
 export default function ProfesseurDetailsPage() {
@@ -534,7 +535,7 @@ export default function ProfesseurDetailsPage() {
                           <TableCell className="font-medium">{solde.annee}</TableCell>
                           <TableCell>{solde.jours_total}</TableCell>
                           <TableCell>
-                            <span className={isExpired ? 'text-slate-400' : 'text-green-600 font-semibold'}>
+                            <span className={isExpired ? 'text-slate-400' : 'text-[#16A34A] font-semibold'}>
                               {solde.jours_restants}
                             </span>
                           </TableCell>
@@ -577,7 +578,7 @@ export default function ProfesseurDetailsPage() {
               <div className="pt-2 border-t border-slate-200">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-slate-700">Total disponible (non expiré)</p>
-                  <p className="text-lg font-semibold text-green-600">
+                  <p className="text-lg font-semibold text-[#16A34A]">
                     {soldes
                       .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
                       .reduce((sum, solde) => sum + solde.jours_restants, 0)} jours
@@ -615,7 +616,11 @@ export default function ProfesseurDetailsPage() {
               ) : (
                 professeur.conges.map((conge) => (
                   <TableRow key={conge.id}>
-                    <TableCell>{conge.type_conge.nom}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {conge.type_conge.nom}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       {new Date(conge.date_debut).toLocaleDateString('fr-FR')}
                     </TableCell>

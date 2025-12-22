@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
+import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
 import Link from 'next/link'
 
@@ -177,7 +178,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Tableau de suivi des congés des professeurs – CHU Tanger
+        <h1 className="text-xl sm:text-2xl font-semibold text-[#334155]">Tableau de suivi des congés des professeurs – CHU Tanger
         </h1>
       </div>
 
@@ -355,7 +356,11 @@ export default function DashboardPage() {
                       <TableCell>{conge.prenom}</TableCell>
                       <TableCell>{conge.ppr}</TableCell>
                       <TableCell>{conge.service}</TableCell>
-                      <TableCell>{conge.type_conge}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {conge.type_conge}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         {formatDate(conge.date_debut)} - {formatDate(conge.date_fin)}
                       </TableCell>
@@ -363,10 +368,10 @@ export default function DashboardPage() {
                       <TableCell>
                         {conge.soldes && conge.soldes.length > 0 ? (
                           <div className="space-y-1">
-                            <div className="font-medium">
+                            <div className="font-semibold text-[#16A34A]">
                               Total: {conge.solde_restant_total} jour(s)
                             </div>
-                            <div className="text-xs text-slate-600 space-y-0.5">
+                            <div className="text-xs text-[#64748B] space-y-0.5">
                               {conge.soldes.map((solde) => (
                                 <div key={solde.annee}>
                                   {solde.annee}: {solde.jours_restants} / {solde.jours_total} jours

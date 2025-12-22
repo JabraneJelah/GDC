@@ -22,7 +22,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} antialiased bg-[#F8FAFC] text-[#334155]`}>
         {children}
       </body>
     </html>

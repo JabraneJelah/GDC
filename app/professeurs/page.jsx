@@ -449,7 +449,7 @@ export default function ProfesseursPage() {
                     <TableCell>
                       {soldesNonExpires.length > 0 ? (
                         <div className="space-y-1">
-                          <div className="font-medium">
+                          <div className="font-semibold text-[#16A34A]">
                             Total: {totalJoursRestants} jours
                           </div>
                           <div className="text-xs text-slate-600 space-y-0.5">

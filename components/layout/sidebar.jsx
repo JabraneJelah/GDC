@@ -81,8 +81,8 @@ export function Sidebar() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-200">
-        <Link href="/dashboard" className="text-base font-semibold text-slate-900">
+      <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0]">
+        <Link href="/dashboard" className="text-base font-semibold text-[#334155]">
           Gestion des Congés
         </Link>
         <Button
@@ -105,8 +105,8 @@ export function Sidebar() {
                   onClick={() => setIsReferentielOpen(!isReferentielOpen)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isReferentielOpen
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-[#F8FAFC] text-[#334155]'
+                      : 'text-[#334155] hover:bg-[#F8FAFC]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -127,8 +127,8 @@ export function Sidebar() {
                         href={child.href}
                         className={`block px-3 py-2 rounded-md text-sm transition-colors ${
                           isActive(child.href)
-                            ? 'bg-slate-100 text-slate-900 font-medium'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-[#F8FAFC] text-[#334155] font-medium'
+                            : 'text-[#334155] hover:bg-[#F8FAFC]'
                         }`}
                       >
                         {child.label}
@@ -146,8 +146,8 @@ export function Sidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 isActive(item.href)
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'bg-[#F8FAFC] text-[#334155]'
+                  : 'text-[#334155] hover:bg-[#F8FAFC]'
               }`}
             >
               <item.icon className="h-5 w-5" />
@@ -158,12 +158,12 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-slate-200 p-4 space-y-2">
+      <div className="border-t border-[#E2E8F0] p-4 space-y-2">
         <Link href="/profile">
           <Button
             variant="ghost"
             className={`w-full justify-start gap-3 ${
-              pathname === '/profile' ? 'bg-slate-100' : ''
+              pathname === '/profile' ? 'bg-[#F8FAFC]' : ''
             }`}
           >
             <User className="h-5 w-5" />
@@ -173,7 +173,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="w-full justify-start gap-3 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+          className="w-full justify-start gap-3 text-[#334155] hover:bg-[#F8FAFC]"
         >
           <LogOut className="h-5 w-5" />
           <span>Déconnexion</span>
@@ -209,7 +209,7 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-slate-200 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-[#E2E8F0] z-50 transform transition-transform duration-300 ease-in-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
