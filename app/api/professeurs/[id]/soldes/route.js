@@ -1,0 +1,134 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+
+// GET - Liste des soldes d'un professeur
+export async function GET(request, { params }) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const professeurId = resolvedParams?.id
+
+    if (!professeurId) {
+      return NextResponse.json(
+        { error: 'ID du professeur manquant' },
+        { status: 400 }
+      )
+    }
+
+    const soldes = await prisma.soldeConge.findMany({
+      where: { professeur_id: professeurId },
+      orderBy: { annee: 'desc' },
+    })
+
+    return NextResponse.json(soldes)
+  } catch (error) {
+    console.error('Erreur lors de la récupération des soldes:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Créer un nouveau solde pour un professeur
+export async function POST(request, { params }) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const professeurId = resolvedParams?.id
+
+    if (!professeurId) {
+      return NextResponse.json(
+        { error: 'ID du professeur manquant' },
+        { status: 400 }
+      )
+    }
+
+    const body = await request.json()
+    const { annee, jours_total } = body
+
+    if (!annee || !jours_total) {
+      return NextResponse.json(
+        { error: 'L\'année et le nombre de jours sont obligatoires' },
+        { status: 400 }
+      )
+    }
+
+    const anneeInt = parseInt(annee, 10)
+    const joursTotalInt = parseInt(jours_total, 10)
+
+    if (isNaN(anneeInt) || anneeInt < 2000 || anneeInt > 2100) {
+      return NextResponse.json(
+        { error: 'Année invalide' },
+        { status: 400 }
+      )
+    }
+
+    if (isNaN(joursTotalInt) || joursTotalInt <= 0) {
+      return NextResponse.json(
+        { error: 'Nombre de jours invalide' },
+        { status: 400 }
+      )
+    }
+
+    // Vérifier si le professeur existe
+    const professeur = await prisma.professeur.findUnique({
+      where: { id: professeurId },
+    })
+
+    if (!professeur) {
+      return NextResponse.json(
+        { error: 'Professeur non trouvé' },
+        { status: 404 }
+      )
+    }
+
+    // Vérifier si un solde existe déjà pour cette année
+    const existingSolde = await prisma.soldeConge.findUnique({
+      where: {
+        professeur_id_annee: {
+          professeur_id: professeurId,
+          annee: anneeInt,
+        },
+      },
+    })
+
+    if (existingSolde) {
+      return NextResponse.json(
+        { error: `Un solde existe déjà pour l'année ${anneeInt}` },
+        { status: 400 }
+      )
+    }
+
+    // Calculer la date d'expiration (fin d'année + 2 ans)
+    const expireLe = new Date(anneeInt + 2, 11, 31) // 31 décembre de l'année + 2
+
+    const solde = await prisma.soldeConge.create({
+      data: {
+        professeur_id: professeurId,
+        annee: anneeInt,
+        jours_total: joursTotalInt,
+        jours_restants: joursTotalInt, // Initialement, tous les jours sont disponibles
+        expire_le: expireLe,
+      },
+    })
+
+    return NextResponse.json(solde, { status: 201 })
+  } catch (error) {
+    console.error('Erreur lors de la création du solde:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
+}
+
