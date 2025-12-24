@@ -25,7 +25,7 @@ export default function UtilisateursPage() {
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     nom_complet: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -34,7 +34,7 @@ export default function UtilisateursPage() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [editFormData, setEditFormData] = useState({
-    email: '',
+    username: '',
     nom_complet: '',
   })
   const [actionLoadingId, setActionLoadingId] = useState(null)
@@ -72,7 +72,7 @@ export default function UtilisateursPage() {
       })
 
       if (res.ok) {
-        setFormData({ email: '', nom_complet: '' })
+        setFormData({ username: '', nom_complet: '' })
         setSuccessDialogOpen(true)
         fetchUtilisateurs()
       } else {
@@ -92,7 +92,7 @@ export default function UtilisateursPage() {
   const handleEdit = (user) => {
     setEditingUser(user)
     setEditFormData({
-      email: user.email,
+      username: user.username,
       nom_complet: user.nom_complet,
     })
   }
@@ -195,14 +195,14 @@ export default function UtilisateursPage() {
         </p>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
+            <Label htmlFor="username">Nom d'utilisateur *</Label>
             <Input
-              id="email"
-              type="email"
+              id="username"
+              type="text"
               required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="rh@example.com"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              placeholder="nom_utilisateur"
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -225,34 +225,34 @@ export default function UtilisateursPage() {
         </form>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
-              <TableHead>Email</TableHead>
+              <TableHead>Nom d'utilisateur</TableHead>
               <TableHead>Nom complet</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead>Date de création</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {loading ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={3} className="text-center">
                   Chargement...
                 </TableCell>
               </TableRow>
             ) : utilisateurs.length === 0 ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={3} className="text-center">
                   Aucun utilisateur RH
                 </TableCell>
               </TableRow>
             ) : (
               utilisateurs.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
+                <TableRow key={user.id} className="bg-white hover:bg-slate-50">
+                  <TableCell>{user.username}</TableCell>
                   <TableCell>{user.nom_complet}</TableCell>
                   <TableCell>
                     <span
@@ -323,14 +323,14 @@ export default function UtilisateursPage() {
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit_email">Email *</Label>
+              <Label htmlFor="edit_username">Nom d'utilisateur *</Label>
               <Input
-                id="edit_email"
-                type="email"
+                id="edit_username"
+                type="text"
                 required
-                value={editFormData.email}
+                value={editFormData.username}
                 onChange={(e) =>
-                  setEditFormData({ ...editFormData, email: e.target.value })
+                  setEditFormData({ ...editFormData, username: e.target.value })
                 }
               />
             </div>

@@ -13,7 +13,6 @@ export async function GET(request) {
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const ppr = searchParams.get('ppr') || ''
-    const cin = searchParams.get('cin') || ''
 
     const maintenant = new Date()
     
@@ -21,10 +20,6 @@ export async function GET(request) {
     if (ppr) {
       whereClause = {
         ppr: { contains: ppr, mode: 'insensitive' },
-      }
-    } else if (cin) {
-      whereClause = {
-        cin: { contains: cin, mode: 'insensitive' },
       }
     } else if (search) {
       whereClause = {
@@ -43,7 +38,6 @@ export async function GET(request) {
         nom: true,
         prenom: true,
         ppr: true,
-        cin: true,
         telephone: true,
         _count: {
           select: { conges: true },
@@ -113,20 +107,17 @@ export async function POST(request) {
       nom,
       prenom,
       ppr,
-      cin,
       specialite_id,
       categorie_personnel_id,
       titre_id,
       service_id,
       telephone,
-      solde_jours,
     } = body
 
     if (
       !nom ||
       !prenom ||
       !ppr ||
-      !cin ||
       !specialite_id ||
       !categorie_personnel_id ||
       !titre_id ||
@@ -185,27 +176,11 @@ export async function POST(request) {
         nom,
         prenom,
         ppr,
-        cin,
         specialite_id: specialiteId,
         categorie_personnel_id: categoriePersonnelId,
         titre_id: titreId,
         service_id: serviceId,
         telephone: telephone || null,
-      },
-    })
-
-    // Créer le solde initial pour l'année en cours
-    const anneeActuelle = new Date().getFullYear()
-    const expireLe = new Date(anneeActuelle + 2, 11, 31) // 31 décembre de l'année + 2
-    const joursSolde = solde_jours ? parseInt(solde_jours, 10) : 22 // Par défaut 22 jours
-
-    await prisma.soldeConge.create({
-      data: {
-        professeur_id: professeur.id,
-        annee: anneeActuelle,
-        jours_total: joursSolde,
-        jours_restants: joursSolde,
-        expire_le: expireLe,
       },
     })
 

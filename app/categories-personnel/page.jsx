@@ -192,25 +192,25 @@ export default function CategoriesPersonnelPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Nom</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {categories.length === 0 ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={3} className="text-center">
                   Aucune catégorie trouvée
                 </TableCell>
               </TableRow>
             ) : (
               paginatedCategories.map((category) => (
-                <TableRow key={category.id}>
+                <TableRow key={category.id} className="bg-white hover:bg-slate-50">
                   <TableCell>{category.id}</TableCell>
                   <TableCell className="font-medium">{category.nom}</TableCell>
                   <TableCell>

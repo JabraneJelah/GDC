@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata = {
   title: "Gestion des Congés des Professeurs",
-  description: "Application interne RH pour la gestion des congés des professeurs",
+  description: "",
 };
 
 export default function RootLayout({ children }) {

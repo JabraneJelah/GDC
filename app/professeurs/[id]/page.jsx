@@ -49,7 +49,9 @@ export default function ProfesseurDetailsPage() {
     annee: '',
     jours_total: '',
     jours_restants: '',
+    type_conge_id: '',
   })
+  const [typesConge, setTypesConge] = useState([])
   const [categories, setCategories] = useState([])
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
@@ -58,7 +60,6 @@ export default function ProfesseurDetailsPage() {
     nom: '',
     prenom: '',
     ppr: '',
-    cin: '',
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
@@ -70,6 +71,7 @@ export default function ProfesseurDetailsPage() {
     if (params.id) {
       fetchProfesseur()
       fetchOptions()
+      fetchTypesConge()
       fetchSoldes()
     }
   }, [params.id])
@@ -116,6 +118,18 @@ export default function ProfesseurDetailsPage() {
     }
   }
 
+  const fetchTypesConge = async () => {
+    try {
+      const response = await fetch('/api/types-conge')
+      if (response.ok) {
+        const data = await response.json()
+        setTypesConge(data)
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des types de congé:', error)
+    }
+  }
+
   const fetchProfesseur = async () => {
     try {
       const response = await fetch(`/api/professeurs/${params.id}`)
@@ -127,7 +141,6 @@ export default function ProfesseurDetailsPage() {
           nom: data.nom || '',
           prenom: data.prenom || '',
           ppr: data.ppr || '',
-          cin: data.cin || '',
           specialite_id: data.specialite_id?.toString() || '',
           categorie_personnel_id: data.categorie_personnel_id?.toString() || '',
           titre_id: data.titre_id?.toString() || '',
@@ -186,6 +199,7 @@ export default function ProfesseurDetailsPage() {
         annee: solde.annee.toString(),
         jours_total: solde.jours_total.toString(),
         jours_restants: solde.jours_restants.toString(),
+        type_conge_id: solde.type_conge_id?.toString() || '',
       })
     } else {
       setEditingSolde(null)
@@ -193,6 +207,7 @@ export default function ProfesseurDetailsPage() {
         annee: new Date().getFullYear().toString(),
         jours_total: '22',
         jours_restants: '22',
+        type_conge_id: '',
       })
     }
     setSoldeDialogOpen(true)
@@ -216,6 +231,7 @@ export default function ProfesseurDetailsPage() {
           annee: parseInt(soldeFormData.annee, 10),
           jours_total: parseInt(soldeFormData.jours_total, 10),
           jours_restants: parseInt(soldeFormData.jours_restants, 10),
+          type_conge_id: soldeFormData.type_conge_id ? parseInt(soldeFormData.type_conge_id, 10) : null,
         }),
       })
 
@@ -324,17 +340,6 @@ export default function ProfesseurDetailsPage() {
                     value={formData.ppr}
                     onChange={(e) =>
                       setFormData({ ...formData, ppr: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cin">CIN *</Label>
-                  <Input
-                    id="cin"
-                    value={formData.cin}
-                    onChange={(e) =>
-                      setFormData({ ...formData, cin: e.target.value })
                     }
                     required
                   />
@@ -455,10 +460,6 @@ export default function ProfesseurDetailsPage() {
               <p className="font-medium">{professeur.ppr}</p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">CIN</p>
-              <p className="font-medium">{professeur.cin}</p>
-            </div>
-            <div>
               <p className="text-sm text-slate-700">Catégorie Personnel</p>
               <p className="font-medium">
                 {professeur.categorie_personnel?.nom || '-'}
@@ -518,6 +519,7 @@ export default function ProfesseurDetailsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Année</TableHead>
+                      <TableHead>Type de congé</TableHead>
                       <TableHead>Jours totaux</TableHead>
                       <TableHead>Jours restants</TableHead>
                       <TableHead>Expire le</TableHead>
@@ -533,6 +535,7 @@ export default function ProfesseurDetailsPage() {
                       return (
                         <TableRow key={solde.id}>
                           <TableCell className="font-medium">{solde.annee}</TableCell>
+                          <TableCell>{solde.type_conge?.nom || '-'}</TableCell>
                           <TableCell>{solde.jours_total}</TableCell>
                           <TableCell>
                             <span className={isExpired ? 'text-slate-400' : 'text-[#16A34A] font-semibold'}>
@@ -665,6 +668,27 @@ export default function ProfesseurDetailsPage() {
                 }
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="type_conge_id">Type de congé *</Label>
+              <Select
+                value={soldeFormData.type_conge_id}
+                onValueChange={(value) =>
+                  setSoldeFormData({ ...soldeFormData, type_conge_id: value })
+                }
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un type de congé" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typesConge.map((type) => (
+                    <SelectItem key={type.id} value={type.id.toString()}>
+                      {type.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="jours_total">Jours totaux *</Label>

@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { annee, jours_total, jours_restants } = body
+    const { annee, jours_total, jours_restants, type_conge_id } = body
 
     // Vérifier si le solde existe
     const existingSolde = await prisma.soldeConge.findUnique({
@@ -46,20 +46,21 @@ export async function PUT(request, { params }) {
         )
       }
 
-      // Vérifier si un autre solde existe déjà pour cette année
+      // Vérifier si un autre solde existe déjà pour cette année + type
       if (anneeInt !== existingSolde.annee) {
         const duplicateSolde = await prisma.soldeConge.findUnique({
           where: {
-            professeur_id_annee: {
+            professeur_id_annee_type_conge_id: {
               professeur_id: existingSolde.professeur_id,
               annee: anneeInt,
+              type_conge_id: existingSolde.type_conge_id,
             },
           },
         })
 
         if (duplicateSolde) {
           return NextResponse.json(
-            { error: `Un solde existe déjà pour l'année ${anneeInt}` },
+            { error: `Un solde existe déjà pour l'année ${anneeInt} et ce type de congé` },
             { status: 400 }
           )
         }
@@ -87,6 +88,49 @@ export async function PUT(request, { params }) {
       }
     }
 
+    if (type_conge_id !== undefined) {
+      const typeCongeIdInt = parseInt(type_conge_id, 10)
+      if (isNaN(typeCongeIdInt)) {
+        return NextResponse.json(
+          { error: 'Type de congé invalide' },
+          { status: 400 }
+        )
+      }
+
+      const typeConge = await prisma.typeConge.findUnique({
+        where: { id: typeCongeIdInt },
+      })
+
+      if (!typeConge) {
+        return NextResponse.json(
+          { error: 'Type de congé non trouvé' },
+          { status: 404 }
+        )
+      }
+
+      // Vérifier l'unicité si on change le type
+      if (typeCongeIdInt !== existingSolde.type_conge_id) {
+        const duplicateByType = await prisma.soldeConge.findUnique({
+          where: {
+            professeur_id_annee_type_conge_id: {
+              professeur_id: existingSolde.professeur_id,
+              annee: updateData.annee || existingSolde.annee,
+              type_conge_id: typeCongeIdInt,
+            },
+          },
+        })
+
+        if (duplicateByType) {
+          return NextResponse.json(
+            { error: 'Un solde existe déjà pour cette année et ce type de congé' },
+            { status: 400 }
+          )
+        }
+      }
+
+      updateData.type_conge_id = typeCongeIdInt
+    }
+
     if (jours_restants !== undefined) {
       const joursRestantsInt = parseInt(jours_restants, 10)
       if (isNaN(joursRestantsInt) || joursRestantsInt < 0) {
@@ -109,6 +153,7 @@ export async function PUT(request, { params }) {
     const solde = await prisma.soldeConge.update({
       where: { id: soldeId },
       data: updateData,
+      include: { type_conge: true },
     })
 
     return NextResponse.json(solde)

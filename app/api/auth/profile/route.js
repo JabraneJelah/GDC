@@ -14,7 +14,7 @@ export async function GET() {
       where: { id: currentUser.userId },
       select: {
         id: true,
-        email: true,
+        username: true,
         nom_complet: true,
         cree_le: true,
       },
@@ -46,7 +46,7 @@ export async function PUT(request) {
     }
 
     const body = await request.json()
-    const { email, nom_complet } = body
+    const { username, nom_complet } = body
 
     // Vérifier que l'utilisateur existe
     const existing = await prisma.utilisateurRH.findUnique({
@@ -60,15 +60,15 @@ export async function PUT(request) {
       )
     }
 
-    // Vérifier si l'email est modifié et s'il existe déjà
-    if (email && email !== existing.email) {
-      const emailExists = await prisma.utilisateurRH.findUnique({
-        where: { email },
+    // Vérifier si le username est modifié et s'il existe déjà
+    if (username && username !== existing.username) {
+      const usernameExists = await prisma.utilisateurRH.findUnique({
+        where: { username },
       })
 
-      if (emailExists) {
+      if (usernameExists) {
         return NextResponse.json(
-          { error: 'Cet email est déjà utilisé' },
+          { error: 'Ce nom d\'utilisateur est déjà utilisé' },
           { status: 400 }
         )
       }
@@ -76,7 +76,7 @@ export async function PUT(request) {
 
     // Mettre à jour le profil
     const updateData = {}
-    if (email) updateData.email = email
+    if (username) updateData.username = username
     if (nom_complet) updateData.nom_complet = nom_complet
 
     if (Object.keys(updateData).length === 0) {
@@ -91,7 +91,7 @@ export async function PUT(request) {
       data: updateData,
       select: {
         id: true,
-        email: true,
+        username: true,
         nom_complet: true,
         cree_le: true,
       },

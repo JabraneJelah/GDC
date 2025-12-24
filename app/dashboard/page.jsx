@@ -80,7 +80,7 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      
+
       if (filters.service_id && filters.service_id !== 'all') params.append('service_id', filters.service_id)
       if (filters.type_conge_id && filters.type_conge_id !== 'all') params.append('type_conge_id', filters.type_conge_id)
       if (filters.date_debut) params.append('date_debut', filters.date_debut)
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           <CardTitle>Historique des Congés</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-4 mb-4">
+          <div className="rounded-md border border-slate-200 bg-white p-4 mb-4">
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
@@ -322,9 +322,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200">
+          <div className="rounded-md border border-slate-200 bg-white">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-slate-100">
                 <TableRow>
                   <TableHead>Nom</TableHead>
                   <TableHead>Prénom</TableHead>
@@ -333,25 +333,26 @@ export default function DashboardPage() {
                   <TableHead>Type de Congé</TableHead>
                   <TableHead>Période</TableHead>
                   <TableHead>Jours</TableHead>
+                  <TableHead>Intérim</TableHead>
                   <TableHead>Solde Restant</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
                 {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                  <TableRow className="bg-white">
+                    <TableCell colSpan={9} className="text-center">
                       Chargement...
                     </TableCell>
                   </TableRow>
                 ) : historique.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center">
+                  <TableRow className="bg-white">
+                    <TableCell colSpan={9} className="text-center">
                       Aucun congé enregistré
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedHistorique.map((conge) => (
-                    <TableRow key={conge.id}>
+                    <TableRow key={conge.id} className="bg-white hover:bg-slate-50">
                       <TableCell className="font-medium">{conge.nom}</TableCell>
                       <TableCell>{conge.prenom}</TableCell>
                       <TableCell>{conge.ppr}</TableCell>
@@ -365,6 +366,11 @@ export default function DashboardPage() {
                         {formatDate(conge.date_debut)} - {formatDate(conge.date_fin)}
                       </TableCell>
                       <TableCell>{conge.duree_jours} jour(s)</TableCell>
+                      <TableCell>
+                        {conge.nom_interim && conge.prenom_interim
+                          ? `${conge.nom_interim} ${conge.prenom_interim}`
+                          : '-'}
+                      </TableCell>
                       <TableCell>
                         {conge.soldes && conge.soldes.length > 0 ? (
                           <div className="space-y-1">
@@ -410,4 +416,5 @@ export default function DashboardPage() {
     </div>
   )
 }
+
 

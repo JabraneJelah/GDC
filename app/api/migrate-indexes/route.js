@@ -53,7 +53,7 @@ export async function POST() {
       CREATE INDEX IF NOT EXISTS "utilisateurs_rh_actif_idx" ON "utilisateurs_rh"("actif");
     `)
     await prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "utilisateurs_rh_email_actif_idx" ON "utilisateurs_rh"("email", "actif");
+      CREATE INDEX IF NOT EXISTS "utilisateurs_rh_username_actif_idx" ON "utilisateurs_rh"("username", "actif");
     `)
     
     console.log('\n✓ Performance indexes created successfully!')

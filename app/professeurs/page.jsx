@@ -50,13 +50,11 @@ export default function ProfesseursPage() {
     nom: '',
     prenom: '',
     ppr: '',
-    cin: '',
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
     service_id: '',
     telephone: '',
-    solde_jours: '22',
   })
 
   useEffect(() => {
@@ -102,8 +100,6 @@ export default function ProfesseursPage() {
         const params = new URLSearchParams()
         if (filterType === 'ppr') {
           params.append('ppr', filterValue.trim())
-        } else if (filterType === 'cin') {
-          params.append('cin', filterValue.trim())
         } else if (filterType === 'nom_prenom') {
           params.append('search', filterValue.trim())
         }
@@ -144,13 +140,11 @@ export default function ProfesseursPage() {
           nom: '',
           prenom: '',
           ppr: '',
-          cin: '',
           specialite_id: '',
           categorie_personnel_id: '',
           titre_id: '',
           service_id: '',
           telephone: '',
-          solde_jours: '22',
         })
         setCurrentPage(1)
         fetchProfesseurs()
@@ -310,19 +304,6 @@ export default function ProfesseursPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cin">CIN *</Label>
-                <Input
-                  id="cin"
-                  value={formData.cin}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cin: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-            
-              <div className="space-y-2">
                 <Label htmlFor="telephone">Téléphone</Label>
                 <Input
                   id="telephone"
@@ -331,22 +312,6 @@ export default function ProfesseursPage() {
                     setFormData({ ...formData, telephone: e.target.value })
                   }
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="solde_jours">Solde de congé (jours) *</Label>
-                <Input
-                  id="solde_jours"
-                  type="number"
-                  min="1"
-                  value={formData.solde_jours}
-                  onChange={(e) =>
-                    setFormData({ ...formData, solde_jours: e.target.value })
-                  }
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  Nombre de jours de congé annuel (par défaut: 22 jours)
-                </p>
               </div>
               <Button type="submit" className="w-full">
                 Créer
@@ -357,7 +322,7 @@ export default function ProfesseursPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col sm:flex-row gap-3 items-end">
           <div className="flex-1 w-full sm:w-auto">
             <Label htmlFor="filter-type" className="text-xs text-slate-600 mb-1.5 block">
@@ -370,21 +335,18 @@ export default function ProfesseursPage() {
               <SelectContent>
                 <SelectItem value="nom_prenom">Nom / Prénom</SelectItem>
                 <SelectItem value="ppr">PPR</SelectItem>
-                <SelectItem value="cin">CIN</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex-1 w-full sm:flex-initial sm:w-[300px]">
             <Label htmlFor="filter-value" className="text-xs text-slate-600 mb-1.5 block">
-              {filterType === 'ppr' ? 'PPR' : filterType === 'cin' ? 'CIN' : 'Nom ou Prénom'}
+              {filterType === 'ppr' ? 'PPR' : 'Nom ou Prénom'}
             </Label>
             <Input
               id="filter-value"
               placeholder={
                 filterType === 'ppr'
                   ? 'Entrez le PPR...'
-                  : filterType === 'cin'
-                  ? 'Entrez le CIN...'
                   : 'Entrez le nom ou prénom...'
               }
               value={filterValue}
@@ -409,24 +371,23 @@ export default function ProfesseursPage() {
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>Nom</TableHead>
               <TableHead>Prénom</TableHead>
               <TableHead>PPR</TableHead>
-              <TableHead>CIN</TableHead>
               <TableHead>Spécialité</TableHead>
               <TableHead>Solde Congé</TableHead>
               <TableHead>Congés</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {professeurs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center">
+              <TableRow className="bg-white">
+                <TableCell colSpan={7} className="text-center">
                   Aucun professeur trouvé
                 </TableCell>
               </TableRow>
@@ -438,11 +399,10 @@ export default function ProfesseursPage() {
                   0
                 )
                 return (
-                  <TableRow key={professeur.id}>
+                  <TableRow key={professeur.id} className="bg-white hover:bg-slate-50">
                     <TableCell>{professeur.nom}</TableCell>
                     <TableCell>{professeur.prenom}</TableCell>
                     <TableCell>{professeur.ppr}</TableCell>
-                    <TableCell>{professeur.cin}</TableCell>
                     <TableCell>
                       {professeur.specialite?.nom || '-'}
                     </TableCell>

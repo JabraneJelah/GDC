@@ -89,7 +89,6 @@ export async function PUT(request, { params }) {
       nom,
       prenom,
       ppr,
-      cin,
       specialite_id,
       categorie_personnel_id,
       titre_id,
@@ -128,7 +127,6 @@ export async function PUT(request, { params }) {
       nom: nom || existing.nom,
       prenom: prenom || existing.prenom,
       ppr: ppr || existing.ppr,
-      cin: cin || existing.cin,
       telephone: telephone !== undefined ? telephone : existing.telephone,
     }
 

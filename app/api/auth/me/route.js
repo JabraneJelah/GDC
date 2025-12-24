@@ -14,7 +14,7 @@ export async function GET() {
       where: { id: user.userId },
       select: {
         id: true,
-        email: true,
+        username: true,
         nom_complet: true,
       },
     })

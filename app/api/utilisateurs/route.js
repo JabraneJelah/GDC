@@ -31,22 +31,22 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { email, nom_complet } = body
+    const { username, nom_complet } = body
 
-    if (!email || !nom_complet) {
+    if (!username || !nom_complet) {
       return NextResponse.json(
-        { error: 'Email et nom complet sont requis' },
+        { error: 'Nom d\'utilisateur et nom complet sont requis' },
         { status: 400 }
       )
     }
 
     const existing = await prisma.utilisateurRH.findUnique({
-      where: { email },
+      where: { username },
     })
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Un utilisateur avec cet email existe déjà' },
+        { error: 'Un utilisateur avec ce nom d\'utilisateur existe déjà' },
         { status: 400 }
       )
     }
@@ -56,7 +56,7 @@ export async function POST(request) {
 
     const user = await prisma.utilisateurRH.create({
       data: {
-        email,
+        username,
         mot_de_passe: hashedPassword,
         nom_complet,
         actif: true,

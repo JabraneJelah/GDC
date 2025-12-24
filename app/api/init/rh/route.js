@@ -14,9 +14,9 @@ export async function POST(req) {
   }
 
   // 2️⃣ نقرا body
-  const { email, mot_de_passe, nom_complet } = await req.json();
+  const { username, mot_de_passe, nom_complet } = await req.json();
 
-  if (!email || !mot_de_passe || !nom_complet) {
+  if (!username || !mot_de_passe || !nom_complet) {
     return NextResponse.json(
       { error: "Tous les champs sont obligatoires" },
       { status: 400 }
@@ -29,13 +29,13 @@ export async function POST(req) {
   // 4️⃣ نخلق أول RH
   const user = await prisma.utilisateurRH.create({
     data: {
-      email,
+      username,
       mot_de_passe: hash,
       nom_complet,
     },
     select: {
       id: true,
-      email: true,
+      username: true,
       nom_complet: true,
       cree_le: true,
     },

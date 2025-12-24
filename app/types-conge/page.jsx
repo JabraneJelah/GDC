@@ -219,9 +219,9 @@ export default function TypesCongePage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Nom</TableHead>
@@ -229,16 +229,16 @@ export default function TypesCongePage() {
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {typesConge.length === 0 ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={4} className="text-center">
                   Aucun type de congé trouvé
                 </TableCell>
               </TableRow>
             ) : (
               paginatedTypesConge.map((type) => (
-                <TableRow key={type.id}>
+                <TableRow key={type.id} className="bg-white hover:bg-slate-50">
                   <TableCell>{type.id}</TableCell>
                   <TableCell className="font-medium">{type.nom}</TableCell>
                   <TableCell>

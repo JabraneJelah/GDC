@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client"
   output   = "../.prisma/client"
@@ -10,143 +7,122 @@ datasource db {
   provider = "postgresql"
 }
 
-// Utilisateurs RH - Personnel RH qui utilise l'application
 model UtilisateurRH {
   id           String   @id @default(uuid())
-  email        String   @unique
-  mot_de_passe String   // Hash bcrypt
+  email        String?  @unique
+  mot_de_passe String
   nom_complet  String
-  actif        Boolean  @default(true)
   cree_le      DateTime @default(now())
-
-  // Relations
+  actif        Boolean  @default(true)
+  username     String?  @unique
   conges_crees Conge[]
 
   @@index([actif])
   @@index([email, actif])
+  @@index([username])
   @@map("utilisateurs_rh")
 }
 
-// Catégories de Personnel
 model CategoriePersonnel {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
-
-  // Relations
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
   professeurs Professeur[]
 
   @@map("categories_personnel")
 }
 
-// Spécialités
 model Specialite {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
-
-  // Relations
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
   professeurs Professeur[]
 
   @@map("specialites")
 }
 
-// Titres
 model Titre {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
-
-  // Relations
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
   professeurs Professeur[]
 
   @@map("titres")
 }
 
-// Services
 model Service {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
-
-  // Relations
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
   professeurs Professeur[]
 
   @@map("services")
 }
 
-// Professeurs - Identités des professeurs
 model Professeur {
-  id                      String              @id @default(uuid())
-  nom                     String
-  prenom                  String
-  ppr                     String              @unique // Numéro PPR unique
-  cin                     String
-  specialite_id           Int
-  categorie_personnel_id  Int
-  titre_id                Int
-  service_id              Int
-  telephone               String?
-  cree_le                 DateTime            @default(now())
-
-  // Relations
-  specialite              Specialite          @relation(fields: [specialite_id], references: [id])
-  categorie_personnel     CategoriePersonnel  @relation(fields: [categorie_personnel_id], references: [id])
-  titre                   Titre               @relation(fields: [titre_id], references: [id])
-  service                 Service             @relation(fields: [service_id], references: [id])
-  conges                  Conge[]
-  soldes                  SoldeConge[]
+  id                     String             @id @default(uuid())
+  nom                    String
+  prenom                 String
+  ppr                    String             @unique
+  telephone              String?
+  cree_le                DateTime           @default(now())
+  categorie_personnel_id Int
+  specialite_id          Int
+  titre_id               Int
+  service_id             Int
+  conges                 Conge[]
+  categorie_personnel    CategoriePersonnel @relation(fields: [categorie_personnel_id], references: [id])
+  service                Service            @relation(fields: [service_id], references: [id])
+  specialite             Specialite         @relation(fields: [specialite_id], references: [id])
+  titre                  Titre              @relation(fields: [titre_id], references: [id])
+  soldes                 SoldeConge[]
 
   @@index([nom])
   @@index([prenom])
-  @@index([cin])
   @@index([nom, prenom])
   @@map("professeurs")
 }
 
-// Types de Congé
 model TypeConge {
-  id                   Int    @id @default(autoincrement())
-  nom                  String // Annuel, Maladie, Exceptionnel
-  document_obligatoire Boolean @default(false)
-
-  // Relations
+  id                   Int          @id @default(autoincrement())
+  nom                  String
+  document_obligatoire Boolean      @default(false)
   conges               Conge[]
+  soldes               SoldeConge[]
 
   @@map("types_conge")
 }
 
-// Soldes de Congé - Gestion automatique des soldes annuels
 model SoldeConge {
-  id            String    @id @default(uuid())
-  professeur_id String
-  annee         Int       // Année du solde
-  jours_total   Int       @default(22) // 22 jours par défaut
-  jours_restants Int      // Jours restants
-  expire_le     DateTime  // Fin d'année + 2 ans
+  id             String     @id @default(uuid())
+  professeur_id  String
+  annee          Int
+  jours_total    Int
+  jours_restants Int
+  expire_le      DateTime
+  type_conge_id  Int
+  professeur     Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+  type_conge     TypeConge  @relation(fields: [type_conge_id], references: [id])
 
-  // Relations
-  professeur    Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
-
-  @@unique([professeur_id, annee])
+  @@unique([professeur_id, annee, type_conge_id])
   @@index([professeur_id, annee])
   @@index([annee])
   @@index([expire_le])
+  @@index([type_conge_id])
   @@map("soldes_conge")
 }
 
-// Congés - Enregistrements des congés
 model Conge {
-  id              String        @id @default(uuid())
-  professeur_id   String
-  type_conge_id   Int
-  date_debut      DateTime
-  date_fin        DateTime
-  duree_jours     Int
-  reference_doc   String?       // Référence du document papier
-  cree_par_rh_id  String
-  cree_le         DateTime      @default(now())
-
-  // Relations
-  professeur      Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
-  type_conge      TypeConge     @relation(fields: [type_conge_id], references: [id])
-  cree_par_rh     UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
+  id             String        @id @default(uuid())
+  professeur_id  String
+  type_conge_id  Int
+  date_debut     DateTime
+  date_fin       DateTime
+  duree_jours    Int
+  reference_doc  String?
+  nom_interim    String?
+  prenom_interim String?
+  cree_par_rh_id String
+  cree_le        DateTime      @default(now())
+  cree_par_rh    UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
+  professeur     Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+  type_conge     TypeConge     @relation(fields: [type_conge_id], references: [id])
 
   @@index([professeur_id])
   @@index([date_debut])

@@ -1,159 +1,169 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 
 export default function ProfilePage() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [updatingProfile, setUpdatingProfile] = useState(false)
-  const [updatingPassword, setUpdatingPassword] = useState(false)
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
-  const [successDialogOpen, setSuccessDialogOpen] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
-  
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
   const [profileData, setProfileData] = useState({
-    email: '',
-    nom_complet: '',
-  })
+    username: "",
+    nom_complet: "",
+  });
 
   const [passwordData, setPasswordData] = useState({
-    mot_de_passe_actuel: '',
-    nouveau_mot_de_passe: '',
-    confirmer_mot_de_passe: '',
-  })
+    mot_de_passe_actuel: "",
+    nouveau_mot_de_passe: "",
+    confirmer_mot_de_passe: "",
+  });
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    fetchProfile();
+  }, []);
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch('/api/auth/profile')
+      const response = await fetch("/api/auth/profile");
       if (response.ok) {
-        const data = await response.json()
-        setUser(data)
+        const data = await response.json();
+        setUser(data);
         setProfileData({
-          email: data.email || '',
-          nom_complet: data.nom_complet || '',
-        })
+          username: data.username || "",
+          nom_complet: data.nom_complet || "",
+        });
       } else {
-        setErrorMessage('Erreur lors du chargement du profil')
-        setErrorDialogOpen(true)
+        setErrorMessage("Erreur lors du chargement du profil");
+        setErrorDialogOpen(true);
       }
     } catch (error) {
-      console.error('Erreur:', error)
-      setErrorMessage('Erreur lors du chargement du profil')
-      setErrorDialogOpen(true)
+      console.error("Erreur:", error);
+      setErrorMessage("Erreur lors du chargement du profil");
+      setErrorDialogOpen(true);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleProfileSubmit = async (e) => {
-    e.preventDefault()
-    setUpdatingProfile(true)
+    e.preventDefault();
+    setUpdatingProfile(true);
     try {
-      const response = await fetch('/api/auth/profile', {
-        method: 'PUT',
+      const response = await fetch("/api/auth/profile", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(profileData),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setUser(data)
-        setSuccessMessage('Profil mis à jour avec succès')
-        setSuccessDialogOpen(true)
+        const data = await response.json();
+        setUser(data);
+        setSuccessMessage("Profil mis à jour avec succès");
+        setSuccessDialogOpen(true);
       } else {
-        const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la mise à jour')
-        setErrorDialogOpen(true)
+        const data = await response.json();
+        setErrorMessage(data.error || "Erreur lors de la mise à jour");
+        setErrorDialogOpen(true);
       }
     } catch (error) {
-      console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la mise à jour')
-      setErrorDialogOpen(true)
+      console.error("Erreur:", error);
+      setErrorMessage("Erreur lors de la mise à jour");
+      setErrorDialogOpen(true);
     } finally {
-      setUpdatingProfile(false)
+      setUpdatingProfile(false);
     }
-  }
+  };
 
   const handlePasswordSubmit = async (e) => {
-    e.preventDefault()
-    
-    if (passwordData.nouveau_mot_de_passe !== passwordData.confirmer_mot_de_passe) {
-      setErrorMessage('Les mots de passe ne correspondent pas')
-      setErrorDialogOpen(true)
-      return
+    e.preventDefault();
+
+    if (
+      passwordData.nouveau_mot_de_passe !== passwordData.confirmer_mot_de_passe
+    ) {
+      setErrorMessage("Les mots de passe ne correspondent pas");
+      setErrorDialogOpen(true);
+      return;
     }
 
     if (passwordData.nouveau_mot_de_passe.length < 6) {
-      setErrorMessage('Le mot de passe doit contenir au moins 6 caractères')
-      setErrorDialogOpen(true)
-      return
+      setErrorMessage("Le mot de passe doit contenir au moins 6 caractères");
+      setErrorDialogOpen(true);
+      return;
     }
 
-    setUpdatingPassword(true)
+    setUpdatingPassword(true);
     try {
-      const response = await fetch('/api/auth/password', {
-        method: 'PUT',
+      const response = await fetch("/api/auth/password", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           mot_de_passe_actuel: passwordData.mot_de_passe_actuel,
           nouveau_mot_de_passe: passwordData.nouveau_mot_de_passe,
         }),
-      })
+      });
 
       if (response.ok) {
-        setSuccessMessage('Mot de passe mis à jour avec succès')
-        setSuccessDialogOpen(true)
+        setSuccessMessage("Mot de passe mis à jour avec succès");
+        setSuccessDialogOpen(true);
         setPasswordData({
-          mot_de_passe_actuel: '',
-          nouveau_mot_de_passe: '',
-          confirmer_mot_de_passe: '',
-        })
+          mot_de_passe_actuel: "",
+          nouveau_mot_de_passe: "",
+          confirmer_mot_de_passe: "",
+        });
       } else {
-        const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la mise à jour du mot de passe')
-        setErrorDialogOpen(true)
+        const data = await response.json();
+        setErrorMessage(
+          data.error || "Erreur lors de la mise à jour du mot de passe"
+        );
+        setErrorDialogOpen(true);
       }
     } catch (error) {
-      console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la mise à jour du mot de passe')
-      setErrorDialogOpen(true)
+      console.error("Erreur:", error);
+      setErrorMessage("Erreur lors de la mise à jour du mot de passe");
+      setErrorDialogOpen(true);
     } finally {
-      setUpdatingPassword(false)
+      setUpdatingPassword(false);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         Chargement...
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Mon Profil</h1>
+       
         <p className="text-sm text-slate-600 mt-2">
           Gérez vos informations personnelles et votre mot de passe
         </p>
@@ -162,21 +172,20 @@ export default function ProfilePage() {
       <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-slate-700">Informations personnelles</CardTitle>
-            <CardDescription>
-              Mettez à jour votre email et votre nom complet
-            </CardDescription>
+            <CardTitle className="text-slate-700">
+              Informations personnelles
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleProfileSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="username">Nom d'utilisateur *</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={profileData.email}
+                  id="username"
+                  type="text"
+                  value={profileData.username}
                   onChange={(e) =>
-                    setProfileData({ ...profileData, email: e.target.value })
+                    setProfileData({ ...profileData, username: e.target.value })
                   }
                   required
                 />
@@ -187,13 +196,20 @@ export default function ProfilePage() {
                   id="nom_complet"
                   value={profileData.nom_complet}
                   onChange={(e) =>
-                    setProfileData({ ...profileData, nom_complet: e.target.value })
+                    setProfileData({
+                      ...profileData,
+                      nom_complet: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
-              <Button type="submit" disabled={updatingProfile} className="w-full sm:w-auto">
-                {updatingProfile ? 'Mise à jour...' : 'Mettre à jour'}
+              <Button
+                type="submit"
+                disabled={updatingProfile}
+                className="w-full sm:w-auto"
+              >
+                {updatingProfile ? "Mise à jour..." : "Mettre à jour"}
               </Button>
             </form>
           </CardContent>
@@ -201,56 +217,74 @@ export default function ProfilePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-slate-700">Changer le mot de passe</CardTitle>
-            <CardDescription>
-              Mettez à jour votre mot de passe pour sécuriser votre compte
-            </CardDescription>
+            <CardTitle className="text-slate-700">
+              Changer le mot de passe
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="mot_de_passe_actuel">Mot de passe actuel *</Label>
+                <Label htmlFor="mot_de_passe_actuel">
+                  Mot de passe actuel *
+                </Label>
                 <Input
                   id="mot_de_passe_actuel"
                   type="password"
                   value={passwordData.mot_de_passe_actuel}
                   onChange={(e) =>
-                    setPasswordData({ ...passwordData, mot_de_passe_actuel: e.target.value })
+                    setPasswordData({
+                      ...passwordData,
+                      mot_de_passe_actuel: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="nouveau_mot_de_passe">Nouveau mot de passe *</Label>
+                <Label htmlFor="nouveau_mot_de_passe">
+                  Nouveau mot de passe *
+                </Label>
                 <Input
                   id="nouveau_mot_de_passe"
                   type="password"
                   value={passwordData.nouveau_mot_de_passe}
                   onChange={(e) =>
-                    setPasswordData({ ...passwordData, nouveau_mot_de_passe: e.target.value })
+                    setPasswordData({
+                      ...passwordData,
+                      nouveau_mot_de_passe: e.target.value,
+                    })
                   }
                   required
                   minLength={6}
                 />
-                <p className="text-xs text-slate-500">
-                  Minimum 6 caractères
-                </p>
+                <p className="text-xs text-slate-500">Minimum 6 caractères</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmer_mot_de_passe">Confirmer le nouveau mot de passe *</Label>
+                <Label htmlFor="confirmer_mot_de_passe">
+                  Confirmer le nouveau mot de passe *
+                </Label>
                 <Input
                   id="confirmer_mot_de_passe"
                   type="password"
                   value={passwordData.confirmer_mot_de_passe}
                   onChange={(e) =>
-                    setPasswordData({ ...passwordData, confirmer_mot_de_passe: e.target.value })
+                    setPasswordData({
+                      ...passwordData,
+                      confirmer_mot_de_passe: e.target.value,
+                    })
                   }
                   required
                   minLength={6}
                 />
               </div>
-              <Button type="submit" disabled={updatingPassword} className="w-full sm:w-auto">
-                {updatingPassword ? 'Mise à jour...' : 'Changer le mot de passe'}
+              <Button
+                type="submit"
+                disabled={updatingPassword}
+                className="w-full sm:w-auto"
+              >
+                {updatingPassword
+                  ? "Mise à jour..."
+                  : "Changer le mot de passe"}
               </Button>
             </form>
           </CardContent>
@@ -260,23 +294,21 @@ export default function ProfilePage() {
       {user && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-slate-700">Informations du compte</CardTitle>
+            <CardTitle className="text-slate-700">
+              Informations du compte
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-slate-700">Date de création</p>
                 <p className="font-medium">
-                  {new Date(user.cree_le).toLocaleDateString('fr-FR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
+                  {new Date(user.cree_le).toLocaleDateString("fr-FR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
                   })}
                 </p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-700">ID utilisateur</p>
-                <p className="font-medium text-xs sm:text-sm">{user.id}</p>
               </div>
             </div>
           </CardContent>
@@ -292,9 +324,7 @@ export default function ProfilePage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end">
-            <Button onClick={() => setErrorDialogOpen(false)}>
-              Fermer
-            </Button>
+            <Button onClick={() => setErrorDialogOpen(false)}>Fermer</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -308,13 +338,15 @@ export default function ProfilePage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end">
-            <Button onClick={() => setSuccessDialogOpen(false)}>
+            <Button
+              className="cursor-pointer"
+              onClick={() => setSuccessDialogOpen(false)}
+            >
               Fermer
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
-

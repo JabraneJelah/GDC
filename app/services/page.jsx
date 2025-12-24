@@ -192,25 +192,25 @@ export default function ServicesPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Nom</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {services.length === 0 ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={3} className="text-center">
                   Aucun service trouvé
                 </TableCell>
               </TableRow>
             ) : (
               paginatedServices.map((service) => (
-                <TableRow key={service.id}>
+                <TableRow key={service.id} className="bg-white hover:bg-slate-50">
                   <TableCell>{service.id}</TableCell>
                   <TableCell className="font-medium">{service.nom}</TableCell>
                   <TableCell>

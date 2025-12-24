@@ -9,23 +9,23 @@ export async function POST(request) {
 
   try {
     const body = await request.json()
-    const { email, mot_de_passe } = body
+    const { username, mot_de_passe } = body
 
-    if (!email || !mot_de_passe) {
+    if (!username || !mot_de_passe) {
       return NextResponse.json(
-        { error: 'Email et mot de passe requis' },
+        { error: 'Nom d\'utilisateur et mot de passe requis' },
         { status: 400 }
       )
     }
 
     const utilisateur = await prisma.utilisateurRH.findUnique({
-      where: { email },
+      where: { username },
     })
 
     if (!utilisateur) {
-      console.log("User not found:", email)
+      console.log("User not found:", username)
       return NextResponse.json(
-        { error: 'Email ou mot de passe incorrect' },
+        { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
         { status: 401 }
       )
     }
@@ -33,16 +33,16 @@ export async function POST(request) {
     const isValid = await verifyPassword(mot_de_passe, utilisateur.mot_de_passe)
 
     if (!isValid) {
-      console.log("Invalid password for user:", email)
+      console.log("Invalid password for user:", username)
       return NextResponse.json(
-        { error: 'Email ou mot de passe incorrect' },
+        { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
         { status: 401 }
       )
     }
 
     // Vérifier si le compte est actif
     if (utilisateur.actif === false) {
-      console.log("Account is deactivated for user:", email)
+      console.log("Account is deactivated for user:", username)
       return NextResponse.json(
         { error: 'Ce compte est désactivé. Veuillez contacter l\'administrateur.' },
         { status: 403 }
@@ -51,15 +51,15 @@ export async function POST(request) {
 
     const token = generateToken({
       userId: utilisateur.id,
-      email: utilisateur.email,
+      username: utilisateur.username,
     })
-    console.log("TOKEN GENERATED successfully for user:", utilisateur.email)
+    console.log("TOKEN GENERATED successfully for user:", utilisateur.username)
 
     const response = NextResponse.json({
       success: true,
       user: {
         id: utilisateur.id,
-        email: utilisateur.email,
+        username: utilisateur.username,
         nom_complet: utilisateur.nom_complet,
       },
     })

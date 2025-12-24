@@ -129,6 +129,8 @@ export async function GET(request) {
         date_debut: conge.date_debut,
         date_fin: conge.date_fin,
         duree_jours: conge.duree_jours,
+        nom_interim: conge.nom_interim,
+        prenom_interim: conge.prenom_interim,
         soldes: soldesNonExpires.map((solde) => ({
           annee: solde.annee,
           jours_restants: solde.jours_restants,

@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
+import { Pencil, Trash2 } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
@@ -38,9 +39,13 @@ export default function CongesPage() {
   const [typesConge, setTypesConge] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [editingConge, setEditingConge] = useState(null)
+  const [congeToDelete, setCongeToDelete] = useState(null)
   const [formData, setFormData] = useState({
     professeur_id: '',
     type_conge_id: '',
@@ -48,6 +53,8 @@ export default function CongesPage() {
     date_fin: '',
     duree_jours: '',
     reference_doc: '',
+    nom_interim: '',
+    prenom_interim: '',
   })
 
   useEffect(() => {
@@ -83,21 +90,66 @@ export default function CongesPage() {
     }
   }
 
-  const calculateDays = () => {
-    if (formData.date_debut && formData.date_fin) {
-      const start = new Date(formData.date_debut)
-      const end = new Date(formData.date_fin)
-      const diffTime = Math.abs(end.getTime() - start.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-      setFormData({ ...formData, duree_jours: diffDays.toString() })
+  const calculateDays = (dateDebut, dateFin) => {
+    if (dateDebut && dateFin) {
+      const start = new Date(dateDebut + 'T00:00:00')
+      const end = new Date(dateFin + 'T00:00:00')
+      
+      // Vérifier que la date de fin est après la date de début
+      if (end < start) {
+        setFormData(prev => ({ ...prev, duree_jours: '0' }))
+        return
+      }
+      
+      // Compter uniquement les jours ouvrables (exclure samedi et dimanche)
+      let workingDays = 0
+      const currentDate = new Date(start)
+      
+      while (currentDate <= end) {
+        const dayOfWeek = currentDate.getDay() // 0 = dimanche, 6 = samedi
+        // Compter seulement du lundi (1) au vendredi (5)
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          workingDays++
+        }
+        currentDate.setDate(currentDate.getDate() + 1)
+      }
+      
+      setFormData(prev => ({ 
+        ...prev, 
+        duree_jours: workingDays.toString() 
+      }))
     }
+  }
+
+  // Calcul automatique de la durée quand les dates changent
+  useEffect(() => {
+    if (formData.date_debut && formData.date_fin) {
+      calculateDays(formData.date_debut, formData.date_fin)
+    }
+  }, [formData.date_debut, formData.date_fin])
+
+  const resetForm = () => {
+    setFormData({
+      professeur_id: '',
+      type_conge_id: '',
+      date_debut: '',
+      date_fin: '',
+      duree_jours: '',
+      reference_doc: '',
+      nom_interim: '',
+      prenom_interim: '',
+    })
+    setEditingConge(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const response = await fetch('/api/conges', {
-        method: 'POST',
+      const url = editingConge ? `/api/conges/${editingConge.id}` : '/api/conges'
+      const method = editingConge ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -110,25 +162,88 @@ export default function CongesPage() {
 
       if (response.ok) {
         setOpen(false)
-        setFormData({
-          professeur_id: '',
-          type_conge_id: '',
-          date_debut: '',
-          date_fin: '',
-          duree_jours: '',
-          reference_doc: '',
-        })
+        setEditOpen(false)
+        resetForm()
         setCurrentPage(1)
         fetchData()
       } else {
         const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la création')
+        setErrorMessage(data.error || `Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la création')
+      setErrorMessage(`Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
       setErrorDialogOpen(true)
+    }
+  }
+
+  const handleEdit = (conge) => {
+    // Formater les dates pour les inputs de type date (YYYY-MM-DD)
+    const formatDateForInput = (dateString) => {
+      const date = new Date(dateString)
+      return date.toISOString().split('T')[0]
+    }
+
+    setEditingConge(conge)
+    setFormData({
+      professeur_id: conge.professeur_id,
+      type_conge_id: conge.type_conge_id.toString(),
+      date_debut: formatDateForInput(conge.date_debut),
+      date_fin: formatDateForInput(conge.date_fin),
+      duree_jours: conge.duree_jours.toString(),
+      reference_doc: conge.reference_doc || '',
+      nom_interim: conge.nom_interim || '',
+      prenom_interim: conge.prenom_interim || '',
+    })
+    setEditOpen(true)
+  }
+
+  const handleDeleteClick = (conge) => {
+    setCongeToDelete(conge)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!congeToDelete) return
+
+    try {
+      const response = await fetch(`/api/conges/${congeToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setDeleteDialogOpen(false)
+        setCongeToDelete(null)
+        setCurrentPage(1)
+        fetchData()
+      } else {
+        const data = await response.json()
+        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorDialogOpen(true)
+        setDeleteDialogOpen(false)
+        setCongeToDelete(null)
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      setErrorMessage('Erreur lors de la suppression')
+      setErrorDialogOpen(true)
+      setDeleteDialogOpen(false)
+      setCongeToDelete(null)
+    }
+  }
+
+  const handleOpenChange = (open) => {
+    setOpen(open)
+    if (!open) {
+      resetForm()
+    }
+  }
+
+  const handleEditOpenChange = (open) => {
+    setEditOpen(open)
+    if (!open) {
+      resetForm()
     }
   }
 
@@ -145,15 +260,17 @@ export default function CongesPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Congés</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">Nouveau Congé</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Nouveau Congé</DialogTitle>
+              <DialogTitle>{editingConge ? 'Modifier le Congé' : 'Nouveau Congé'}</DialogTitle>
               <DialogDescription>
-                Enregistrer un nouveau congé depuis un document papier
+                {editingConge
+                  ? 'Modifier les informations du congé'
+                  : 'Enregistrer un nouveau congé depuis un document papier'}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -207,8 +324,11 @@ export default function CongesPage() {
                     type="date"
                     value={formData.date_debut}
                     onChange={(e) => {
-                      setFormData({ ...formData, date_debut: e.target.value })
-                      calculateDays()
+                      const newDateDebut = e.target.value
+                      setFormData(prev => ({ ...prev, date_debut: newDateDebut }))
+                      if (newDateDebut && formData.date_fin) {
+                        calculateDays(newDateDebut, formData.date_fin)
+                      }
                     }}
                     required
                   />
@@ -219,25 +339,29 @@ export default function CongesPage() {
                     id="date_fin"
                     type="date"
                     value={formData.date_fin}
+                    min={formData.date_debut || undefined}
                     onChange={(e) => {
-                      setFormData({ ...formData, date_fin: e.target.value })
-                      calculateDays()
+                      const newDateFin = e.target.value
+                      setFormData(prev => ({ ...prev, date_fin: newDateFin }))
+                      if (formData.date_debut && newDateFin) {
+                        calculateDays(formData.date_debut, newDateFin)
+                      }
                     }}
                     required
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="duree_jours">Durée (jours) *</Label>
+                <Label htmlFor="duree_jours">Durée (jours ouvrables) *</Label>
                 <Input
                   id="duree_jours"
                   type="number"
                   value={formData.duree_jours}
-                  onChange={(e) =>
-                    setFormData({ ...formData, duree_jours: e.target.value })
-                  }
+                  readOnly
+                  className="bg-slate-50 cursor-not-allowed"
                   required
                 />
+                <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reference_doc">Référence document</Label>
@@ -250,10 +374,213 @@ export default function CongesPage() {
                   placeholder="Réf. du document papier"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="nom_interim">Nom de l'intérim</Label>
+                <Input
+                  id="nom_interim"
+                  value={formData.nom_interim}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nom_interim: e.target.value })
+                  }
+                  placeholder="Nom de la personne en intérim"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prenom_interim">Prénom de l'intérim</Label>
+                <Input
+                  id="prenom_interim"
+                  value={formData.prenom_interim}
+                  onChange={(e) =>
+                    setFormData({ ...formData, prenom_interim: e.target.value })
+                  }
+                  placeholder="Prénom de la personne en intérim"
+                />
+              </div>
               <Button type="submit" className="w-full">
-                Enregistrer
+                {editingConge ? 'Modifier' : 'Enregistrer'}
               </Button>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de modification */}
+        <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Modifier le Congé</DialogTitle>
+              <DialogDescription>
+                Modifier les informations du congé
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_professeur_id">Professeur *</Label>
+                <Select
+                  value={formData.professeur_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, professeur_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un professeur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {professeurs.map((prof) => (
+                      <SelectItem key={prof.id} value={prof.id}>
+                        {prof.prenom} {prof.nom} ({prof.ppr})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_type_conge_id">Type de congé *</Label>
+                <Select
+                  value={formData.type_conge_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, type_conge_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesConge.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_date_debut">Date début *</Label>
+                  <Input
+                    id="edit_date_debut"
+                    type="date"
+                    value={formData.date_debut}
+                    onChange={(e) => {
+                      const newDateDebut = e.target.value
+                      setFormData(prev => ({ ...prev, date_debut: newDateDebut }))
+                      if (newDateDebut && formData.date_fin) {
+                        calculateDays(newDateDebut, formData.date_fin)
+                      }
+                    }}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_date_fin">Date fin *</Label>
+                  <Input
+                    id="edit_date_fin"
+                    type="date"
+                    value={formData.date_fin}
+                    min={formData.date_debut || undefined}
+                    onChange={(e) => {
+                      const newDateFin = e.target.value
+                      setFormData(prev => ({ ...prev, date_fin: newDateFin }))
+                      if (formData.date_debut && newDateFin) {
+                        calculateDays(formData.date_debut, newDateFin)
+                      }
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_duree_jours">Durée (jours ouvrables) *</Label>
+                <Input
+                  id="edit_duree_jours"
+                  type="number"
+                  value={formData.duree_jours}
+                  readOnly
+                  className="bg-slate-50 cursor-not-allowed"
+                  required
+                />
+                <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_reference_doc">Référence document</Label>
+                <Input
+                  id="edit_reference_doc"
+                  value={formData.reference_doc}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reference_doc: e.target.value })
+                  }
+                  placeholder="Réf. du document papier"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_nom_interim">Nom de l'intérim</Label>
+                <Input
+                  id="edit_nom_interim"
+                  value={formData.nom_interim}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nom_interim: e.target.value })
+                  }
+                  placeholder="Nom de la personne en intérim"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_prenom_interim">Prénom de l'intérim</Label>
+                <Input
+                  id="edit_prenom_interim"
+                  value={formData.prenom_interim}
+                  onChange={(e) =>
+                    setFormData({ ...formData, prenom_interim: e.target.value })
+                  }
+                  placeholder="Prénom de la personne en intérim"
+                />
+              </div>
+              <Button type="submit" className="w-full">
+                Modifier
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de confirmation de suppression */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-red-600">Supprimer le congé</DialogTitle>
+              <DialogDescription>
+                Êtes-vous sûr de vouloir supprimer ce congé ? Cette action est irréversible.
+                {congeToDelete && (
+                  <div className="mt-4 p-3 bg-slate-50 rounded-md">
+                    <p className="text-sm font-medium">
+                      {congeToDelete.professeur
+                        ? `${congeToDelete.professeur.prenom || ''} ${congeToDelete.professeur.nom || ''}`.trim() || 'Professeur inconnu'
+                        : 'Professeur inconnu'}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {new Date(congeToDelete.date_debut).toLocaleDateString('fr-FR')} -{' '}
+                      {new Date(congeToDelete.date_fin).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false)
+                  setCongeToDelete(null)
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+              >
+                Supprimer
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -267,14 +594,16 @@ export default function CongesPage() {
               <TableHead>Date début</TableHead>
               <TableHead>Date fin</TableHead>
               <TableHead>Durée</TableHead>
+              <TableHead>Intérim</TableHead>
               <TableHead>Référence</TableHead>
               <TableHead>Créé par</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {conges.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={9} className="text-center">
                   Aucun congé enregistré
                 </TableCell>
               </TableRow>
@@ -282,11 +611,13 @@ export default function CongesPage() {
               paginatedConges.map((conge) => (
                 <TableRow key={conge.id}>
                   <TableCell>
-                    {conge.professeur.prenom} {conge.professeur.nom}
+                    {conge.professeur
+                      ? `${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '-'
+                      : '-'}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {conge.type_conge.nom}
+                      {conge.type_conge?.nom || '-'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -296,8 +627,33 @@ export default function CongesPage() {
                     {new Date(conge.date_fin).toLocaleDateString('fr-FR')}
                   </TableCell>
                   <TableCell>{conge.duree_jours} jours</TableCell>
+                  <TableCell>
+                    {conge.nom_interim && conge.prenom_interim
+                      ? `${conge.nom_interim} ${conge.prenom_interim}`
+                      : '-'}
+                  </TableCell>
                   <TableCell>{conge.reference_doc || '-'}</TableCell>
-                  <TableCell>{conge.cree_par_rh.nom_complet}</TableCell>
+                  <TableCell>{conge.cree_par_rh?.nom_complet || '-'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(conge)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(conge)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -330,4 +686,5 @@ export default function CongesPage() {
     </div>
   )
 }
+
 

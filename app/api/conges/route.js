@@ -23,6 +23,8 @@ export async function GET(request) {
         date_fin: true,
         duree_jours: true,
         reference_doc: true,
+        nom_interim: true,
+        prenom_interim: true,
         cree_le: true,
         professeur: {
           select: {
@@ -74,6 +76,8 @@ export async function POST(request) {
       date_fin,
       duree_jours,
       reference_doc,
+      nom_interim,
+      prenom_interim,
     } = body
 
     if (
@@ -139,6 +143,7 @@ export async function POST(request) {
     const soldesDisponibles = await prisma.soldeConge.findMany({
       where: {
         professeur_id: professeur_id,
+        type_conge_id: typeCongeIdInt,
         expire_le: { gte: maintenant }, // Non expirés
         jours_restants: { gt: 0 }, // Avec des jours restants
       },
@@ -186,26 +191,27 @@ export async function POST(request) {
       }
     }
 
-    // Si aucun solde n'existe pour l'année du congé, créer un nouveau solde
+    // Si aucun solde n'existe pour l'année et ce type de congé, en créer un automatiquement
     const soldeAnneeActuelle = await prisma.soldeConge.findUnique({
       where: {
-        professeur_id_annee: {
+        professeur_id_annee_type_conge_id: {
           professeur_id: professeur_id,
           annee: annee,
+          type_conge_id: typeCongeIdInt,
         },
       },
     })
 
     if (!soldeAnneeActuelle) {
-      // Récupérer le solde initial du professeur (22 par défaut ou celui défini à la création)
+      // Récupérer un solde de référence pour ce type (sinon défaut 22)
       const soldeInitial = await prisma.soldeConge.findFirst({
-        where: { professeur_id: professeur_id },
+        where: { professeur_id: professeur_id, type_conge_id: typeCongeIdInt },
         orderBy: { annee: 'desc' },
       })
-      
+
       const joursTotal = soldeInitial?.jours_total || 22
       const expireLe = new Date(annee + 2, 11, 31) // 31 décembre de l'année + 2
-      
+
       await prisma.soldeConge.create({
         data: {
           professeur_id: professeur_id,
@@ -213,6 +219,7 @@ export async function POST(request) {
           jours_total: joursTotal,
           jours_restants: joursTotal, // Le solde de l'année actuelle n'a pas encore été consommé
           expire_le: expireLe,
+          type_conge_id: typeCongeIdInt,
         },
       })
     }
@@ -226,6 +233,8 @@ export async function POST(request) {
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
         reference_doc: reference_doc || null,
+        nom_interim: nom_interim || null,
+        prenom_interim: prenom_interim || null,
         cree_par_rh_id: currentUser.userId,
       },
       include: {

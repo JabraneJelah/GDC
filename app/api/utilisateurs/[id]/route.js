@@ -18,21 +18,21 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { email, nom_complet, actif, reset_password } = body
+    const { username, nom_complet, actif, reset_password } = body
 
-    // Vérifier unicité email si modifié
-    if (email) {
-      const existing = await prisma.utilisateurRH.findUnique({ where: { email } })
+    // Vérifier unicité username si modifié
+    if (username) {
+      const existing = await prisma.utilisateurRH.findUnique({ where: { username } })
       if (existing && existing.id !== id) {
         return NextResponse.json(
-          { error: 'Un utilisateur avec cet email existe déjà' },
+          { error: 'Un utilisateur avec ce nom d\'utilisateur existe déjà' },
           { status: 400 }
         )
       }
     }
 
     const updateData = {
-      email: email || undefined,
+      username: username || undefined,
       nom_complet: nom_complet || undefined,
       actif: typeof actif === 'boolean' ? actif : undefined,
     }
