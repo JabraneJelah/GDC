@@ -55,6 +55,13 @@ model Service {
   @@map("services")
 }
 
+model Hopital {
+  id      Int    @id @default(autoincrement())
+  nom     String @unique
+  cree_le DateTime @default(now())
+}
+
+
 model Professeur {
   id                     String             @id @default(uuid())
   nom                    String
