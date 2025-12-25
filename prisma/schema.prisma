@@ -116,10 +116,10 @@ model Conge {
   date_fin       DateTime
   duree_jours    Int
   reference_doc  String?
-  nom_interim    String?
-  prenom_interim String?
   cree_par_rh_id String
   cree_le        DateTime      @default(now())
+  nom_interim    String?
+  prenom_interim String?
   cree_par_rh    UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
   professeur     Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
   type_conge     TypeConge     @relation(fields: [type_conge_id], references: [id])

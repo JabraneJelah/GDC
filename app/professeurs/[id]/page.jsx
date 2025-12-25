@@ -56,6 +56,7 @@ export default function ProfesseurDetailsPage() {
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
   const [services, setServices] = useState([])
+  const [hopitaux, setHopitaux] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -64,6 +65,7 @@ export default function ProfesseurDetailsPage() {
     categorie_personnel_id: '',
     titre_id: '',
     service_id: '',
+    hopital_id: '',
     telephone: '',
   })
 
@@ -90,11 +92,12 @@ export default function ProfesseurDetailsPage() {
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes, servicesRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
         fetch('/api/services'),
+        fetch('/api/hopitaux'),
       ])
 
       if (categoriesRes.ok) {
@@ -112,6 +115,10 @@ export default function ProfesseurDetailsPage() {
       if (servicesRes.ok) {
         const data = await servicesRes.json()
         setServices(data)
+      }
+      if (hopitauxRes.ok) {
+        const data = await hopitauxRes.json()
+        setHopitaux(data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
@@ -145,6 +152,7 @@ export default function ProfesseurDetailsPage() {
           categorie_personnel_id: data.categorie_personnel_id?.toString() || '',
           titre_id: data.titre_id?.toString() || '',
           service_id: data.service_id?.toString() || '',
+          hopital_id: data.hopital_id?.toString() || '',
           telephone: data.telephone || '',
         })
       } else {
@@ -174,6 +182,7 @@ export default function ProfesseurDetailsPage() {
           categorie_personnel_id: formData.categorie_personnel_id ? parseInt(formData.categorie_personnel_id, 10) : undefined,
           titre_id: formData.titre_id ? parseInt(formData.titre_id, 10) : undefined,
           service_id: formData.service_id ? parseInt(formData.service_id, 10) : undefined,
+          hopital_id: formData.hopital_id ? parseInt(formData.hopital_id, 10) : undefined,
         }),
       })
 
@@ -429,6 +438,27 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="hopital_id">Hôpital *</Label>
+                  <Select
+                    value={formData.hopital_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, hopital_id: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un hôpital" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hopitaux.map((hopital) => (
+                        <SelectItem key={hopital.id} value={hopital.id.toString()}>
+                          {hopital.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="telephone">Téléphone</Label>
                   <Input
                     id="telephone"
@@ -481,6 +511,12 @@ export default function ProfesseurDetailsPage() {
               <p className="text-sm text-slate-700">Service</p>
               <p className="font-medium">
                 {professeur.service?.nom || '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-700">Hôpital</p>
+              <p className="font-medium">
+                {professeur.hopital?.nom || '-'}
               </p>
             </div>
             {professeur.telephone && (

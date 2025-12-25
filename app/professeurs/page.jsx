@@ -46,6 +46,7 @@ export default function ProfesseursPage() {
   const [specialites, setSpecialites] = useState([])
   const [titres, setTitres] = useState([])
   const [services, setServices] = useState([])
+  const [hopitaux, setHopitaux] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -54,6 +55,7 @@ export default function ProfesseursPage() {
     categorie_personnel_id: '',
     titre_id: '',
     service_id: '',
+    hopital_id: '',
     telephone: '',
   })
 
@@ -65,11 +67,12 @@ export default function ProfesseursPage() {
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes, servicesRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
         fetch('/api/services'),
+        fetch('/api/hopitaux'),
       ])
 
       if (categoriesRes.ok) {
@@ -87,6 +90,10 @@ export default function ProfesseursPage() {
       if (servicesRes.ok) {
         const data = await servicesRes.json()
         setServices(data)
+      }
+      if (hopitauxRes.ok) {
+        const data = await hopitauxRes.json()
+        setHopitaux(data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
@@ -144,6 +151,7 @@ export default function ProfesseursPage() {
           categorie_personnel_id: '',
           titre_id: '',
           service_id: '',
+          hopital_id: '',
           telephone: '',
         })
         setCurrentPage(1)
@@ -223,6 +231,27 @@ export default function ProfesseursPage() {
                     {services.map((service) => (
                       <SelectItem key={service.id} value={service.id.toString()}>
                         {service.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hopital_id">Hôpital *</Label>
+                <Select
+                  value={formData.hopital_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, hopital_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un hôpital" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hopitaux.map((hopital) => (
+                      <SelectItem key={hopital.id} value={hopital.id.toString()}>
+                        {hopital.nom}
                       </SelectItem>
                     ))}
                   </SelectContent>

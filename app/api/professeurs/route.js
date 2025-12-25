@@ -66,6 +66,12 @@ export async function GET(request) {
             nom: true,
           },
         },
+        hopital: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
         soldes: {
           where: {
             expire_le: { gte: maintenant }, // Seulement les soldes non expirés
@@ -111,6 +117,7 @@ export async function POST(request) {
       categorie_personnel_id,
       titre_id,
       service_id,
+      hopital_id,
       telephone,
     } = body
 
@@ -121,7 +128,8 @@ export async function POST(request) {
       !specialite_id ||
       !categorie_personnel_id ||
       !titre_id ||
-      !service_id
+      !service_id ||
+      !hopital_id
     ) {
       return NextResponse.json(
         { error: 'Tous les champs obligatoires doivent être remplis' },
@@ -134,27 +142,29 @@ export async function POST(request) {
     const categoriePersonnelId = parseInt(categorie_personnel_id, 10)
     const titreId = parseInt(titre_id, 10)
     const serviceId = parseInt(service_id, 10)
+    const hopitalId = parseInt(hopital_id, 10)
 
-    if (isNaN(specialiteId) || isNaN(categoriePersonnelId) || isNaN(titreId) || isNaN(serviceId)) {
+    if (isNaN(specialiteId) || isNaN(categoriePersonnelId) || isNaN(titreId) || isNaN(serviceId) || isNaN(hopitalId)) {
       return NextResponse.json(
-        { error: 'IDs invalides pour spécialité, catégorie, titre ou service' },
+        { error: 'IDs invalides pour spécialité, catégorie, titre, service ou hopital' },
         { status: 400 }
       )
     }
 
     // Vérifier que les entités existent
-    const [specialite, categorie, titre, service] = await Promise.all([
+    const [specialite, categorie, titre, service, hopital] = await Promise.all([
       prisma.specialite.findUnique({ where: { id: specialiteId } }),
       prisma.categoriePersonnel.findUnique({
         where: { id: categoriePersonnelId },
       }),
       prisma.titre.findUnique({ where: { id: titreId } }),
       prisma.service.findUnique({ where: { id: serviceId } }),
+      prisma.hopital.findUnique({ where: { id: hopitalId } }),
     ])
 
-    if (!specialite || !categorie || !titre || !service) {
+    if (!specialite || !categorie || !titre || !service || !hopital) {
       return NextResponse.json(
-        { error: 'Spécialité, catégorie, titre ou service non trouvé' },
+        { error: 'Spécialité, catégorie, titre, service ou hopital non trouvé' },
         { status: 404 }
       )
     }
@@ -180,6 +190,7 @@ export async function POST(request) {
         categorie_personnel_id: categoriePersonnelId,
         titre_id: titreId,
         service_id: serviceId,
+        hopital_id: hopitalId,
         telephone: telephone || null,
       },
     })

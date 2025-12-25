@@ -28,6 +28,7 @@ export async function GET(request, { params }) {
         categorie_personnel: true,
         titre: true,
         service: true,
+        hopital: true,
         conges: {
           include: {
             type_conge: true,
@@ -93,6 +94,7 @@ export async function PUT(request, { params }) {
       categorie_personnel_id,
       titre_id,
       service_id,
+      hopital_id,
       telephone,
     } = body
 
@@ -175,6 +177,18 @@ export async function PUT(request, { params }) {
         })
         if (serviceExists) {
           updateData.service_id = serviceIdInt
+        }
+      }
+    }
+
+    if (hopital_id) {
+      const hopitalIdInt = parseInt(hopital_id, 10)
+      if (!isNaN(hopitalIdInt)) {
+        const hopitalExists = await prisma.hopital.findUnique({
+          where: { id: hopitalIdInt },
+        })
+        if (hopitalExists) {
+          updateData.hopital_id = hopitalIdInt
         }
       }
     }
