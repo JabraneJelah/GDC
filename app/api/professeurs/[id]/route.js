@@ -28,7 +28,8 @@ export async function GET(request, { params }) {
         categorie_personnel: true,
         titre: true,
         service: true,
-        hopital: true,
+        Hopital: true,
+        grade: true,
         conges: {
           include: {
             type_conge: true,
@@ -95,6 +96,7 @@ export async function PUT(request, { params }) {
       titre_id,
       service_id,
       hopital_id,
+      grade_id,
       telephone,
     } = body
 
@@ -188,7 +190,19 @@ export async function PUT(request, { params }) {
           where: { id: hopitalIdInt },
         })
         if (hopitalExists) {
-          updateData.hopital_id = hopitalIdInt
+          updateData.Hopital_id = hopitalIdInt
+        }
+      }
+    }
+
+    if (grade_id) {
+      const gradeIdInt = parseInt(grade_id, 10)
+      if (!isNaN(gradeIdInt)) {
+        const gradeExists = await prisma.grade.findUnique({
+          where: { id: gradeIdInt },
+        })
+        if (gradeExists) {
+          updateData.grade_id = gradeIdInt
         }
       }
     }

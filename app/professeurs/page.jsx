@@ -36,8 +36,12 @@ const ITEMS_PER_PAGE = 10
 export default function ProfesseursPage() {
   const [professeurs, setProfesseurs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filterType, setFilterType] = useState('nom_prenom')
-  const [filterValue, setFilterValue] = useState('')
+  const [filters, setFilters] = useState({
+    nom: '',
+    prenom: '',
+    ppr: '',
+    hopital_id: '',
+  })
   const [open, setOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -47,6 +51,7 @@ export default function ProfesseursPage() {
   const [titres, setTitres] = useState([])
   const [services, setServices] = useState([])
   const [hopitaux, setHopitaux] = useState([])
+  const [grades, setGrades] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -56,6 +61,7 @@ export default function ProfesseursPage() {
     titre_id: '',
     service_id: '',
     hopital_id: '',
+    grade_id: '',
     telephone: '',
   })
 
@@ -63,16 +69,17 @@ export default function ProfesseursPage() {
     fetchProfesseurs()
     fetchOptions()
     setCurrentPage(1)
-  }, [filterType, filterValue])
+  }, [filters.nom, filters.prenom, filters.ppr, filters.hopital_id])
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes, gradesRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
         fetch('/api/services'),
         fetch('/api/hopitaux'),
+        fetch('/api/grades'),
       ])
 
       if (categoriesRes.ok) {
@@ -95,6 +102,10 @@ export default function ProfesseursPage() {
         const data = await hopitauxRes.json()
         setHopitaux(data)
       }
+      if (gradesRes.ok) {
+        const data = await gradesRes.json()
+        setGrades(data)
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
     }
@@ -102,16 +113,21 @@ export default function ProfesseursPage() {
 
   const fetchProfesseurs = async () => {
     try {
-      let url = '/api/professeurs'
-      if (filterValue.trim()) {
-        const params = new URLSearchParams()
-        if (filterType === 'ppr') {
-          params.append('ppr', filterValue.trim())
-        } else if (filterType === 'nom_prenom') {
-          params.append('search', filterValue.trim())
-        }
-        url += `?${params.toString()}`
+      const params = new URLSearchParams()
+      if (filters.nom.trim()) {
+        params.append('nom', filters.nom.trim())
       }
+      if (filters.prenom.trim()) {
+        params.append('prenom', filters.prenom.trim())
+      }
+      if (filters.ppr.trim()) {
+        params.append('ppr', filters.ppr.trim())
+      }
+      if (filters.hopital_id) {
+        params.append('hopital_id', filters.hopital_id)
+      }
+      
+      const url = params.toString() ? `/api/professeurs?${params.toString()}` : '/api/professeurs'
       const response = await fetch(url)
       if (response.ok) {
         const data = await response.json()
@@ -125,8 +141,12 @@ export default function ProfesseursPage() {
   }
 
   const handleClearFilter = () => {
-    setFilterValue('')
-    setFilterType('nom_prenom')
+    setFilters({
+      nom: '',
+      prenom: '',
+      ppr: '',
+      hopital_id: '',
+    })
     setCurrentPage(1)
   }
 
@@ -152,6 +172,7 @@ export default function ProfesseursPage() {
           titre_id: '',
           service_id: '',
           hopital_id: '',
+          grade_id: '',
           telephone: '',
         })
         setCurrentPage(1)
@@ -256,6 +277,27 @@ export default function ProfesseursPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grade_id">Grade *</Label>
+                <Select
+                  value={formData.grade_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, grade_id: value })
+                  }
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grades.map((grade) => (
+                      <SelectItem key={grade.id} value={grade.id.toString()}>
+                        {grade.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>       
                 <div className="space-y-2">
                 <Label htmlFor="categorie_personnel_id">Catégorie Personnel *</Label>
@@ -352,51 +394,89 @@ export default function ProfesseursPage() {
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex flex-col sm:flex-row gap-3 items-end">
-          <div className="flex-1 w-full sm:w-auto">
-            <Label htmlFor="filter-type" className="text-xs text-slate-600 mb-1.5 block">
-              Filtrer par
-            </Label>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="nom_prenom">Nom / Prénom</SelectItem>
-                <SelectItem value="ppr">PPR</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-end">
+            <div className="flex-1 w-full sm:w-auto">
+              <Label htmlFor="filter-nom" className="text-xs text-slate-600 mb-1.5 block">
+                Nom
+              </Label>
+              <Input
+                id="filter-nom"
+                placeholder="Entrez le nom..."
+                value={filters.nom}
+                onChange={(e) => {
+                  setFilters({ ...filters, nom: e.target.value })
+                  setCurrentPage(1)
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 w-full sm:w-auto">
+              <Label htmlFor="filter-prenom" className="text-xs text-slate-600 mb-1.5 block">
+                Prénom
+              </Label>
+              <Input
+                id="filter-prenom"
+                placeholder="Entrez le prénom..."
+                value={filters.prenom}
+                onChange={(e) => {
+                  setFilters({ ...filters, prenom: e.target.value })
+                  setCurrentPage(1)
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 w-full sm:w-auto">
+              <Label htmlFor="filter-ppr" className="text-xs text-slate-600 mb-1.5 block">
+                PPR
+              </Label>
+              <Input
+                id="filter-ppr"
+                placeholder="Entrez le PPR..."
+                value={filters.ppr}
+                onChange={(e) => {
+                  setFilters({ ...filters, ppr: e.target.value })
+                  setCurrentPage(1)
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="flex-1 w-full sm:w-auto">
+              <Label htmlFor="filter-hopital" className="text-xs text-slate-600 mb-1.5 block">
+                Hôpital
+              </Label>
+              <Select
+                value={filters.hopital_id || 'all'}
+                onValueChange={(value) => {
+                  setFilters({ ...filters, hopital_id: value === 'all' ? '' : value })
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sélectionner un hôpital" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les hôpitaux</SelectItem>
+                  {hopitaux.map((hopital) => (
+                    <SelectItem key={hopital.id} value={hopital.id.toString()}>
+                      {hopital.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(filters.nom || filters.prenom || filters.ppr || filters.hopital_id) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearFilter}
+                className="w-full sm:w-auto"
+              >
+                <X className="h-4 w-4 mr-1.5" />
+                Effacer
+              </Button>
+            )}
           </div>
-          <div className="flex-1 w-full sm:flex-initial sm:w-[300px]">
-            <Label htmlFor="filter-value" className="text-xs text-slate-600 mb-1.5 block">
-              {filterType === 'ppr' ? 'PPR' : 'Nom ou Prénom'}
-            </Label>
-            <Input
-              id="filter-value"
-              placeholder={
-                filterType === 'ppr'
-                  ? 'Entrez le PPR...'
-                  : 'Entrez le nom ou prénom...'
-              }
-              value={filterValue}
-              onChange={(e) => {
-                setFilterValue(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="w-full"
-            />
-          </div>
-          {filterValue && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearFilter}
-              className="w-full sm:w-auto"
-            >
-              <X className="h-4 w-4 mr-1.5" />
-              Effacer
-            </Button>
-          )}
         </div>
       </div>
 
@@ -408,6 +488,7 @@ export default function ProfesseursPage() {
               <TableHead>Prénom</TableHead>
               <TableHead>PPR</TableHead>
               <TableHead>Spécialité</TableHead>
+              <TableHead>Hopitale</TableHead>
               <TableHead>Solde Congé</TableHead>
               <TableHead>Congés</TableHead>
               <TableHead>Actions</TableHead>
@@ -434,6 +515,9 @@ export default function ProfesseursPage() {
                     <TableCell>{professeur.ppr}</TableCell>
                     <TableCell>
                       {professeur.specialite?.nom || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {professeur.Hopital?.nom || '-'}
                     </TableCell>
                     <TableCell>
                       {soldesNonExpires.length > 0 ? (

@@ -57,6 +57,7 @@ export default function ProfesseurDetailsPage() {
   const [titres, setTitres] = useState([])
   const [services, setServices] = useState([])
   const [hopitaux, setHopitaux] = useState([])
+  const [grades, setGrades] = useState([])
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -66,6 +67,7 @@ export default function ProfesseurDetailsPage() {
     titre_id: '',
     service_id: '',
     hopital_id: '',
+    grade_id: '',
     telephone: '',
   })
 
@@ -92,12 +94,13 @@ export default function ProfesseurDetailsPage() {
 
   const fetchOptions = async () => {
     try {
-      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes] = await Promise.all([
+      const [categoriesRes, specialitesRes, titresRes, servicesRes, hopitauxRes, gradesRes] = await Promise.all([
         fetch('/api/categories-personnel'),
         fetch('/api/specialites'),
         fetch('/api/titres'),
         fetch('/api/services'),
         fetch('/api/hopitaux'),
+        fetch('/api/grades'),
       ])
 
       if (categoriesRes.ok) {
@@ -119,6 +122,10 @@ export default function ProfesseurDetailsPage() {
       if (hopitauxRes.ok) {
         const data = await hopitauxRes.json()
         setHopitaux(data)
+      }
+      if (gradesRes.ok) {
+        const data = await gradesRes.json()
+        setGrades(data)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
@@ -143,7 +150,6 @@ export default function ProfesseurDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setProfesseur(data)
-        // Pré-remplir le formulaire avec les données du professeur
         setFormData({
           nom: data.nom || '',
           prenom: data.prenom || '',
@@ -153,6 +159,7 @@ export default function ProfesseurDetailsPage() {
           titre_id: data.titre_id?.toString() || '',
           service_id: data.service_id?.toString() || '',
           hopital_id: data.hopital_id?.toString() || '',
+          grade_id: data.grade_id?.toString() || '',
           telephone: data.telephone || '',
         })
       } else {
@@ -183,6 +190,7 @@ export default function ProfesseurDetailsPage() {
           titre_id: formData.titre_id ? parseInt(formData.titre_id, 10) : undefined,
           service_id: formData.service_id ? parseInt(formData.service_id, 10) : undefined,
           hopital_id: formData.hopital_id ? parseInt(formData.hopital_id, 10) : undefined,
+          grade_id: formData.grade_id ? parseInt(formData.grade_id, 10) : undefined,
         }),
       })
 
@@ -459,6 +467,27 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="grade_id">Grade *</Label>
+                  <Select
+                    value={formData.grade_id}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, grade_id: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grades.map((grade) => (
+                        <SelectItem key={grade.id} value={grade.id.toString()}>
+                          {grade.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="telephone">Téléphone</Label>
                   <Input
                     id="telephone"
@@ -516,7 +545,13 @@ export default function ProfesseurDetailsPage() {
             <div>
               <p className="text-sm text-slate-700">Hôpital</p>
               <p className="font-medium">
-                {professeur.hopital?.nom || '-'}
+                {professeur.Hopital?.nom || '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-700">Grade</p>
+              <p className="font-medium">
+                {professeur.grade?.nom || '-'}
               </p>
             </div>
             {professeur.telephone && (

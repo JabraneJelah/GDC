@@ -11,24 +11,41 @@ export async function GET(request) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const search = searchParams.get('search') || ''
+    const nom = searchParams.get('nom') || ''
+    const prenom = searchParams.get('prenom') || ''
     const ppr = searchParams.get('ppr') || ''
+    const hopital_id = searchParams.get('hopital_id') || ''
 
     const maintenant = new Date()
     
-    let whereClause = undefined
-    if (ppr) {
-      whereClause = {
-        ppr: { contains: ppr, mode: 'insensitive' },
+    let whereClause = {}
+    const conditions = []
+    
+    if (nom.trim()) {
+      conditions.push({ nom: { contains: nom.trim(), mode: 'insensitive' } })
+    }
+    
+    if (prenom.trim()) {
+      conditions.push({ prenom: { contains: prenom.trim(), mode: 'insensitive' } })
+    }
+    
+    if (ppr.trim()) {
+      conditions.push({ ppr: { contains: ppr.trim(), mode: 'insensitive' } })
+    }
+    
+    if (hopital_id) {
+      const hopitalIdInt = parseInt(hopital_id, 10)
+      if (!isNaN(hopitalIdInt)) {
+        conditions.push({
+          Hopital_id: hopitalIdInt
+        })
       }
-    } else if (search) {
-      whereClause = {
-        OR: [
-          { nom: { contains: search, mode: 'insensitive' } },
-          { prenom: { contains: search, mode: 'insensitive' } },
-          { ppr: { contains: search, mode: 'insensitive' } },
-        ],
-      }
+    }
+    
+    if (conditions.length > 0) {
+      whereClause = { AND: conditions }
+    } else {
+      whereClause = undefined
     }
     
     const professeurs = await prisma.professeur.findMany({
@@ -66,7 +83,13 @@ export async function GET(request) {
             nom: true,
           },
         },
-        hopital: {
+        Hopital: {
+          select: {
+            id: true,
+            nom: true,
+          },
+        },
+        grade: {
           select: {
             id: true,
             nom: true,
@@ -103,11 +126,13 @@ export async function GET(request) {
 // POST - Créer un nouveau professeur
 export async function POST(request) {
   try {
+    // 1️⃣ Vérifier l'utilisateur
     const currentUser = await getCurrentUser()
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
+    // 2️⃣ Lire le body
     const body = await request.json()
     const {
       nom,
@@ -118,9 +143,11 @@ export async function POST(request) {
       titre_id,
       service_id,
       hopital_id,
+      grade_id,
       telephone,
     } = body
 
+    // 3️⃣ Validation basique
     if (
       !nom ||
       !prenom ||
@@ -129,7 +156,8 @@ export async function POST(request) {
       !categorie_personnel_id ||
       !titre_id ||
       !service_id ||
-      !hopital_id
+      !hopital_id ||
+      !grade_id
     ) {
       return NextResponse.json(
         { error: 'Tous les champs obligatoires doivent être remplis' },
@@ -137,38 +165,43 @@ export async function POST(request) {
       )
     }
 
-    // Vérifier que les IDs existent
-    const specialiteId = parseInt(specialite_id, 10)
-    const categoriePersonnelId = parseInt(categorie_personnel_id, 10)
-    const titreId = parseInt(titre_id, 10)
-    const serviceId = parseInt(service_id, 10)
-    const hopitalId = parseInt(hopital_id, 10)
+    // 4️⃣ Parsing IDs
+    const specialiteId = Number(specialite_id)
+    const categoriePersonnelId = Number(categorie_personnel_id)
+    const titreId = Number(titre_id)
+    const serviceId = Number(service_id)
+    const hopitalId = Number(hopital_id)
+    const gradeId = Number(grade_id)
 
-    if (isNaN(specialiteId) || isNaN(categoriePersonnelId) || isNaN(titreId) || isNaN(serviceId) || isNaN(hopitalId)) {
+    if (
+      [specialiteId, categoriePersonnelId, titreId, serviceId, hopitalId, gradeId].some(
+        isNaN
+      )
+    ) {
       return NextResponse.json(
-        { error: 'IDs invalides pour spécialité, catégorie, titre, service ou hopital' },
+        { error: 'IDs invalides' },
         { status: 400 }
       )
     }
 
-    // Vérifier que les entités existent
-    const [specialite, categorie, titre, service, hopital] = await Promise.all([
+    // 5️⃣ Vérifier existence des relations
+    const [specialite, categorie, titre, service, hopital, grade] = await Promise.all([
       prisma.specialite.findUnique({ where: { id: specialiteId } }),
-      prisma.categoriePersonnel.findUnique({
-        where: { id: categoriePersonnelId },
-      }),
+      prisma.categoriePersonnel.findUnique({ where: { id: categoriePersonnelId } }),
       prisma.titre.findUnique({ where: { id: titreId } }),
       prisma.service.findUnique({ where: { id: serviceId } }),
       prisma.hopital.findUnique({ where: { id: hopitalId } }),
+      prisma.grade.findUnique({ where: { id: gradeId } }),
     ])
 
-    if (!specialite || !categorie || !titre || !service || !hopital) {
+    if (!specialite || !categorie || !titre || !service || !hopital || !grade) {
       return NextResponse.json(
-        { error: 'Spécialité, catégorie, titre, service ou hopital non trouvé' },
+        { error: 'Relation introuvable (spécialité, catégorie, titre, service, hôpital ou grade)' },
         { status: 404 }
       )
     }
 
+    // 6️⃣ Vérifier unicité du PPR
     const existing = await prisma.professeur.findUnique({
       where: { ppr },
     })
@@ -180,24 +213,40 @@ export async function POST(request) {
       )
     }
 
-    // Créer le professeur
+    // 7️⃣ Création du professeur (relations avec connect)
     const professeur = await prisma.professeur.create({
       data: {
         nom,
         prenom,
         ppr,
-        specialite_id: specialiteId,
-        categorie_personnel_id: categoriePersonnelId,
-        titre_id: titreId,
-        service_id: serviceId,
-        hopital_id: hopitalId,
         telephone: telephone || null,
+
+        specialite: {
+          connect: { id: specialiteId },
+        },
+        categorie_personnel: {
+          connect: { id: categoriePersonnelId },
+        },
+        titre: {
+          connect: { id: titreId },
+        },
+        service: {
+          connect: { id: serviceId },
+        },
+        Hopital: {
+          connect: { id: hopitalId },
+        },
+        grade: {
+          connect: { id: gradeId },
+        },
       },
     })
 
+    // 8️⃣ Retour OK
     return NextResponse.json(professeur, { status: 201 })
+
   } catch (error) {
-    console.error('Erreur lors de la création du professeur:', error)
+    console.error('Erreur création professeur:', error)
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }

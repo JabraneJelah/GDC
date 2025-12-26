@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
 import Link from 'next/link'
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 5
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null)
@@ -337,6 +337,7 @@ export default function DashboardPage() {
                   <TableHead>Solde Restant</TableHead>
                 </TableRow>
               </TableHeader>
+              
               <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
                 {loading ? (
                   <TableRow className="bg-white">

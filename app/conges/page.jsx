@@ -29,9 +29,9 @@ import {
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, X } from 'lucide-react'
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 8
 
 export default function CongesPage() {
   const [conges, setConges] = useState([])
@@ -46,6 +46,11 @@ export default function CongesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [editingConge, setEditingConge] = useState(null)
   const [congeToDelete, setCongeToDelete] = useState(null)
+  const [filters, setFilters] = useState({
+    professeur_id: 'all',
+    type_conge_id: 'all',
+    duree: '',
+  })
   const [formData, setFormData] = useState({
     professeur_id: '',
     type_conge_id: '',
@@ -251,10 +256,35 @@ export default function CongesPage() {
     return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
   }
 
-  const totalPages = Math.ceil(conges.length / ITEMS_PER_PAGE)
+  // Filter conges based on filters
+  const filteredConges = conges.filter((conge) => {
+    if (filters.professeur_id !== 'all' && conge.professeur_id !== filters.professeur_id) {
+      return false
+    }
+    if (filters.type_conge_id !== 'all' && conge.type_conge_id.toString() !== filters.type_conge_id) {
+      return false
+    }
+    if (filters.duree && conge.duree_jours.toString() !== filters.duree) {
+      return false
+    }
+    return true
+  })
+
+  const totalPages = Math.ceil(filteredConges.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedConges = conges.slice(startIndex, endIndex)
+  const paginatedConges = filteredConges.slice(startIndex, endIndex)
+
+  const handleClearFilters = () => {
+    setFilters({
+      professeur_id: 'all',
+      type_conge_id: 'all',
+      duree: '',
+    })
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = filters.professeur_id !== 'all' || filters.type_conge_id !== 'all' || filters.duree !== ''
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -403,7 +433,7 @@ export default function CongesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Dialog de modification */}
+        {/*  modification model */}
         <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -542,7 +572,7 @@ export default function CongesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Dialog de confirmation de suppression */}
+        {/* model de suppresion */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -585,9 +615,89 @@ export default function CongesPage() {
         </Dialog>
       </div>
 
-      <div className="rounded-md border border-slate-200">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex-1 w-full sm:w-auto">
+            <Label htmlFor="filter-professeur" className="text-xs text-slate-600 mb-1.5 block">
+              Professeur
+            </Label>
+            <Select
+              value={filters.professeur_id}
+              onValueChange={(value) => {
+                setFilters({ ...filters, professeur_id: value })
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Tous les professeurs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les professeurs</SelectItem>
+                {professeurs.map((prof) => (
+                  <SelectItem key={prof.id} value={prof.id}>
+                    {prof.prenom} {prof.nom} ({prof.ppr})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 w-full sm:w-auto">
+            <Label htmlFor="filter-type-conge" className="text-xs text-slate-600 mb-1.5 block">
+              Type de Congé
+            </Label>
+            <Select
+              value={filters.type_conge_id}
+              onValueChange={(value) => {
+                setFilters({ ...filters, type_conge_id: value })
+                setCurrentPage(1)
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Tous les types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                {typesConge.map((type) => (
+                  <SelectItem key={type.id} value={type.id.toString()}>
+                    {type.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 w-full sm:w-auto">
+            <Label htmlFor="filter-duree" className="text-xs text-slate-600 mb-1.5 block">
+              Durée (jours)
+            </Label>
+            <Input
+              id="filter-duree"
+              type="number"
+              placeholder="Durée..."
+              value={filters.duree}
+              onChange={(e) => {
+                setFilters({ ...filters, duree: e.target.value })
+                setCurrentPage(1)
+              }}
+              className="w-full"
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearFilters}
+              className="w-full sm:w-auto"
+            >
+              <X className="h-4 w-4 mr-1.5" />
+              Effacer
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>Professeur</TableHead>
               <TableHead>Type</TableHead>
@@ -600,11 +710,11 @@ export default function CongesPage() {
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {conges.length === 0 ? (
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
+            {filteredConges.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center">
-                  Aucun congé enregistré
+                  {conges.length === 0 ? 'Aucun congé enregistré' : 'Aucun congé ne correspond aux filtres'}
                 </TableCell>
               </TableRow>
             ) : (
