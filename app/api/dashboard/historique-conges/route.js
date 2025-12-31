@@ -15,8 +15,7 @@ export async function GET(request) {
     const typeCongeId = searchParams.get('type_conge_id')
     const dateDebut = searchParams.get('date_debut')
     const dateFin = searchParams.get('date_fin')
-    const nom = searchParams.get('nom')
-    const prenom = searchParams.get('prenom')
+    const nomComplet = searchParams.get('nom_complet')
     const ppr = searchParams.get('ppr')
 
     const maintenant = new Date()
@@ -30,13 +29,17 @@ export async function GET(request) {
       professeurFilters.service_id = parseInt(serviceId, 10)
     }
 
-    // Filtre par nom/prénom/PPR
+    // Filtre par nom complet (recherche dans nom, prenom et titre) ou PPR
     const nameFilters = []
-    if (nom) {
-      nameFilters.push({ nom: { contains: nom, mode: 'insensitive' } })
-    }
-    if (prenom) {
-      nameFilters.push({ prenom: { contains: prenom, mode: 'insensitive' } })
+    if (nomComplet) {
+      // Rechercher dans nom, prenom ou titre
+      nameFilters.push({
+        OR: [
+          { nom: { contains: nomComplet, mode: 'insensitive' } },
+          { prenom: { contains: nomComplet, mode: 'insensitive' } },
+          { titre: { nom: { contains: nomComplet, mode: 'insensitive' } } },
+        ],
+      })
     }
     if (ppr) {
       nameFilters.push({ ppr: { contains: ppr, mode: 'insensitive' } })
@@ -81,7 +84,18 @@ export async function GET(request) {
             nom: true,
             prenom: true,
             ppr: true,
+            titre: {
+              select: {
+                id: true,
+                nom: true,
+              },
+            },
             service: {
+              select: {
+                nom: true,
+              },
+            },
+            grade: {
               select: {
                 nom: true,
               },
@@ -123,8 +137,10 @@ export async function GET(request) {
         id: conge.id,
         nom: conge.professeur.nom,
         prenom: conge.professeur.prenom,
+        titre: conge.professeur.titre?.nom || null,
         ppr: conge.professeur.ppr,
         service: conge.professeur.service?.nom || '-',
+        grade: conge.professeur.grade?.nom || '-',
         type_conge: conge.type_conge.nom,
         date_debut: conge.date_debut,
         date_fin: conge.date_fin,

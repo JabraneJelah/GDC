@@ -73,24 +73,13 @@ export default function ProfesseurDetailsPage() {
 
   useEffect(() => {
     if (params.id) {
+      // Charger les données critiques en premier
       fetchProfesseur()
-      fetchOptions()
+      // Charger les types de congé dès le début (nécessaires pour les dialogs de solde)
       fetchTypesConge()
-      fetchSoldes()
+      // Les autres options seront chargées seulement quand nécessaire (lazy loading)
     }
   }, [params.id])
-
-  const fetchSoldes = async () => {
-    try {
-      const response = await fetch(`/api/professeurs/${params.id}/soldes`)
-      if (response.ok) {
-        const data = await response.json()
-        setSoldes(data)
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des soldes:', error)
-    }
-  }
 
   const fetchOptions = async () => {
     try {
@@ -150,6 +139,8 @@ export default function ProfesseurDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setProfesseur(data)
+        // Utiliser les soldes déjà chargés depuis l'API
+        setSoldes(data.soldes || [])
         setFormData({
           nom: data.nom || '',
           prenom: data.prenom || '',
@@ -173,6 +164,23 @@ export default function ProfesseurDetailsPage() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  // Charger les options seulement quand nécessaire (lazy loading)
+  const loadOptionsIfNeeded = async () => {
+    if (categories.length > 0 && specialites.length > 0 && titres.length > 0 && 
+        services.length > 0 && hopitaux.length > 0 && grades.length > 0) {
+      return // Déjà chargées
+    }
+    await fetchOptions()
+  }
+  
+  // Charger les types de congé seulement quand nécessaire
+  const loadTypesCongeIfNeeded = async () => {
+    if (typesConge.length > 0) {
+      return // Déjà chargés
+    }
+    await fetchTypesConge()
   }
 
   const handleSubmit = async (e) => {
@@ -254,8 +262,8 @@ export default function ProfesseurDetailsPage() {
 
       if (response.ok) {
         setSoldeDialogOpen(false)
-        fetchSoldes()
-        fetchProfesseur() // Rafraîchir pour mettre à jour l'affichage
+        // Rafraîchir les données du professeur (qui inclut les soldes)
+        fetchProfesseur()
       } else {
         const data = await response.json()
         setErrorMessage(data.error || 'Erreur lors de l\'opération')
@@ -285,7 +293,7 @@ export default function ProfesseurDetailsPage() {
       if (response.ok) {
         setDeleteSoldeDialogOpen(false)
         setSoldeToDelete(null)
-        fetchSoldes()
+        // Rafraîchir les données du professeur (qui inclut les soldes)
         fetchProfesseur()
       } else {
         const data = await response.json()
@@ -315,18 +323,24 @@ export default function ProfesseurDetailsPage() {
             <Button variant="outline" className="w-full sm:w-auto">← Retour</Button>
           </Link>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(isOpen) => {
+          setOpen(isOpen)
+          // Charger les options seulement quand le dialog s'ouvre
+          if (isOpen) {
+            loadOptionsIfNeeded()
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">Modifier les informations</Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] flex flex-col">
+          <DialogContent className="max-h-[90vh] w-full max-w-[95vw] sm:max-w-2xl flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Modifier les informations du professeur</DialogTitle>
               <DialogDescription>
                 Modifier les informations du professeur
               </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+            <div className="flex-1 overflow-y-auto pr-2 -mr-2 min-h-0">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom *</Label>
@@ -362,16 +376,15 @@ export default function ProfesseurDetailsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="categorie_personnel_id">Catégorie Personnel *</Label>
+                  <Label htmlFor="categorie_personnel_id">Catégorie Personnel</Label>
                   <Select
                     value={formData.categorie_personnel_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, categorie_personnel_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une catégorie" />
+                      <SelectValue placeholder="Sélectionner une catégorie (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -383,16 +396,15 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="specialite_id">Spécialité *</Label>
+                  <Label htmlFor="specialite_id">Spécialité</Label>
                   <Select
                     value={formData.specialite_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, specialite_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une spécialité" />
+                      <SelectValue placeholder="Sélectionner une spécialité (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {specialites.map((spec) => (
@@ -404,16 +416,15 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="titre_id">Titre *</Label>
+                  <Label htmlFor="titre_id">Titre</Label>
                   <Select
                     value={formData.titre_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, titre_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un titre" />
+                      <SelectValue placeholder="Sélectionner un titre (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {titres.map((titre) => (
@@ -425,16 +436,15 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="service_id">Service *</Label>
+                  <Label htmlFor="service_id">Service</Label>
                   <Select
                     value={formData.service_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, service_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un service" />
+                      <SelectValue placeholder="Sélectionner un service (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {services.map((service) => (
@@ -446,16 +456,15 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="hopital_id">Hôpital *</Label>
+                  <Label htmlFor="hopital_id">Hôpital</Label>
                   <Select
                     value={formData.hopital_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, hopital_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un hôpital" />
+                      <SelectValue placeholder="Sélectionner un hôpital (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {hopitaux.map((hopital) => (
@@ -467,16 +476,15 @@ export default function ProfesseurDetailsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="grade_id">Grade *</Label>
+                  <Label htmlFor="grade_id">Grade</Label>
                   <Select
                     value={formData.grade_id}
                     onValueChange={(value) =>
                       setFormData({ ...formData, grade_id: value })
                     }
-                    required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un grade" />
+                      <SelectValue placeholder="Sélectionner un grade (optionnel)" />
                     </SelectTrigger>
                     <SelectContent>
                       {grades.map((grade) => (
@@ -486,16 +494,6 @@ export default function ProfesseurDetailsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telephone">Téléphone</Label>
-                  <Input
-                    id="telephone"
-                    value={formData.telephone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, telephone: e.target.value })
-                    }
-                  />
                 </div>
                 <Button type="submit" className="w-full">
                   Enregistrer les modifications
@@ -509,57 +507,29 @@ export default function ProfesseurDetailsPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {professeur.prenom} {professeur.nom}
+            {professeur.titre?.nom ? `${professeur.titre.nom} ` : ''}{professeur.prenom} {professeur.nom}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-slate-700">PPR</p>
-              <p className="font-medium">{professeur.ppr}</p>
+              <p className="text-sm text-slate-700">PPR : <span className="font-medium">{professeur.ppr}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Catégorie Personnel</p>
-              <p className="font-medium">
-                {professeur.categorie_personnel?.nom || '-'}
-              </p>
+              <p className="text-sm text-slate-700">Catégorie Personnel : <span className="font-medium">{professeur.categorie_personnel?.nom || '-'}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Spécialité</p>
-              <p className="font-medium">
-                {professeur.specialite?.nom || '-'}
-              </p>
+              <p className="text-sm text-slate-700">Spécialité : <span className="font-medium">{professeur.specialite?.nom || '-'}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Titre</p>
-              <p className="font-medium">
-                {professeur.titre?.nom || '-'}
-              </p>
+              <p className="text-sm text-slate-700">Service : <span className="font-medium">{professeur.service?.nom || '-'}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Service</p>
-              <p className="font-medium">
-                {professeur.service?.nom || '-'}
-              </p>
+              <p className="text-sm text-slate-700">Hôpital : <span className="font-medium">{professeur.Hopital?.nom || '-'}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Hôpital</p>
-              <p className="font-medium">
-                {professeur.Hopital?.nom || '-'}
-              </p>
+              <p className="text-sm text-slate-700">Grade : <span className="font-medium">{professeur.grade?.nom || '-'}</span></p>
             </div>
-            <div>
-              <p className="text-sm text-slate-700">Grade</p>
-              <p className="font-medium">
-                {professeur.grade?.nom || '-'}
-              </p>
-            </div>
-            {professeur.telephone && (
-              <div>
-                <p className="text-sm text-slate-700">Téléphone</p>
-                <p className="font-medium">{professeur.telephone}</p>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -651,7 +621,7 @@ export default function ProfesseurDetailsPage() {
               </div>
               <div className="pt-2 border-t border-slate-200">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-700">Total disponible (non expiré)</p>
+                  <p className="text-sm font-medium text-slate-700">Total disponible</p>
                   <p className="text-lg font-semibold text-[#16A34A]">
                     {soldes
                       .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
@@ -676,6 +646,7 @@ export default function ProfesseurDetailsPage() {
                 <TableHead>Date début</TableHead>
                 <TableHead>Date fin</TableHead>
                 <TableHead>Durée (jours)</TableHead>
+                <TableHead>Grade</TableHead>
                 <TableHead>Référence doc</TableHead>
                 <TableHead>Créé par</TableHead>
               </TableRow>
@@ -683,7 +654,7 @@ export default function ProfesseurDetailsPage() {
             <TableBody>
               {professeur.conges.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="text-center">
                     Aucun congé enregistré
                   </TableCell>
                 </TableRow>
@@ -702,6 +673,7 @@ export default function ProfesseurDetailsPage() {
                       {new Date(conge.date_fin).toLocaleDateString('fr-FR')}
                     </TableCell>
                     <TableCell>{conge.duree_jours}</TableCell>
+                    <TableCell>{professeur.grade?.nom || '-'}</TableCell>
                     <TableCell>{conge.reference_doc || '-'}</TableCell>
                     <TableCell>{conge.cree_par_rh.nom_complet}</TableCell>
                   </TableRow>

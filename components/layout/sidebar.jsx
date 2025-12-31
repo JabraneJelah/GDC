@@ -37,7 +37,7 @@ export function Sidebar() {
 
   // Vérifier si on est dans une page du référentiel pour ouvrir le menu
   useEffect(() => {
-    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux']
+    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades']
     if (referentielPaths.some(path => pathname.startsWith(path))) {
       setIsReferentielOpen(true)
     }
@@ -71,6 +71,7 @@ export function Sidebar() {
         { href: '/services', label: 'Services' },
         { href: '/specialites', label: 'Spécialités' },
         { href: '/titres', label: 'Titres' },
+        { href: '/grades', label: 'Grades' },
         { href: '/types-conge', label: 'Types de congé' },
         { href: '/categories-personnel', label: 'Catégorie personnel' },
         { href: '/hopitaux', label: 'Hôpitaux' },

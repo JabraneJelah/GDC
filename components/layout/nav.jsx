@@ -31,6 +31,7 @@ export function Nav() {
     { href: '/specialites', label: 'Spécialités' },
     { href: '/titres', label: 'Titres' },
     { href: '/services', label: 'Services' },
+    { href: '/grades', label: 'Grades' },
     { href: '/utilisateurs', label: 'Utilisateurs RH' },
   ]
 

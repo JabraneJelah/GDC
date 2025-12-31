@@ -181,18 +181,15 @@ export default function UtilisateursPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">
-          Utilisateurs RH
+          Gestion des Utilisateurs
         </h1>
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-slate-700 mb-4">
-          Créer un utilisateur RH
+          Créer un utilisateur
         </h2>
-        <p className="text-sm text-slate-600 mb-4">
-          Le mot de passe par défaut est <span className="font-semibold">123456</span>.
-          L&apos;utilisateur pourra le changer dans son profil.
-        </p>
+
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="username">Nom d'utilisateur *</Label>
@@ -205,7 +202,7 @@ export default function UtilisateursPage() {
               placeholder="nom_utilisateur"
             />
           </div>
-          <div className="space-y-2 sm:col-span-2">
+          <div className="space-y-2">
             <Label htmlFor="nom_complet">Nom complet *</Label>
             <Input
               id="nom_complet"

@@ -39,8 +39,7 @@ export default function DashboardPage() {
     type_conge_id: 'all',
     date_debut: '',
     date_fin: '',
-    nom: '',
-    prenom: '',
+    nom_complet: '',
     ppr: '',
   })
 
@@ -85,8 +84,7 @@ export default function DashboardPage() {
       if (filters.type_conge_id && filters.type_conge_id !== 'all') params.append('type_conge_id', filters.type_conge_id)
       if (filters.date_debut) params.append('date_debut', filters.date_debut)
       if (filters.date_fin) params.append('date_fin', filters.date_fin)
-      if (filters.nom) params.append('nom', filters.nom)
-      if (filters.prenom) params.append('prenom', filters.prenom)
+      if (filters.nom_complet) params.append('nom_complet', filters.nom_complet)
       if (filters.ppr) params.append('ppr', filters.ppr)
 
       const url = `/api/dashboard/historique-conges${params.toString() ? `?${params.toString()}` : ''}`
@@ -124,11 +122,11 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    // Debounce pour les champs de texte (nom, prenom, ppr)
+    // Debounce pour les champs de texte (nom_complet, ppr)
     const timeoutId = setTimeout(() => {
       fetchHistorique()
       setCurrentPage(1)
-    }, filters.nom || filters.prenom || filters.ppr ? 500 : 0) // 500ms de délai pour les champs texte
+    }, filters.nom_complet || filters.ppr ? 500 : 0) // 500ms de délai pour les champs texte
 
     return () => clearTimeout(timeoutId)
   }, [filters, fetchHistorique])
@@ -139,8 +137,7 @@ export default function DashboardPage() {
       type_conge_id: 'all',
       date_debut: '',
       date_fin: '',
-      nom: '',
-      prenom: '',
+      nom_complet: '',
       ppr: '',
     })
     setCurrentPage(1)
@@ -239,27 +236,14 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="filter-nom" className="text-xs text-slate-600">
-                    Nom
+                  <Label htmlFor="filter-nom-complet" className="text-xs text-slate-600">
+                    Nom complet
                   </Label>
                   <Input
-                    id="filter-nom"
-                    placeholder="Nom..."
-                    value={filters.nom}
-                    onChange={(e) => setFilters({ ...filters, nom: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="filter-prenom" className="text-xs text-slate-600">
-                    Prénom
-                  </Label>
-                  <Input
-                    id="filter-prenom"
-                    placeholder="Prénom..."
-                    value={filters.prenom}
-                    onChange={(e) => setFilters({ ...filters, prenom: e.target.value })}
+                    id="filter-nom-complet"
+                    placeholder="Nom complet (titre, prénom, nom)..."
+                    value={filters.nom_complet}
+                    onChange={(e) => setFilters({ ...filters, nom_complet: e.target.value })}
                     className="h-9"
                   />
                 </div>
@@ -326,15 +310,14 @@ export default function DashboardPage() {
             <Table>
               <TableHeader className="bg-slate-100">
                 <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Prénom</TableHead>
+                  <TableHead>Nom complet</TableHead>
                   <TableHead>PPR</TableHead>
+                  <TableHead>Grade</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Type de Congé</TableHead>
                   <TableHead>Période</TableHead>
                   <TableHead>Jours</TableHead>
                   <TableHead>Intérim</TableHead>
-                  <TableHead>Solde Restant</TableHead>
                 </TableRow>
               </TableHeader>
               
@@ -354,9 +337,11 @@ export default function DashboardPage() {
                 ) : (
                   paginatedHistorique.map((conge) => (
                     <TableRow key={conge.id} className="bg-white hover:bg-slate-50">
-                      <TableCell className="font-medium">{conge.nom}</TableCell>
-                      <TableCell>{conge.prenom}</TableCell>
+                      <TableCell className="font-medium">
+                        {conge.titre ? `${conge.titre} ` : ''}{conge.prenom} {conge.nom}
+                      </TableCell>
                       <TableCell>{conge.ppr}</TableCell>
+                      <TableCell>{conge.grade}</TableCell>
                       <TableCell>{conge.service}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
@@ -372,7 +357,7 @@ export default function DashboardPage() {
                           ? `${conge.nom_interim} ${conge.prenom_interim}`
                           : '-'}
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         {conge.soldes && conge.soldes.length > 0 ? (
                           <div className="space-y-1">
                             <div className="font-semibold text-[#16A34A]">
@@ -389,7 +374,7 @@ export default function DashboardPage() {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   ))
                 )}

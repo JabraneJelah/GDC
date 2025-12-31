@@ -32,6 +32,12 @@ export async function GET(request) {
             nom: true,
             prenom: true,
             ppr: true,
+            titre: {
+              select: {
+                id: true,
+                nom: true,
+              },
+            },
           },
         },
         type_conge: {
@@ -156,6 +162,16 @@ export async function POST(request) {
       0
     )
 
+    // Vérifier qu'il existe au moins un solde de congé
+    if (soldesDisponibles.length === 0) {
+      return NextResponse.json(
+        {
+          error: 'Aucun solde de congé disponible pour ce professeur et ce type de congé. Veuillez créer un solde de congé avant de créer un congé.',
+        },
+        { status: 400 }
+      )
+    }
+
     if (totalJoursDisponibles < dureeJoursInt) {
       return NextResponse.json(
         {
@@ -219,39 +235,6 @@ export async function POST(request) {
           })
         }
       }
-    }
-
-    // Si aucun solde n'existe pour l'année du congé et ce type de congé, en créer un automatiquement
-    const soldeAnneeActuelle = await prisma.soldeConge.findUnique({
-      where: {
-        professeur_id_annee_type_conge_id: {
-          professeur_id: professeur_id,
-          annee: anneeConge,
-          type_conge_id: typeCongeIdInt,
-        },
-      },
-    })
-
-    if (!soldeAnneeActuelle) {
-      // Récupérer un solde de référence pour ce type (sinon défaut 22)
-      const soldeInitial = await prisma.soldeConge.findFirst({
-        where: { professeur_id: professeur_id, type_conge_id: typeCongeIdInt },
-        orderBy: { annee: 'desc' },
-      })
-
-      const joursTotal = soldeInitial?.jours_total || 22
-      const expireLe = new Date(anneeConge + 2, 11, 31) // 31 décembre de l'année + 2
-
-      await prisma.soldeConge.create({
-        data: {
-          professeur_id: professeur_id,
-          annee: anneeConge,
-          jours_total: joursTotal,
-          jours_restants: joursTotal, // Le solde de l'année du congé n'a pas encore été consommé
-          expire_le: expireLe,
-          type_conge_id: typeCongeIdInt,
-        },
-      })
     }
 
     // Créer le congé
