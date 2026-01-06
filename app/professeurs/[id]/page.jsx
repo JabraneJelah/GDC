@@ -68,7 +68,6 @@ export default function ProfesseurDetailsPage() {
     service_id: '',
     hopital_id: '',
     grade_id: '',
-    telephone: '',
   })
 
   useEffect(() => {
@@ -151,7 +150,6 @@ export default function ProfesseurDetailsPage() {
           service_id: data.service_id?.toString() || '',
           hopital_id: data.hopital_id?.toString() || '',
           grade_id: data.grade_id?.toString() || '',
-          telephone: data.telephone || '',
         })
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
@@ -557,17 +555,17 @@ export default function ProfesseurDetailsPage() {
             <div className="space-y-4">
               <div className="rounded-md border border-slate-200">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Année</TableHead>
-                      <TableHead>Type de congé</TableHead>
-                      <TableHead>Jours totaux</TableHead>
-                      <TableHead>Jours restants</TableHead>
-                      <TableHead>Expire le</TableHead>
-                      <TableHead>Actions</TableHead>
+                  <TableHeader className="">
+                    <TableRow className="">
+                      <TableHead className="">Année</TableHead>
+                      <TableHead className="">Type de congé</TableHead>
+                      <TableHead className="">Jours totaux</TableHead>
+                      <TableHead className="">Jours restants</TableHead>
+                      <TableHead className="">Expire le</TableHead>
+                      <TableHead className="">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
                     {soldes.map((solde) => {
                       const maintenant = new Date()
                       const expireLe = new Date(solde.expire_le)

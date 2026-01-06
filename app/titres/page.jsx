@@ -194,23 +194,23 @@ export default function TitresPage() {
 
       <div className="rounded-md border border-slate-200">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-slate-100">
             <TableRow>
               <TableHead>ID</TableHead>
               <TableHead>Nom</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {titres.length === 0 ? (
-              <TableRow>
+              <TableRow className="bg-white">
                 <TableCell colSpan={3} className="text-center">
                   Aucun titre trouvé
                 </TableCell>
               </TableRow>
             ) : (
               paginatedTitres.map((titre) => (
-                <TableRow key={titre.id}>
+                <TableRow key={titre.id} className="bg-white hover:bg-slate-50">
                   <TableCell>{titre.id}</TableCell>
                   <TableCell className="font-medium">{titre.nom}</TableCell>
                   <TableCell>

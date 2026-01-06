@@ -72,7 +72,6 @@ export default function ProfesseursPage() {
     service_id: '',
     hopital_id: '',
     grade_id: '',
-    telephone: '',
   })
 
   useEffect(() => {
@@ -196,7 +195,6 @@ export default function ProfesseursPage() {
           service_id: '',
           hopital_id: '',
           grade_id: '',
-          telephone: '',
         })
         setCurrentPage(1)
         fetchProfesseurs()
@@ -627,16 +625,6 @@ export default function ProfesseursPage() {
                     setFormData({ ...formData, ppr: e.target.value })
                   }
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telephone">Téléphone</Label>
-                <Input
-                  id="telephone"
-                  value={formData.telephone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telephone: e.target.value })
-                  }
                 />
               </div>
               <Button type="submit" className="w-full">

@@ -20,10 +20,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ToggleLeft, ToggleRight, RefreshCw } from 'lucide-react'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 6
 
 export default function UtilisateursPage() {
   const [utilisateurs, setUtilisateurs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
     username: '',
     nom_complet: '',
@@ -41,7 +45,16 @@ export default function UtilisateursPage() {
 
   useEffect(() => {
     fetchUtilisateurs()
+    setCurrentPage(1)
   }, [])
+
+  // Reset to page 1 if current page is out of bounds
+  useEffect(() => {
+    const totalPages = Math.ceil(utilisateurs.length / ITEMS_PER_PAGE)
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1)
+    }
+  }, [utilisateurs.length, currentPage])
 
   const fetchUtilisateurs = async () => {
     try {
@@ -74,6 +87,7 @@ export default function UtilisateursPage() {
       if (res.ok) {
         setFormData({ username: '', nom_complet: '' })
         setSuccessDialogOpen(true)
+        setCurrentPage(1)
         fetchUtilisateurs()
       } else {
         const data = await res.json()
@@ -236,18 +250,20 @@ export default function UtilisateursPage() {
           <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
             {loading ? (
               <TableRow className="bg-white">
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={5} className="text-center">
                   Chargement...
                 </TableCell>
               </TableRow>
             ) : utilisateurs.length === 0 ? (
               <TableRow className="bg-white">
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={5} className="text-center">
                   Aucun utilisateur RH
                 </TableCell>
               </TableRow>
             ) : (
-              utilisateurs.map((user) => (
+              utilisateurs
+                .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                .map((user) => (
                 <TableRow key={user.id} className="bg-white hover:bg-slate-50">
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.nom_complet}</TableCell>
@@ -308,6 +324,16 @@ export default function UtilisateursPage() {
             )}
           </TableBody>
         </Table>
+        {(() => {
+          const totalPages = Math.ceil(utilisateurs.length / ITEMS_PER_PAGE)
+          return !loading && totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => setCurrentPage(page)}
+            />
+          )
+        })()}
       </div>
 
       <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>

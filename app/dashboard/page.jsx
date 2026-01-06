@@ -23,7 +23,6 @@ import {
 import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
-import Link from 'next/link'
 
 const ITEMS_PER_PAGE = 5
 
@@ -390,15 +389,6 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Link href="/professeurs" className="w-full sm:w-auto">
-          <Button className="w-full sm:w-auto">Gérer les Professeurs</Button>
-        </Link>
-        <Link href="/conges" className="w-full sm:w-auto">
-          <Button variant="outline" className="w-full sm:w-auto">Gérer les Congés</Button>
-        </Link>
-      </div>
     </div>
   )
 }
