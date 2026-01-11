@@ -2,6 +2,6 @@ import React from 'react'
 
 export const page = () => {
   return (
-    <div>Statistiques</div>
+    <div>page</div>
   )
 }
