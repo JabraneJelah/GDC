@@ -8,8 +8,9 @@ services:
       POSTGRES_USER: conge
       POSTGRES_PASSWORD: conge123
       POSTGRES_DB: congedb
+      POSTGRES_INITDB_ARGS: "--auth-host=trust"
     ports:
-      - "5432:5432"
+      - "5433:5432"  # بدلنا 5432 بـ 5433 على برا
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
+export const runtime = "nodejs";
+
 
 export async function POST(req) {
-  // 1️⃣ نشوفو واش كاين شي RH دابا
   const count = await prisma.utilisateurRH.count();
+
+  
 
   if (count < 1) {
     return NextResponse.json(
@@ -13,7 +16,6 @@ export async function POST(req) {
     );
   }
 
-  // 2️⃣ نقرا body
   const { username, mot_de_passe, nom_complet } = await req.json();
 
   if (!username || !mot_de_passe || !nom_complet) {
@@ -23,7 +25,6 @@ export async function POST(req) {
     );
   }
 
-  // 3️⃣ نhashيو password
   const hash = await bcrypt.hash(mot_de_passe, 10);
 
   // 4️⃣ نخلق أول RH

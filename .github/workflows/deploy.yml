@@ -1,0 +1,17 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main ] # تأكد واش البرانش سميتها main أو master
+
+jobs:
+  deploy:
+    runs-on: self-hosted # حيت نتا ديجا أنستاليتي الـ Runner فالسيرفر
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy with Docker
+        run: |
+          sudo docker-compose down
+          sudo docker-compose up -d --build
