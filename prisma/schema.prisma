@@ -56,9 +56,9 @@ model Service {
 }
 
 model Hopital {
-  id      Int      @id @default(autoincrement())
-  nom     String   @unique
-  cree_le DateTime @default(now())
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
+  cree_le     DateTime     @default(now())
   professeurs Professeur[]
 
   @@map("hopitaux")
@@ -72,27 +72,26 @@ model Grade {
   @@map("grades")
 }
 
-
 model Professeur {
-  id                     String             @id @default(uuid())
+  id                     String              @id @default(uuid())
   nom                    String
   prenom                 String
-  ppr                    String             @unique
+  ppr                    String              @unique
   telephone              String?
-  cree_le                DateTime           @default(now())
-  categorie_personnel_id Int
-  specialite_id          Int
-  titre_id               Int
-  service_id             Int
-  Hopital_id             Int
-  grade_id               Int
+  cree_le                DateTime            @default(now())
+  categorie_personnel_id Int?
+  specialite_id          Int?
+  titre_id               Int?
+  service_id             Int?
+  Hopital_id             Int?
+  grade_id               Int?
   conges                 Conge[]
-  categorie_personnel    CategoriePersonnel @relation(fields: [categorie_personnel_id], references: [id])
-  service                Service            @relation(fields: [service_id], references: [id])
-  specialite             Specialite         @relation(fields: [specialite_id], references: [id])
-  titre                  Titre              @relation(fields: [titre_id], references: [id])
-  Hopital                Hopital            @relation(fields: [Hopital_id], references: [id])
-  grade                  Grade          @relation(fields: [grade_id], references: [id])
+  categorie_personnel    CategoriePersonnel? @relation(fields: [categorie_personnel_id], references: [id])
+  service                Service?            @relation(fields: [service_id], references: [id])
+  specialite             Specialite?         @relation(fields: [specialite_id], references: [id])
+  titre                  Titre?              @relation(fields: [titre_id], references: [id])
+  Hopital                Hopital?            @relation(fields: [Hopital_id], references: [id])
+  grade                  Grade?              @relation(fields: [grade_id], references: [id])
   soldes                 SoldeConge[]
 
   @@index([nom])

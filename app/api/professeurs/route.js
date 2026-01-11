@@ -57,7 +57,10 @@ export async function GET(request) {
         ppr: true,
         telephone: true,
         _count: {
-          select: { conges: true },
+          select: { 
+            conges: true,
+            soldes: true,
+          },
         },
         specialite: {
           select: {
@@ -147,58 +150,71 @@ export async function POST(request) {
       telephone,
     } = body
 
-    // 3️⃣ Validation basique
-    if (
-      !nom ||
-      !prenom ||
-      !ppr ||
-      !specialite_id ||
-      !categorie_personnel_id ||
-      !titre_id ||
-      !service_id ||
-      !hopital_id ||
-      !grade_id
-    ) {
+    // 3️⃣ Validation basique - seulement nom, prenom et ppr sont obligatoires
+    if (!nom || !prenom || !ppr) {
       return NextResponse.json(
-        { error: 'Tous les champs obligatoires doivent être remplis' },
+        { error: 'Les champs Nom, Prénom et PPR sont obligatoires' },
         { status: 400 }
       )
     }
 
-    // 4️⃣ Parsing IDs
-    const specialiteId = Number(specialite_id)
-    const categoriePersonnelId = Number(categorie_personnel_id)
-    const titreId = Number(titre_id)
-    const serviceId = Number(service_id)
-    const hopitalId = Number(hopital_id)
-    const gradeId = Number(grade_id)
+    // 4️⃣ Parsing IDs (optionnels)
+    const specialiteId = specialite_id ? Number(specialite_id) : null
+    const categoriePersonnelId = categorie_personnel_id ? Number(categorie_personnel_id) : null
+    const titreId = titre_id ? Number(titre_id) : null
+    const serviceId = service_id ? Number(service_id) : null
+    const hopitalId = hopital_id ? Number(hopital_id) : null
+    const gradeId = grade_id ? Number(grade_id) : null
 
-    if (
-      [specialiteId, categoriePersonnelId, titreId, serviceId, hopitalId, gradeId].some(
-        isNaN
-      )
-    ) {
-      return NextResponse.json(
-        { error: 'IDs invalides' },
-        { status: 400 }
-      )
+    // Vérifier que les IDs fournis sont valides
+    const idsToCheck = [
+      { value: specialiteId, name: 'spécialité' },
+      { value: categoriePersonnelId, name: 'catégorie personnel' },
+      { value: titreId, name: 'titre' },
+      { value: serviceId, name: 'service' },
+      { value: hopitalId, name: 'hôpital' },
+      { value: gradeId, name: 'grade' },
+    ]
+
+    for (const { value, name } of idsToCheck) {
+      if (value !== null && isNaN(value)) {
+        return NextResponse.json(
+          { error: `ID invalide pour ${name}` },
+          { status: 400 }
+        )
+      }
     }
 
-    // 5️⃣ Vérifier existence des relations
-    const [specialite, categorie, titre, service, hopital, grade] = await Promise.all([
-      prisma.specialite.findUnique({ where: { id: specialiteId } }),
-      prisma.categoriePersonnel.findUnique({ where: { id: categoriePersonnelId } }),
-      prisma.titre.findUnique({ where: { id: titreId } }),
-      prisma.service.findUnique({ where: { id: serviceId } }),
-      prisma.hopital.findUnique({ where: { id: hopitalId } }),
-      prisma.grade.findUnique({ where: { id: gradeId } }),
-    ])
+    // 5️⃣ Vérifier existence des relations (seulement si fournies)
+    const checks = []
+    if (specialiteId !== null) {
+      checks.push(prisma.specialite.findUnique({ where: { id: specialiteId } }).then(r => ({ type: 'specialite', result: r })))
+    }
+    if (categoriePersonnelId !== null) {
+      checks.push(prisma.categoriePersonnel.findUnique({ where: { id: categoriePersonnelId } }).then(r => ({ type: 'categorie', result: r })))
+    }
+    if (titreId !== null) {
+      checks.push(prisma.titre.findUnique({ where: { id: titreId } }).then(r => ({ type: 'titre', result: r })))
+    }
+    if (serviceId !== null) {
+      checks.push(prisma.service.findUnique({ where: { id: serviceId } }).then(r => ({ type: 'service', result: r })))
+    }
+    if (hopitalId !== null) {
+      checks.push(prisma.hopital.findUnique({ where: { id: hopitalId } }).then(r => ({ type: 'hopital', result: r })))
+    }
+    if (gradeId !== null) {
+      checks.push(prisma.grade.findUnique({ where: { id: gradeId } }).then(r => ({ type: 'grade', result: r })))
+    }
 
-    if (!specialite || !categorie || !titre || !service || !hopital || !grade) {
-      return NextResponse.json(
-        { error: 'Relation introuvable (spécialité, catégorie, titre, service, hôpital ou grade)' },
-        { status: 404 }
-      )
+    const checkResults = await Promise.all(checks)
+    
+    for (const check of checkResults) {
+      if (!check.result) {
+        return NextResponse.json(
+          { error: `Relation introuvable: ${check.type}` },
+          { status: 404 }
+        )
+      }
     }
 
     // 6️⃣ Vérifier unicité du PPR
@@ -213,33 +229,36 @@ export async function POST(request) {
       )
     }
 
-    // 7️⃣ Création du professeur (relations avec connect)
-    const professeur = await prisma.professeur.create({
-      data: {
-        nom,
-        prenom,
-        ppr,
-        telephone: telephone || null,
+    // 7️⃣ Création du professeur (utiliser les IDs directement pour les champs optionnels)
+    const data = {
+      nom,
+      prenom,
+      ppr,
+      telephone: telephone || null,
+    }
 
-        specialite: {
-          connect: { id: specialiteId },
-        },
-        categorie_personnel: {
-          connect: { id: categoriePersonnelId },
-        },
-        titre: {
-          connect: { id: titreId },
-        },
-        service: {
-          connect: { id: serviceId },
-        },
-        Hopital: {
-          connect: { id: hopitalId },
-        },
-        grade: {
-          connect: { id: gradeId },
-        },
-      },
+    // Ajouter les IDs seulement s'ils sont fournis (non null)
+    if (specialiteId !== null) {
+      data.specialite_id = specialiteId
+    }
+    if (categoriePersonnelId !== null) {
+      data.categorie_personnel_id = categoriePersonnelId
+    }
+    if (titreId !== null) {
+      data.titre_id = titreId
+    }
+    if (serviceId !== null) {
+      data.service_id = serviceId
+    }
+    if (hopitalId !== null) {
+      data.Hopital_id = hopitalId
+    }
+    if (gradeId !== null) {
+      data.grade_id = gradeId
+    }
+
+    const professeur = await prisma.professeur.create({
+      data,
     })
 
     // 8️⃣ Retour OK
@@ -247,6 +266,82 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Erreur création professeur:', error)
+    return NextResponse.json(
+      { error: 'Erreur serveur' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE - Supprimer plusieurs professeurs
+export async function DELETE(request) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { ids } = body
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: 'Aucun ID de professeur fourni' },
+        { status: 400 }
+      )
+    }
+
+    // Vérifier que tous les IDs sont valides
+    const validIds = ids.filter(id => typeof id === 'string' && id.trim() !== '')
+    
+    if (validIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Aucun ID valide fourni' },
+        { status: 400 }
+      )
+    }
+
+    // Récupérer les professeurs avec leurs compteurs avant suppression
+    const professeurs = await prisma.professeur.findMany({
+      where: {
+        id: { in: validIds },
+      },
+      include: {
+        _count: {
+          select: {
+            conges: true,
+            soldes: true,
+          },
+        },
+      },
+    })
+
+    if (professeurs.length === 0) {
+      return NextResponse.json(
+        { error: 'Aucun professeur trouvé avec les IDs fournis' },
+        { status: 404 }
+      )
+    }
+
+    // Supprimer les professeurs (les congés et soldes seront supprimés en cascade)
+    await prisma.professeur.deleteMany({
+      where: {
+        id: { in: validIds },
+      },
+    })
+
+    // Calculer les totaux
+    const totalConges = professeurs.reduce((sum, p) => sum + p._count.conges, 0)
+    const totalSoldes = professeurs.reduce((sum, p) => sum + p._count.soldes, 0)
+
+    return NextResponse.json({
+      message: `${professeurs.length} professeur(s) supprimé(s) avec succès`,
+      deletedCount: professeurs.length,
+      deletedConges: totalConges,
+      deletedSoldes: totalSoldes,
+    })
+  } catch (error) {
+    console.error('Erreur lors de la suppression multiple:', error)
     return NextResponse.json(
       { error: 'Erreur serveur' },
       { status: 500 }

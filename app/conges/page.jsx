@@ -61,6 +61,8 @@ export default function CongesPage() {
     nom_interim: '',
     prenom_interim: '',
   })
+  const [professeurSearch, setProfesseurSearch] = useState('')
+  const [professeurSearchOpen, setProfesseurSearchOpen] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -169,6 +171,8 @@ export default function CongesPage() {
         setOpen(false)
         setEditOpen(false)
         resetForm()
+        setProfesseurSearch('')
+        setProfesseurSearchOpen(false)
         setCurrentPage(1)
         fetchData()
       } else {
@@ -242,11 +246,22 @@ export default function CongesPage() {
     setOpen(open)
     if (!open) {
       resetForm()
+      setProfesseurSearch('')
+      setProfesseurSearchOpen(false)
     }
   }
 
   const handleEditOpenChange = (open) => {
     setEditOpen(open)
+    if (open && formData.professeur_id) {
+      const prof = professeurs.find(p => p.id === formData.professeur_id)
+      if (prof) {
+        setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
+      }
+    } else if (!open) {
+      setProfesseurSearch('')
+      setProfesseurSearchOpen(false)
+    }
     if (!open) {
       resetForm()
     }
@@ -306,24 +321,61 @@ export default function CongesPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="professeur_id">Professeur *</Label>
-                <Select
-                  value={formData.professeur_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, professeur_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un professeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {professeurs.map((prof) => (
-                      <SelectItem key={prof.id} value={prof.id}>
-                        {prof.prenom} {prof.nom} ({prof.ppr})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    id="professeur_id"
+                    placeholder="Rechercher un professeur (nom, prénom, PPR)..."
+                    value={professeurSearch}
+                    onChange={(e) => {
+                      setProfesseurSearch(e.target.value)
+                      setProfesseurSearchOpen(true)
+                    }}
+                    onFocus={() => setProfesseurSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 200)}
+                    required
+                  />
+                  {professeurSearchOpen && professeurSearch && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {professeurs
+                        .filter((prof) => {
+                          const searchLower = professeurSearch.toLowerCase()
+                          const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                          return nomComplet.includes(searchLower)
+                        })
+                        .slice(0, 10)
+                        .map((prof) => (
+                          <div
+                            key={prof.id}
+                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                            onClick={() => {
+                              setFormData({ ...formData, professeur_id: prof.id })
+                              setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
+                              setProfesseurSearchOpen(false)
+                            }}
+                          >
+                            {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                          </div>
+                        ))}
+                      {professeurs.filter((prof) => {
+                        const searchLower = professeurSearch.toLowerCase()
+                        const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                        return nomComplet.includes(searchLower)
+                      }).length === 0 && (
+                        <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
+                      )}
+                    </div>
+                  )}
+                  {formData.professeur_id && !professeurSearch && (
+                    <div className="mt-1 text-sm text-slate-600">
+                      {professeurs.find(p => p.id === formData.professeur_id) && (
+                        <span>
+                          {professeurs.find(p => p.id === formData.professeur_id).titre?.nom ? `${professeurs.find(p => p.id === formData.professeur_id).titre.nom} ` : ''}
+                          {professeurs.find(p => p.id === formData.professeur_id).prenom} {professeurs.find(p => p.id === formData.professeur_id).nom} ({professeurs.find(p => p.id === formData.professeur_id).ppr})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type_conge_id">Type de congé *</Label>
@@ -388,21 +440,10 @@ export default function CongesPage() {
                   type="number"
                   value={formData.duree_jours}
                   readOnly
-                  className="bg-slate-50 cursor-not-allowed"
+                  className="bg-slate-100"
                   required
                 />
                 <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reference_doc">Référence document</Label>
-                <Input
-                  id="reference_doc"
-                  value={formData.reference_doc}
-                  onChange={(e) =>
-                    setFormData({ ...formData, reference_doc: e.target.value })
-                  }
-                  placeholder="Réf. du document papier"
-                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nom_interim">Nom de l'intérim</Label>
@@ -445,24 +486,61 @@ export default function CongesPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="edit_professeur_id">Professeur *</Label>
-                <Select
-                  value={formData.professeur_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, professeur_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un professeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {professeurs.map((prof) => (
-                      <SelectItem key={prof.id} value={prof.id}>
-                        {prof.prenom} {prof.nom} ({prof.ppr})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    id="edit_professeur_id"
+                    placeholder="Rechercher un professeur (nom, prénom, PPR)..."
+                    value={professeurSearch}
+                    onChange={(e) => {
+                      setProfesseurSearch(e.target.value)
+                      setProfesseurSearchOpen(true)
+                    }}
+                    onFocus={() => setProfesseurSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 200)}
+                    required
+                  />
+                  {professeurSearchOpen && professeurSearch && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {professeurs
+                        .filter((prof) => {
+                          const searchLower = professeurSearch.toLowerCase()
+                          const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                          return nomComplet.includes(searchLower)
+                        })
+                        .slice(0, 10)
+                        .map((prof) => (
+                          <div
+                            key={prof.id}
+                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                            onClick={() => {
+                              setFormData({ ...formData, professeur_id: prof.id })
+                              setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
+                              setProfesseurSearchOpen(false)
+                            }}
+                          >
+                            {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                          </div>
+                        ))}
+                      {professeurs.filter((prof) => {
+                        const searchLower = professeurSearch.toLowerCase()
+                        const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                        return nomComplet.includes(searchLower)
+                      }).length === 0 && (
+                        <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
+                      )}
+                    </div>
+                  )}
+                  {formData.professeur_id && !professeurSearch && (
+                    <div className="mt-1 text-sm text-slate-600">
+                      {professeurs.find(p => p.id === formData.professeur_id) && (
+                        <span>
+                          {professeurs.find(p => p.id === formData.professeur_id).titre?.nom ? `${professeurs.find(p => p.id === formData.professeur_id).titre.nom} ` : ''}
+                          {professeurs.find(p => p.id === formData.professeur_id).prenom} {professeurs.find(p => p.id === formData.professeur_id).nom} ({professeurs.find(p => p.id === formData.professeur_id).ppr})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_type_conge_id">Type de congé *</Label>
@@ -527,21 +605,10 @@ export default function CongesPage() {
                   type="number"
                   value={formData.duree_jours}
                   readOnly
-                  className="bg-slate-50 cursor-not-allowed"
+                  className="bg-slate-100"
                   required
                 />
                 <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_reference_doc">Référence document</Label>
-                <Input
-                  id="edit_reference_doc"
-                  value={formData.reference_doc}
-                  onChange={(e) =>
-                    setFormData({ ...formData, reference_doc: e.target.value })
-                  }
-                  placeholder="Réf. du document papier"
-                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_nom_interim">Nom de l'intérim</Label>
@@ -583,7 +650,7 @@ export default function CongesPage() {
                   <div className="mt-4 p-3 bg-slate-50 rounded-md">
                     <p className="text-sm font-medium">
                       {congeToDelete.professeur
-                        ? `${congeToDelete.professeur.prenom || ''} ${congeToDelete.professeur.nom || ''}`.trim() || 'Professeur inconnu'
+                        ? `${congeToDelete.professeur.titre?.nom ? `${congeToDelete.professeur.titre.nom} ` : ''}${congeToDelete.professeur.prenom || ''} ${congeToDelete.professeur.nom || ''}`.trim() || 'Professeur inconnu'
                         : 'Professeur inconnu'}
                     </p>
                     <p className="text-xs text-slate-600">
@@ -722,7 +789,7 @@ export default function CongesPage() {
                 <TableRow key={conge.id}>
                   <TableCell>
                     {conge.professeur
-                      ? `${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '-'
+                      ? `${conge.professeur.titre?.nom ? `${conge.professeur.titre.nom} ` : ''}${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '-'
                       : '-'}
                   </TableCell>
                   <TableCell>

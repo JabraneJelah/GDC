@@ -17,8 +17,9 @@ export async function GET() {
     return NextResponse.json(grades)
   } catch (error) {
     console.error('Erreur lors de la récupération des grades:', error)
+    const errorMessage = error.message || 'Erreur serveur'
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: errorMessage, details: process.env.NODE_ENV === 'development' ? error.stack : undefined },
       { status: 500 }
     )
   }
@@ -61,8 +62,10 @@ export async function POST(request) {
     return NextResponse.json(grade, { status: 201 })
   } catch (error) {
     console.error('Erreur lors de la création du grade:', error)
+    // Provide more detailed error message for debugging
+    const errorMessage = error.message || 'Erreur serveur'
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: errorMessage, details: process.env.NODE_ENV === 'development' ? error.stack : undefined },
       { status: 500 }
     )
   }
