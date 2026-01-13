@@ -2,11 +2,10 @@ name: Deploy to Server
 
 on:
   push:
-    branches: [ main ] # تأكد واش البرانش سميتها main أو master
-
+    branches: [ main ] 
 jobs:
   deploy:
-    runs-on: self-hosted # حيت نتا ديجا أنستاليتي الـ Runner فالسيرفر
+    runs-on: self-hosted 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
