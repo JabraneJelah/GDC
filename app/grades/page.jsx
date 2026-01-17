@@ -124,7 +124,7 @@ export default function GradesPage() {
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la suppression')
+      setErrorMessage('Erreur lors de la suppressio de ce article n')
       setErrorDialogOpen(true)
       setDeleteDialogOpen(false)
       setGradeToDelete(null)
@@ -142,7 +142,7 @@ export default function GradesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        Chargement...
+        Chargement... wait a minute
       </div>
     )
   }
