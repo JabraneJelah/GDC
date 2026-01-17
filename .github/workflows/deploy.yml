@@ -2,16 +2,26 @@ name: Deploy to Server
 
 on:
   push:
-    branches: [ main ] 
+    branches: [ main ]
+
 jobs:
   deploy:
-    runs-on: self-hosted 
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # هذه هي المرحلة المهمة لحل مشكل الـ .env
+      - name: Create .env file
+        run: |
+          touch .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
+          # تأكد أن أسماء الـ Secrets هنا تطابق تماماً ما وضعته في GitHub Settings
+
       - name: Deploy with Docker
         run: |
-           ls -la
-           docker compose down
-           docker compose up -d --build
+          # تنظيف أي حاجة قديمة وتشغيل المشروع بالـ Build الجديد
+          docker compose down
+          docker compose up -d --build

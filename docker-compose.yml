@@ -10,7 +10,7 @@ services:
       POSTGRES_DB: congedb
       POSTGRES_INITDB_ARGS: "--auth-host=trust"
     ports:
-      - "5433:5432"  # بدلنا 5432 بـ 5433 على برا
+      - "5433:5432"  
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,6 @@ services:
     env_file:
       - .env
     environment:
-      # DATABASE_URL uses 'postgres' hostname (Docker service name) for container networking
       DATABASE_URL: postgresql://conge:conge123@postgres:5432/congedb
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       NODE_ENV: ${NODE_ENV:-production}
