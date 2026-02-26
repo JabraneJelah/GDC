@@ -4,6 +4,22 @@ import { getCurrentUser } from '@/lib/auth'
 import { getExpireLe } from '@/lib/solde-expiration'
 import * as XLSX from 'xlsx'
 
+/** Message court et compréhensible pour l'utilisateur (pas de détails techniques backend) */
+function messageErreurUtilisateur(err) {
+  const msg = err?.message || String(err)
+  if (/prisma|invocation|ECONNREFUSED|database|connect/i.test(msg)) {
+    return 'Base de données inaccessible. Vérifiez que le serveur est démarré.'
+  }
+  if (/unique|duplicate|exists already/i.test(msg)) {
+    return 'Cette donnée existe déjà (doublon).'
+  }
+  if (/foreign key|constraint|reference/i.test(msg)) {
+    return 'Référence invalide (spécialité, catégorie ou titre manquant dans l\'application).'
+  }
+  if (msg.length > 120) return 'Erreur lors de l\'opération. Vérifiez les données du fichier.'
+  return msg
+}
+
 // POST - Importer les soldes depuis un fichier Excel
 export async function POST(request) {
   try {
@@ -534,7 +550,7 @@ export async function POST(request) {
         } catch (error) {
           results.errors.push({
             row: i + 1,
-            reason: `Erreur lors de la création du professeur: ${error.message}`,
+            reason: `Création du professeur : ${messageErreurUtilisateur(error)}`,
             nom,
             prenom,
           })
@@ -628,7 +644,7 @@ export async function POST(request) {
         } catch (error) {
           results.errors.push({
             row: i + 1,
-            reason: `Erreur lors de la création/mise à jour du solde: ${error.message}`,
+            reason: `Solde (${soldeCol.header}) : ${messageErreurUtilisateur(error)}`,
             nom,
             prenom,
             solde: soldeCol.header,
@@ -649,8 +665,11 @@ export async function POST(request) {
     })
   } catch (error) {
     console.error('Erreur lors de l\'import Excel:', error)
+    const message = /prisma|invocation|ECONNREFUSED|database|connect/i.test(error.message || '')
+      ? 'Impossible d\'accéder à la base de données. Vérifiez qu\'elle est démarrée et que le fichier respecte le format (colonnes Nom, Prénom, et soldes du type "Administratif 2024", "Exceptionnel 2025", etc.).'
+      : messageErreurUtilisateur(error)
     return NextResponse.json(
-      { error: `Erreur serveur: ${error.message}` },
+      { error: message },
       { status: 500 }
     )
   }

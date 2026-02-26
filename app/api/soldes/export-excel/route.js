@@ -95,8 +95,11 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Erreur lors de l\'export Excel des soldes:', error)
+    const message = /prisma|invocation|ECONNREFUSED|database/i.test(error.message)
+      ? 'Une erreur est survenue. Vérifiez que la base de données est accessible.'
+      : `Erreur: ${error.message}`
     return NextResponse.json(
-      { error: `Erreur serveur: ${error.message}` },
+      { error: message },
       { status: 500 }
     )
   }

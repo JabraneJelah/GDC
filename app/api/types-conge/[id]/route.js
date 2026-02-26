@@ -76,8 +76,12 @@ export async function PUT(request, { params }) {
     return NextResponse.json(typeConge)
   } catch (error) {
     console.error('Erreur lors de la mise à jour du type de congé:', error)
+    const msg = error?.message || ''
+    const friendly = /prisma|invocation|ECONNREFUSED|database/i.test(msg)
+      ? 'Impossible de modifier le type. Vérifiez que la base de données est accessible.'
+      : 'Impossible de modifier le type. Réessayez.'
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: friendly },
       { status: 500 }
     )
   }
@@ -145,8 +149,14 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ message: 'Type de congé supprimé avec succès' })
   } catch (error) {
     console.error('Erreur lors de la suppression du type de congé:', error)
+    const msg = error?.message || ''
+    const friendly = /prisma|invocation|ECONNREFUSED|database/i.test(msg)
+      ? 'Impossible de supprimer. Vérifiez que la base de données est accessible.'
+      : /foreign key|constraint/i.test(msg)
+        ? 'Ce type est utilisé par des soldes ou congés et ne peut pas être supprimé.'
+        : 'Impossible de supprimer. Réessayez.'
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: friendly },
       { status: 500 }
     )
   }

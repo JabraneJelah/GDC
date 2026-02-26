@@ -181,8 +181,11 @@ export async function POST(request) {
     })
   } catch (error) {
     console.error('Erreur lors de l\'ajout en masse des soldes annuels:', error)
+    const message = /prisma|invocation|ECONNREFUSED|database/i.test(error.message)
+      ? 'Une erreur est survenue. Vérifiez que la base de données est accessible et que les types de congé existent (Référentiel > Types de congé).'
+      : `Erreur: ${error.message}`
     return NextResponse.json(
-      { error: `Erreur serveur: ${error.message}` },
+      { error: message },
       { status: 500 }
     )
   }
