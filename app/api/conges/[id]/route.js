@@ -2,6 +2,27 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+/** Jours ouvrables entre deux dates (exclut week-end et jours fériés). */
+async function getWorkingDaysBetween(dateDebutStr, dateFinStr, prismaClient) {
+  const start = new Date(dateDebutStr + 'T00:00:00')
+  const end = new Date(dateFinStr + 'T00:00:00')
+  if (end < start) return 0
+  const joursFeries = await prismaClient.jourFerie.findMany({
+    where: { actif: true, date: { gte: start, lte: end } },
+    select: { date: true },
+  })
+  const ferieSet = new Set(joursFeries.map((j) => j.date.toISOString().slice(0, 10)))
+  let count = 0
+  const current = new Date(start)
+  while (current <= end) {
+    const dayOfWeek = current.getDay()
+    const ymd = current.toISOString().slice(0, 10)
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !ferieSet.has(ymd)) count++
+    current.setDate(current.getDate() + 1)
+  }
+  return count
+}
+
 // PUT - Mettre à jour un congé
 export async function PUT(request, { params }) {
   try {
@@ -49,34 +70,25 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Validation des champs obligatoires
-    if (
-      !professeur_id ||
-      !type_conge_id ||
-      !date_debut ||
-      !date_fin ||
-      !duree_jours
-    ) {
+    if (!professeur_id || !type_conge_id || !date_debut || !date_fin) {
       return NextResponse.json(
         { error: 'Tous les champs obligatoires doivent être remplis' },
         { status: 400 }
       )
     }
 
-    // Convertir type_conge_id et duree_jours en entiers
-    const typeCongeIdInt = parseInt(type_conge_id, 10)
-    const dureeJoursInt = parseInt(duree_jours, 10)
-
-    if (isNaN(typeCongeIdInt)) {
+    const dureeJoursInt = await getWorkingDaysBetween(date_debut, date_fin, prisma)
+    if (dureeJoursInt <= 0) {
       return NextResponse.json(
-        { error: 'Type de congé invalide' },
+        { error: 'Aucun jour ouvrable dans cette période (vérifiez les dates et les jours fériés)' },
         { status: 400 }
       )
     }
 
-    if (isNaN(dureeJoursInt) || dureeJoursInt <= 0) {
+    const typeCongeIdInt = parseInt(type_conge_id, 10)
+    if (isNaN(typeCongeIdInt)) {
       return NextResponse.json(
-        { error: 'Durée en jours invalide' },
+        { error: 'Type de congé invalide' },
         { status: 400 }
       )
     }
@@ -285,8 +297,6 @@ export async function PUT(request, { params }) {
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
         reference_doc: reference_doc || null,
-        nom_interim: nom_interim || null,
-        prenom_interim: prenom_interim || null,
       },
       include: {
         professeur: {

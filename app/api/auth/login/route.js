@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyPassword, generateToken } from '@/lib/auth'
+import { verifyPassword, generateToken, hashPassword } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
@@ -18,8 +18,10 @@ export async function POST(request) {
       )
     }
 
-    const utilisateur = await prisma.utilisateurRH.findUnique({
-      where: { username },
+    const utilisateur = await prisma.utilisateurRH.findFirst({
+      where: {
+        username: { equals: username, mode: 'insensitive' },
+      },
     })
 
     if (!utilisateur) {
@@ -30,7 +32,28 @@ export async function POST(request) {
       )
     }
 
-    const isValid = await verifyPassword(mot_de_passe, utilisateur.mot_de_passe)
+    // Check if password is stored as plain text or bcrypt hash
+    // Bcrypt hashes start with $2a$, $2b$, or $2y$ and are 60 characters long
+    const isHashed = utilisateur.mot_de_passe && 
+                     (utilisateur.mot_de_passe.startsWith('$2a$') || 
+                      utilisateur.mot_de_passe.startsWith('$2b$') || 
+                      utilisateur.mot_de_passe.startsWith('$2y$')) &&
+                     utilisateur.mot_de_passe.length === 60
+
+    let isValid = false
+    let needsRehash = false
+
+    if (isHashed) {
+      // Password is hashed, use bcrypt compare
+      isValid = await verifyPassword(mot_de_passe, utilisateur.mot_de_passe)
+    } else {
+      // Password is plain text, compare directly
+      isValid = utilisateur.mot_de_passe === mot_de_passe
+      if (isValid) {
+        // Mark for re-hashing after successful login
+        needsRehash = true
+      }
+    }
 
     if (!isValid) {
       console.log("Invalid password for user:", username)
@@ -38,6 +61,16 @@ export async function POST(request) {
         { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
         { status: 401 }
       )
+    }
+
+    // If password was plain text, hash it now and update the database
+    if (needsRehash) {
+      const hashedPassword = await hashPassword(mot_de_passe)
+      await prisma.utilisateurRH.update({
+        where: { id: utilisateur.id },
+        data: { mot_de_passe: hashedPassword },
+      })
+      console.log("Password hashed and updated for user:", username)
     }
 
     // Vérifier si le compte est actif

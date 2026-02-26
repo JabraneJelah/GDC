@@ -40,8 +40,10 @@ export async function POST(request) {
       )
     }
 
-    const existing = await prisma.utilisateurRH.findUnique({
-      where: { username },
+    const existing = await prisma.utilisateurRH.findFirst({
+      where: {
+        username: { equals: username, mode: 'insensitive' },
+      },
     })
 
     if (existing) {

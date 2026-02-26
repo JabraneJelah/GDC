@@ -253,7 +253,7 @@ export default function ProfesseurDetailsPage() {
         body: JSON.stringify({
           annee: parseInt(soldeFormData.annee, 10),
           jours_total: parseInt(soldeFormData.jours_total, 10),
-          jours_restants: parseInt(soldeFormData.jours_restants, 10),
+          jours_restants: editingSolde ? parseInt(soldeFormData.jours_restants, 10) : undefined,
           type_conge_id: soldeFormData.type_conge_id ? parseInt(soldeFormData.type_conge_id, 10) : null,
         }),
       })
@@ -523,7 +523,7 @@ export default function ProfesseurDetailsPage() {
               <p className="text-sm text-slate-700">Service : <span className="font-medium">{professeur.service?.nom || '-'}</span></p>
             </div>
             <div>
-              <p className="text-sm text-slate-700">Hôpital : <span className="font-medium">{professeur.Hopital?.nom || '-'}</span></p>
+              <p className="text-sm text-slate-700">Hôpital : <span className="font-medium">{professeur.hopital?.nom || '-'}</span></p>
             </div>
             <div>
               <p className="text-sm text-slate-700">Grade : <span className="font-medium">{professeur.grade?.nom || '-'}</span></p>
@@ -623,6 +623,10 @@ export default function ProfesseurDetailsPage() {
                   <p className="text-lg font-semibold text-[#16A34A]">
                     {soldes
                       .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
+                      .filter(s => {
+                        const typeNom = (s.type_conge?.nom || '').toLowerCase()
+                        return !typeNom.includes('exceptionnel') && !typeNom.includes('excepcionel')
+                      })
                       .reduce((sum, solde) => sum + solde.jours_restants, 0)} jours
                   </p>
                 </div>

@@ -21,6 +21,15 @@ export async function GET(request, { params }) {
       )
     }
 
+    // Supprimer automatiquement les soldes expirés pour ce professeur
+    const maintenant = new Date()
+    await prisma.soldeConge.deleteMany({
+      where: {
+        professeur_id: id,
+        expire_le: { lt: maintenant },
+      },
+    })
+
     const professeur = await prisma.professeur.findUnique({
       where: { id },
       include: {
@@ -28,7 +37,7 @@ export async function GET(request, { params }) {
         categorie_personnel: true,
         titre: true,
         service: true,
-        Hopital: true,
+        hopital: true,
         grade: true,
         conges: {
           include: {
@@ -42,10 +51,8 @@ export async function GET(request, { params }) {
           orderBy: { date_debut: 'desc' },
         },
         soldes: {
-          include: {
-            type_conge: true,
-          },
-          orderBy: { annee: 'desc' }, // Plus récent en premier
+          include: { type_conge: true },
+          orderBy: [{ annee: 'desc' }, { type_conge_id: 'asc' }],
         },
       },
     })
@@ -201,7 +208,7 @@ export async function PUT(request, { params }) {
 
     if (hopital_id !== undefined) {
       if (hopital_id === null || hopital_id === '') {
-        updateData.Hopital_id = null
+        updateData.hopital_id = null
       } else {
         const hopitalIdInt = parseInt(hopital_id, 10)
         if (!isNaN(hopitalIdInt)) {
@@ -209,7 +216,7 @@ export async function PUT(request, { params }) {
             where: { id: hopitalIdInt },
           })
           if (hopitalExists) {
-            updateData.Hopital_id = hopitalIdInt
+            updateData.hopital_id = hopitalIdInt
           }
         }
       }

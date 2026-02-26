@@ -1,15 +1,19 @@
+import 'dotenv/config'
+import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
-import { PrismaClient } from '@prisma/client'
 
+const connectionString = process.env.DATABASE_URL
+if (!connectionString) {
+  console.error('❌ DATABASE_URL is not set in .env')
+  process.exit(1)
+}
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL,
-})
+const adapter = new PrismaPg({ connectionString })
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  console.log('Seeding database...')
+  console.log('🌱 Seeding database...')
 
   const typesConge = [
     { nom: 'Annuel', document_obligatoire: false },
@@ -31,15 +35,16 @@ async function main() {
       })
       console.log(`Type de congé créé: ${type.nom}`)
     } else {
-      console.log(` Type de congé déjà existant: ${type.nom}`)
+      console.log(`Type de congé déjà existant: ${type.nom}`)
     }
   }
 
-  const defaultEmail = 'admin@example.com'
-  const defaultPassword = 'admin123' 
+  // Créer un utilisateur RH par défaut (pour le développement)
+  const defaultUsername = 'admin'
+  const defaultPassword = 'admin123' // À changer en production!
 
   const existingUser = await prisma.utilisateurRH.findUnique({
-    where: { email: defaultEmail },
+    where: { username: defaultUsername },
   })
 
   if (!existingUser) {
@@ -48,14 +53,16 @@ async function main() {
 
     await prisma.utilisateurRH.create({
       data: {
-        email: defaultEmail,
+        username: defaultUsername,
+        email: 'admin@example.com', // Optionnel, pour référence
         mot_de_passe: hashedPassword,
         nom_complet: 'Administrateur RH',
+        actif: true,
       },
     })
-    console.log(`✅ Utilisateur RH créé: ${defaultEmail} / ${defaultPassword}`)
+    console.log(`✅ Utilisateur RH créé: ${defaultUsername} / ${defaultPassword}`)
   } else {
-    console.log(`⏭️  Utilisateur RH déjà existant: ${defaultEmail}`)
+    console.log(`⏭️  Utilisateur RH déjà existant: ${defaultUsername}`)
   }
 
   console.log('✨ Seeding completed!')

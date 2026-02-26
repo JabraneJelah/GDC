@@ -2,6 +2,38 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+/**
+ * Calcule le nombre de jours ouvrables entre deux dates (exclut samedi, dimanche et jours fériés actifs).
+ */
+async function getWorkingDaysBetween(dateDebutStr, dateFinStr, prismaClient) {
+  const start = new Date(dateDebutStr + 'T00:00:00')
+  const end = new Date(dateFinStr + 'T00:00:00')
+  if (end < start) return 0
+
+  const joursFeries = await prismaClient.jourFerie.findMany({
+    where: {
+      actif: true,
+      date: { gte: start, lte: end },
+    },
+    select: { date: true },
+  })
+  const ferieSet = new Set(
+    joursFeries.map((j) => j.date.toISOString().slice(0, 10))
+  )
+
+  let count = 0
+  const current = new Date(start)
+  while (current <= end) {
+    const dayOfWeek = current.getDay()
+    const ymd = current.toISOString().slice(0, 10)
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const isFerie = ferieSet.has(ymd)
+    if (!isWeekend && !isFerie) count++
+    current.setDate(current.getDate() + 1)
+  }
+  return count
+}
+
 // GET - Liste des congés
 export async function GET(request) {
   try {
@@ -23,8 +55,6 @@ export async function GET(request) {
         date_fin: true,
         duree_jours: true,
         reference_doc: true,
-        nom_interim: true,
-        prenom_interim: true,
         cree_le: true,
         professeur: {
           select: {
@@ -77,7 +107,7 @@ export async function POST(request) {
     const body = await request.json()
     const {
       professeur_id,
-      type_conge_id,
+      type_conge_id: typeCongeIdRaw,
       date_debut,
       date_fin,
       duree_jours,
@@ -86,36 +116,33 @@ export async function POST(request) {
       prenom_interim,
     } = body
 
-    if (
-      !professeur_id ||
-      !type_conge_id ||
-      !date_debut ||
-      !date_fin ||
-      !duree_jours
-    ) {
+    // Accepter type_conge_id en nombre ou chaîne (évite erreur si le front envoie "1" ou 1)
+    const type_conge_id = typeCongeIdRaw != null && typeCongeIdRaw !== ''
+      ? (typeof typeCongeIdRaw === 'number' ? typeCongeIdRaw : parseInt(typeCongeIdRaw, 10))
+      : null
+
+    const missing = []
+    if (!professeur_id) missing.push('professeur')
+    if (type_conge_id == null || isNaN(type_conge_id)) missing.push('type de congé')
+    if (!date_debut) missing.push('date de départ')
+    if (!date_fin) missing.push('date de fin / date de retour')
+    if (missing.length > 0) {
       return NextResponse.json(
-        { error: 'Tous les champs obligatoires doivent être remplis' },
+        { error: `Champs obligatoires manquants : ${missing.join(', ')}. Vérifiez que vous avez sélectionné un professeur, un type de congé, une date de départ et une durée (la date de fin est calculée automatiquement).` },
         { status: 400 }
       )
     }
 
-    // Convertir type_conge_id et duree_jours en entiers
-    const typeCongeIdInt = parseInt(type_conge_id, 10)
-    const dureeJoursInt = parseInt(duree_jours, 10)
-    
-    if (isNaN(typeCongeIdInt)) {
+    // Calculer la durée en jours ouvrables (exclut samedi, dimanche et jours fériés)
+    const dureeJoursInt = await getWorkingDaysBetween(date_debut, date_fin, prisma)
+    if (dureeJoursInt <= 0) {
       return NextResponse.json(
-        { error: 'Type de congé invalide' },
+        { error: 'Aucun jour ouvrable dans cette période (vérifiez les dates et les jours fériés)' },
         { status: 400 }
       )
     }
-    
-    if (isNaN(dureeJoursInt) || dureeJoursInt <= 0) {
-      return NextResponse.json(
-        { error: 'Durée en jours invalide' },
-        { status: 400 }
-      )
-    }
+
+    const typeCongeIdInt = type_conge_id
 
     // Vérifier que le professeur existe
     const professeur = await prisma.professeur.findUnique({
@@ -145,7 +172,7 @@ export async function POST(request) {
     const maintenant = new Date()
     const anneeConge = new Date(date_debut).getFullYear()
     
-    // Récupérer tous les soldes non expirés, triés par année (plus ancien en premier)
+    // Récupérer tous les soldes non expirés pour ce type de congé, triés par année (plus ancien en premier)
     const soldesDisponibles = await prisma.soldeConge.findMany({
       where: {
         professeur_id: professeur_id,
@@ -162,11 +189,11 @@ export async function POST(request) {
       0
     )
 
-    // Vérifier qu'il existe au moins un solde de congé
+    // Vérifier qu'il existe au moins un solde de congé pour ce type
     if (soldesDisponibles.length === 0) {
       return NextResponse.json(
         {
-          error: 'Aucun solde de congé disponible pour ce professeur et ce type de congé. Veuillez créer un solde de congé avant de créer un congé.',
+          error: `Aucun solde de congé pour ce professeur et le type « ${typeConge.nom} ». Allez dans la fiche du professeur > « Gestion des Soldes de Congé » > « Ajouter un solde » et créez un solde pour l’année concernée et le type « ${typeConge.nom} ».`,
         },
         { status: 400 }
       )
@@ -237,7 +264,7 @@ export async function POST(request) {
       }
     }
 
-    // Créer le congé
+    // Créer le congé (nom_interim/prenom_interim retirés du schéma)
     const conge = await prisma.conge.create({
       data: {
         professeur_id,
@@ -246,8 +273,6 @@ export async function POST(request) {
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
         reference_doc: reference_doc || null,
-        nom_interim: nom_interim || null,
-        prenom_interim: prenom_interim || null,
         cree_par_rh_id: currentUser.userId,
       },
       include: {

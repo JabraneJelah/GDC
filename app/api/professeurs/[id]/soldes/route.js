@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getExpireLe } from '@/lib/solde-expiration'
 
 // GET - Liste des soldes d'un professeur
 export async function GET(request, { params }) {
@@ -19,6 +20,15 @@ export async function GET(request, { params }) {
         { status: 400 }
       )
     }
+
+    // Supprimer automatiquement les soldes expirés pour ce professeur
+    const maintenant = new Date()
+    await prisma.soldeConge.deleteMany({
+      where: {
+        professeur_id: professeurId,
+        expire_le: { lt: maintenant },
+      },
+    })
 
     const soldes = await prisma.soldeConge.findMany({
       where: { professeur_id: professeurId },
@@ -131,8 +141,8 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Calculer la date d'expiration (fin d'année + 2 ans)
-    const expireLe = new Date(anneeInt + 2, 11, 31) // 31 décembre de l'année + 2
+    // Calculer la date d'expiration : 1 an pour exceptionnel, 2 ans pour administratif/annuel
+    const expireLe = getExpireLe(anneeInt, typeConge)
 
     const solde = await prisma.soldeConge.create({
       data: {

@@ -63,6 +63,9 @@ export default function CongesPage() {
   })
   const [professeurSearch, setProfesseurSearch] = useState('')
   const [professeurSearchOpen, setProfesseurSearchOpen] = useState(false)
+  const [calculatingDateRetour, setCalculatingDateRetour] = useState(false)
+  // Date de reprise au travail (jour suivant le dernier jour de congé) — affichée comme "date de retour"
+  const [dateRetourTravailDisplay, setDateRetourTravailDisplay] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -97,43 +100,95 @@ export default function CongesPage() {
     }
   }
 
-  const calculateDays = (dateDebut, dateFin) => {
-    if (dateDebut && dateFin) {
-      const start = new Date(dateDebut + 'T00:00:00')
-      const end = new Date(dateFin + 'T00:00:00')
-      
-      // Vérifier que la date de fin est après la date de début
-      if (end < start) {
-        setFormData(prev => ({ ...prev, duree_jours: '0' }))
-        return
-      }
-      
-      // Compter uniquement les jours ouvrables (exclure samedi et dimanche)
-      let workingDays = 0
-      const currentDate = new Date(start)
-      
-      while (currentDate <= end) {
-        const dayOfWeek = currentDate.getDay() // 0 = dimanche, 6 = samedi
-        // Compter seulement du lundi (1) au vendredi (5)
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-          workingDays++
-        }
-        currentDate.setDate(currentDate.getDate() + 1)
-      }
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        duree_jours: workingDays.toString() 
-      }))
+  // Retourne le prochain jour ouvrable après une date (hors week-end et jours fériés)
+  const nextWorkingDayAfter = (ymd, ferieSet) => {
+    const d = new Date(ymd + 'T00:00:00')
+    d.setDate(d.getDate() + 1)
+    const maxDays = 14
+    for (let i = 0; i < maxDays; i++) {
+      const str = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0')
+      const dayOfWeek = d.getDay()
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      const isFerie = ferieSet.has(str)
+      if (!isWeekend && !isFerie) return str
+      d.setDate(d.getDate() + 1)
     }
+    return ''
   }
 
-  // Calcul automatique de la durée quand les dates changent
-  useEffect(() => {
-    if (formData.date_debut && formData.date_fin) {
-      calculateDays(formData.date_debut, formData.date_fin)
+  // Calcule le dernier jour de congé (date_fin pour l'API) et la date de reprise au travail (affichée comme "date de retour")
+  const calculateDateRetour = async (dateDebut, dureeJours) => {
+    if (!dateDebut || !dureeJours || parseInt(dureeJours, 10) < 1) {
+      setCalculatingDateRetour(false)
+      return
     }
-  }, [formData.date_debut, formData.date_fin])
+    setCalculatingDateRetour(true)
+    const start = new Date(dateDebut + 'T00:00:00')
+    const n = parseInt(dureeJours, 10)
+    if (isNaN(n) || n < 1) {
+      setCalculatingDateRetour(false)
+      return
+    }
+
+    const endRange = new Date(start)
+    endRange.setDate(endRange.getDate() + Math.max(n * 2 + 30, 60))
+    const toStr = endRange.getFullYear() + '-' +
+      String(endRange.getMonth() + 1).padStart(2, '0') + '-' +
+      String(endRange.getDate()).padStart(2, '0')
+
+    let ferieSet = new Set()
+    try {
+      const res = await fetch(`/api/jours-feries?from=${dateDebut}&to=${toStr}`)
+      if (res.ok) {
+        const joursFeries = await res.json()
+        ferieSet = new Set(
+          joursFeries.map((j) => {
+            const d = new Date(j.date)
+            return d.getFullYear() + '-' +
+              String(d.getMonth() + 1).padStart(2, '0') + '-' +
+              String(d.getDate()).padStart(2, '0')
+          })
+        )
+      }
+    } catch (e) {
+      console.error('Erreur chargement jours fériés:', e)
+    }
+
+    let count = 0
+    const current = new Date(start)
+    const maxDays = 400
+    let days = 0
+    while (count < n && days < maxDays) {
+      const ymd = current.getFullYear() + '-' +
+        String(current.getMonth() + 1).padStart(2, '0') + '-' +
+        String(current.getDate()).padStart(2, '0')
+      const dayOfWeek = current.getDay()
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+      const isFerie = ferieSet.has(ymd)
+      if (!isWeekend && !isFerie) count++
+      if (count === n) {
+        const dateReprise = nextWorkingDayAfter(ymd, ferieSet)
+        setFormData(prev => ({ ...prev, date_fin: ymd }))
+        setDateRetourTravailDisplay(dateReprise)
+        setCalculatingDateRetour(false)
+        return
+      }
+      current.setDate(current.getDate() + 1)
+      days++
+    }
+    setFormData(prev => ({ ...prev, date_fin: '' }))
+    setDateRetourTravailDisplay('')
+    setCalculatingDateRetour(false)
+  }
+
+  // Calcul automatique de la date de retour quand la date de départ ou la durée change
+  useEffect(() => {
+    if (formData.date_debut && formData.duree_jours && parseInt(formData.duree_jours, 10) >= 1) {
+      calculateDateRetour(formData.date_debut, formData.duree_jours)
+    }
+  }, [formData.date_debut, formData.duree_jours])
 
   const resetForm = () => {
     setFormData({
@@ -146,25 +201,45 @@ export default function CongesPage() {
       nom_interim: '',
       prenom_interim: '',
     })
+    setDateRetourTravailDisplay('')
     setEditingConge(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    // Ne pas envoyer NaN (évite "Tous les champs obligatoires") : garder type_conge_id en string si vide, et bloquer si date_fin non calculée
+    if (!formData.date_fin && !dateRetourTravailDisplay) {
+      setErrorMessage('Veuillez attendre le calcul de la date de retour (dernier jour de congé) avant d\'enregistrer.')
+      setErrorDialogOpen(true)
+      return
+    }
+    if (!formData.professeur_id) {
+      setErrorMessage('Veuillez sélectionner un professeur dans la liste (recherchez puis cliquez sur son nom).')
+      setErrorDialogOpen(true)
+      return
+    }
+    const typeCongeId = formData.type_conge_id !== '' && !isNaN(parseInt(formData.type_conge_id, 10))
+      ? parseInt(formData.type_conge_id, 10)
+      : formData.type_conge_id
+    if (typeCongeId === '' || typeCongeId == null) {
+      setErrorMessage('Veuillez sélectionner un type de congé.')
+      setErrorDialogOpen(true)
+      return
+    }
     try {
       const url = editingConge ? `/api/conges/${editingConge.id}` : '/api/conges'
       const method = editingConge ? 'PUT' : 'POST'
-
+      const payload = {
+        ...formData,
+        type_conge_id: typeCongeId,
+        duree_jours: parseInt(formData.duree_jours, 10) || 0,
+      }
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          type_conge_id: parseInt(formData.type_conge_id),
-          duree_jours: parseInt(formData.duree_jours),
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -176,13 +251,17 @@ export default function CongesPage() {
         setCurrentPage(1)
         fetchData()
       } else {
-        const data = await response.json()
-        setErrorMessage(data.error || `Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
+        let message = `Erreur lors de la ${editingConge ? 'modification' : 'création'} (${response.status})`
+        try {
+          const data = await response.json()
+          if (data?.error) message = data.error
+        } catch (_) { /* response non JSON */ }
+        setErrorMessage(message)
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage(`Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
+      setErrorMessage(error?.message || `Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
       setErrorDialogOpen(true)
     }
   }
@@ -194,17 +273,19 @@ export default function CongesPage() {
       return date.toISOString().split('T')[0]
     }
 
+    const lastDay = formatDateForInput(conge.date_fin)
     setEditingConge(conge)
     setFormData({
       professeur_id: conge.professeur_id,
       type_conge_id: conge.type_conge_id.toString(),
       date_debut: formatDateForInput(conge.date_debut),
-      date_fin: formatDateForInput(conge.date_fin),
+      date_fin: lastDay,
       duree_jours: conge.duree_jours.toString(),
       reference_doc: conge.reference_doc || '',
       nom_interim: conge.nom_interim || '',
       prenom_interim: conge.prenom_interim || '',
     })
+    setDateRetourTravailDisplay(nextWorkingDayAfter(lastDay, new Set()))
     setEditOpen(true)
   }
 
@@ -315,66 +396,64 @@ export default function CongesPage() {
               <DialogDescription>
                 {editingConge
                   ? 'Modifier les informations du congé'
-                  : 'Enregistrer un nouveau congé depuis un document papier'}
+                  : ''}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="professeur_id">Professeur *</Label>
                 <div className="relative">
-                  <Input
-                    id="professeur_id"
-                    placeholder="Rechercher un professeur (nom, prénom, PPR)..."
-                    value={professeurSearch}
-                    onChange={(e) => {
-                      setProfesseurSearch(e.target.value)
-                      setProfesseurSearchOpen(true)
-                    }}
-                    onFocus={() => setProfesseurSearchOpen(true)}
-                    onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 200)}
-                    required
-                  />
-                  {professeurSearchOpen && professeurSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {professeurs
-                        .filter((prof) => {
-                          const searchLower = professeurSearch.toLowerCase()
-                          const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
-                          return nomComplet.includes(searchLower)
-                        })
-                        .slice(0, 10)
-                        .map((prof) => (
-                          <div
-                            key={prof.id}
-                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
-                            onClick={() => {
-                              setFormData({ ...formData, professeur_id: prof.id })
-                              setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
-                              setProfesseurSearchOpen(false)
-                            }}
-                          >
-                            {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                  {(() => {
+                    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
+                    const displayValue = selectedProf
+                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom} (${selectedProf.ppr})`.trim()
+                      : professeurSearch
+                    const searchLower = professeurSearch.toLowerCase()
+                    const filtered = professeurs.filter((prof) => {
+                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                      return nomComplet.includes(searchLower)
+                    }).slice(0, 10)
+                    return (
+                      <>
+                        <Input
+                          id="professeur_id"
+                          placeholder="Rechercher un professeur (nom, prénom, PPR)..."
+                          value={displayValue}
+                          onChange={(e) => {
+                            setProfesseurSearch(e.target.value)
+                            setFormData(prev => ({ ...prev, professeur_id: '' }))
+                            setProfesseurSearchOpen(true)
+                          }}
+                          onFocus={() => setProfesseurSearchOpen(true)}
+                          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 220)}
+                          required
+                          autoComplete="off"
+                        />
+                        {professeurSearchOpen && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filtered.length > 0 ? (
+                              filtered.map((prof) => (
+                                <div
+                                  key={prof.id}
+                                  className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    setFormData(prev => ({ ...prev, professeur_id: prof.id }))
+                                    setProfesseurSearch('')
+                                    setProfesseurSearchOpen(false)
+                                  }}
+                                >
+                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
+                            )}
                           </div>
-                        ))}
-                      {professeurs.filter((prof) => {
-                        const searchLower = professeurSearch.toLowerCase()
-                        const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
-                        return nomComplet.includes(searchLower)
-                      }).length === 0 && (
-                        <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
-                      )}
-                    </div>
-                  )}
-                  {formData.professeur_id && !professeurSearch && (
-                    <div className="mt-1 text-sm text-slate-600">
-                      {professeurs.find(p => p.id === formData.professeur_id) && (
-                        <span>
-                          {professeurs.find(p => p.id === formData.professeur_id).titre?.nom ? `${professeurs.find(p => p.id === formData.professeur_id).titre.nom} ` : ''}
-                          {professeurs.find(p => p.id === formData.professeur_id).prenom} {professeurs.find(p => p.id === formData.professeur_id).nom} ({professeurs.find(p => p.id === formData.professeur_id).ppr})
-                        </span>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
               <div className="space-y-2">
@@ -398,52 +477,41 @@ export default function CongesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date_debut">Date début *</Label>
-                  <Input
-                    id="date_debut"
-                    type="date"
-                    value={formData.date_debut}
-                    onChange={(e) => {
-                      const newDateDebut = e.target.value
-                      setFormData(prev => ({ ...prev, date_debut: newDateDebut }))
-                      if (newDateDebut && formData.date_fin) {
-                        calculateDays(newDateDebut, formData.date_fin)
-                      }
-                    }}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date_fin">Date fin *</Label>
-                  <Input
-                    id="date_fin"
-                    type="date"
-                    value={formData.date_fin}
-                    min={formData.date_debut || undefined}
-                    onChange={(e) => {
-                      const newDateFin = e.target.value
-                      setFormData(prev => ({ ...prev, date_fin: newDateFin }))
-                      if (formData.date_debut && newDateFin) {
-                        calculateDays(formData.date_debut, newDateFin)
-                      }
-                    }}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="date_debut">Date de départ *</Label>
+                <Input
+                  id="date_debut"
+                  type="date"
+                  value={formData.date_debut}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="duree_jours">Durée (jours ouvrables) *</Label>
+                <Label htmlFor="date_fin">Date de retour au travail (calculée) *</Label>
                 <Input
-                  id="duree_jours"
-                  type="number"
-                  value={formData.duree_jours}
+                  id="date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
                   readOnly
                   className="bg-slate-100"
                   required
                 />
-                <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="duree_jours">Durée du congé (jours ouvrables) *</Label>
+                <Input
+                  id="duree_jours"
+                  type="number"
+                  min={1}
+                  value={formData.duree_jours}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData(prev => ({ ...prev, duree_jours: v }))
+                  }}
+                  placeholder="Ex: 5"
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nom_interim">Nom de l'intérim</Label>
@@ -467,8 +535,12 @@ export default function CongesPage() {
                   placeholder="Prénom de la personne en intérim"
                 />
               </div>
-              <Button type="submit" className="w-full">
-                {editingConge ? 'Modifier' : 'Enregistrer'}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={calculatingDateRetour || !formData.date_fin}
+              >
+                {calculatingDateRetour ? 'Calcul de la date de retour...' : (editingConge ? 'Modifier' : 'Enregistrer')}
               </Button>
             </form>
           </DialogContent>
@@ -487,59 +559,57 @@ export default function CongesPage() {
               <div className="space-y-2">
                 <Label htmlFor="edit_professeur_id">Professeur *</Label>
                 <div className="relative">
-                  <Input
-                    id="edit_professeur_id"
-                    placeholder="Rechercher un professeur (nom, prénom, PPR)..."
-                    value={professeurSearch}
-                    onChange={(e) => {
-                      setProfesseurSearch(e.target.value)
-                      setProfesseurSearchOpen(true)
-                    }}
-                    onFocus={() => setProfesseurSearchOpen(true)}
-                    onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 200)}
-                    required
-                  />
-                  {professeurSearchOpen && professeurSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {professeurs
-                        .filter((prof) => {
-                          const searchLower = professeurSearch.toLowerCase()
-                          const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
-                          return nomComplet.includes(searchLower)
-                        })
-                        .slice(0, 10)
-                        .map((prof) => (
-                          <div
-                            key={prof.id}
-                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
-                            onClick={() => {
-                              setFormData({ ...formData, professeur_id: prof.id })
-                              setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
-                              setProfesseurSearchOpen(false)
-                            }}
-                          >
-                            {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                  {(() => {
+                    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
+                    const displayValue = selectedProf
+                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom} (${selectedProf.ppr})`.trim()
+                      : professeurSearch
+                    const searchLower = professeurSearch.toLowerCase()
+                    const filtered = professeurs.filter((prof) => {
+                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                      return nomComplet.includes(searchLower)
+                    }).slice(0, 10)
+                    return (
+                      <>
+                        <Input
+                          id="edit_professeur_id"
+                          placeholder="Rechercher un professeur (nom, prénom, PPR)..."
+                          value={displayValue}
+                          onChange={(e) => {
+                            setProfesseurSearch(e.target.value)
+                            setFormData(prev => ({ ...prev, professeur_id: '' }))
+                            setProfesseurSearchOpen(true)
+                          }}
+                          onFocus={() => setProfesseurSearchOpen(true)}
+                          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 220)}
+                          required
+                          autoComplete="off"
+                        />
+                        {professeurSearchOpen && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filtered.length > 0 ? (
+                              filtered.map((prof) => (
+                                <div
+                                  key={prof.id}
+                                  className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    setFormData(prev => ({ ...prev, professeur_id: prof.id }))
+                                    setProfesseurSearch('')
+                                    setProfesseurSearchOpen(false)
+                                  }}
+                                >
+                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                                </div>
+                              ))
+                            ) : (
+                              <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
+                            )}
                           </div>
-                        ))}
-                      {professeurs.filter((prof) => {
-                        const searchLower = professeurSearch.toLowerCase()
-                        const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
-                        return nomComplet.includes(searchLower)
-                      }).length === 0 && (
-                        <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
-                      )}
-                    </div>
-                  )}
-                  {formData.professeur_id && !professeurSearch && (
-                    <div className="mt-1 text-sm text-slate-600">
-                      {professeurs.find(p => p.id === formData.professeur_id) && (
-                        <span>
-                          {professeurs.find(p => p.id === formData.professeur_id).titre?.nom ? `${professeurs.find(p => p.id === formData.professeur_id).titre.nom} ` : ''}
-                          {professeurs.find(p => p.id === formData.professeur_id).prenom} {professeurs.find(p => p.id === formData.professeur_id).nom} ({professeurs.find(p => p.id === formData.professeur_id).ppr})
-                        </span>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
               <div className="space-y-2">
@@ -563,52 +633,37 @@ export default function CongesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit_date_debut">Date début *</Label>
-                  <Input
-                    id="edit_date_debut"
-                    type="date"
-                    value={formData.date_debut}
-                    onChange={(e) => {
-                      const newDateDebut = e.target.value
-                      setFormData(prev => ({ ...prev, date_debut: newDateDebut }))
-                      if (newDateDebut && formData.date_fin) {
-                        calculateDays(newDateDebut, formData.date_fin)
-                      }
-                    }}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit_date_fin">Date fin *</Label>
-                  <Input
-                    id="edit_date_fin"
-                    type="date"
-                    value={formData.date_fin}
-                    min={formData.date_debut || undefined}
-                    onChange={(e) => {
-                      const newDateFin = e.target.value
-                      setFormData(prev => ({ ...prev, date_fin: newDateFin }))
-                      if (formData.date_debut && newDateFin) {
-                        calculateDays(formData.date_debut, newDateFin)
-                      }
-                    }}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_date_debut">Date de départ *</Label>
+                <Input
+                  id="edit_date_debut"
+                  type="date"
+                  value={formData.date_debut}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
+                  required
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_duree_jours">Durée (jours ouvrables) *</Label>
+                <Label htmlFor="edit_date_fin">Date de retour au travail (calculée) *</Label>
                 <Input
-                  id="edit_duree_jours"
-                  type="number"
-                  value={formData.duree_jours}
+                  id="edit_date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
                   readOnly
                   className="bg-slate-100"
                   required
                 />
-                <p className="text-xs text-slate-500">Samedi et dimanche exclus du calcul</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_duree_jours">Durée du congé (jours ouvrables) *</Label>
+                <Input
+                  id="edit_duree_jours"
+                  type="number"
+                  min={1}
+                  value={formData.duree_jours}
+                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_nom_interim">Nom de l'intérim</Label>
@@ -632,8 +687,8 @@ export default function CongesPage() {
                   placeholder="Prénom de la personne en intérim"
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Modifier
+              <Button type="submit" className="w-full" disabled={calculatingDateRetour}>
+                {calculatingDateRetour ? 'Calcul...' : 'Modifier'}
               </Button>
             </form>
           </DialogContent>

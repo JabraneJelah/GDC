@@ -37,7 +37,7 @@ export async function GET(request) {
       const hopitalIdInt = parseInt(hopital_id, 10)
       if (!isNaN(hopitalIdInt)) {
         conditions.push({
-          Hopital_id: hopitalIdInt
+          hopital_id: hopitalIdInt
         })
       }
     }
@@ -86,7 +86,7 @@ export async function GET(request) {
             nom: true,
           },
         },
-        Hopital: {
+        hopital: {
           select: {
             id: true,
             nom: true,
@@ -141,6 +141,7 @@ export async function POST(request) {
       nom,
       prenom,
       ppr,
+      cin,
       specialite_id,
       categorie_personnel_id,
       titre_id,
@@ -150,7 +151,7 @@ export async function POST(request) {
       telephone,
     } = body
 
-    // 3️⃣ Validation basique - seulement nom, prenom et ppr sont obligatoires
+    // 3️⃣ Validation basique - nom, prenom, ppr, spécialité, catégorie et titre sont obligatoires
     if (!nom || !prenom || !ppr) {
       return NextResponse.json(
         { error: 'Les champs Nom, Prénom et PPR sont obligatoires' },
@@ -158,10 +159,30 @@ export async function POST(request) {
       )
     }
 
-    // 4️⃣ Parsing IDs (optionnels)
     const specialiteId = specialite_id ? Number(specialite_id) : null
     const categoriePersonnelId = categorie_personnel_id ? Number(categorie_personnel_id) : null
     const titreId = titre_id ? Number(titre_id) : null
+
+    if (specialiteId == null || isNaN(specialiteId) || specialiteId < 1) {
+      return NextResponse.json(
+        { error: 'La spécialité est obligatoire' },
+        { status: 400 }
+      )
+    }
+    if (categoriePersonnelId == null || isNaN(categoriePersonnelId) || categoriePersonnelId < 1) {
+      return NextResponse.json(
+        { error: 'La catégorie personnel est obligatoire' },
+        { status: 400 }
+      )
+    }
+    if (titreId == null || isNaN(titreId) || titreId < 1) {
+      return NextResponse.json(
+        { error: 'Le titre est obligatoire' },
+        { status: 400 }
+      )
+    }
+
+    // 4️⃣ Parsing IDs optionnels (service, hopital, grade)
     const serviceId = service_id ? Number(service_id) : null
     const hopitalId = hopital_id ? Number(hopital_id) : null
     const gradeId = grade_id ? Number(grade_id) : null
@@ -234,6 +255,7 @@ export async function POST(request) {
       nom,
       prenom,
       ppr,
+      cin: cin != null && String(cin).trim() !== '' ? String(cin).trim() : null,
       telephone: telephone || null,
     }
 
@@ -251,7 +273,7 @@ export async function POST(request) {
       data.service_id = serviceId
     }
     if (hopitalId !== null) {
-      data.Hopital_id = hopitalId
+      data.hopital_id = hopitalId
     }
     if (gradeId !== null) {
       data.grade_id = gradeId

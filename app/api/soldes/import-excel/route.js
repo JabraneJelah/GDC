@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getExpireLe } from '@/lib/solde-expiration'
 import * as XLSX from 'xlsx'
 
 // POST - Importer les soldes depuis un fichier Excel
@@ -171,28 +172,58 @@ export async function POST(request) {
       }
       // Mapping flexible pour "Exceptionnel" / "Excepcionel" (gérer les fautes d'orthographe)
       if (typeNomLower.includes('exceptionnel') || typeNomLower.includes('excepcionel')) {
-        // Ajouter les deux variantes au map pour gérer les deux orthographes
         typeCongeMap['exceptionnel'] = type.id
-        typeCongeMap['excepcionel'] = type.id // Faute d'orthographe courante
-        // Normaliser pour gérer les variations (enlever accents et "congé")
+        typeCongeMap['excepcionel'] = type.id
         const normalized = typeNomLower.replace(/[éèê]/g, 'e').replace(/[àâ]/g, 'a').replace(/congé\s*/g, '').replace(/conge\s*/g, '').trim()
         if (normalized.includes('exceptionnel') || normalized.includes('excepcionel')) {
           typeCongeMap['exceptionnel'] = type.id
           typeCongeMap['excepcionel'] = type.id
         }
       }
-      // Mapping direct aussi
       typeCongeMap[typeNomLower] = type.id
-      // Mapping sans accents
       const typeNomNoAccent = typeNomLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       typeCongeMap[typeNomNoAccent] = type.id
-      // Mapping avec variations d'orthographe pour "exceptionnel"
       if (typeNomNoAccent.includes('exceptionnel') || typeNomNoAccent.includes('excepcionel')) {
         typeCongeMap['exceptionnel'] = type.id
         typeCongeMap['excepcionel'] = type.id
       }
     })
-    
+
+    // Si "Exceptionnel" n'a pas de type en base mais qu'on a 2 types (ex: Administratif + un autre), utiliser l'autre pour Exceptionnel
+    if (!typeCongeMap['exceptionnel'] && typesConge.length >= 2) {
+      const typeExceptionnel = typesConge.find((t) => {
+        const n = t.nom.toLowerCase()
+        return !n.includes('administratif') && !n.includes('administrative')
+      })
+      if (typeExceptionnel) {
+        typeCongeMap['exceptionnel'] = typeExceptionnel.id
+        typeCongeMap['excepcionel'] = typeExceptionnel.id
+      }
+    }
+
+    // Si toujours pas de type "Exceptionnel", le créer automatiquement pour que l'import fonctionne
+    if (!typeCongeMap['exceptionnel']) {
+      const existing = await prisma.typeConge.findFirst({
+        where: {
+          OR: [
+            { nom: { contains: 'exceptionnel', mode: 'insensitive' } },
+            { nom: { contains: 'excepcionel', mode: 'insensitive' } },
+          ],
+        },
+      })
+      if (existing) {
+        typeCongeMap['exceptionnel'] = existing.id
+        typeCongeMap['excepcionel'] = existing.id
+      } else {
+        const created = await prisma.typeConge.create({
+          data: { nom: 'Congé exceptionnel', document_obligatoire: false },
+        })
+        typeCongeMap['exceptionnel'] = created.id
+        typeCongeMap['excepcionel'] = created.id
+        typesConge.push(created)
+      }
+    }
+
     // Debug: logger les types de congé trouvés
     console.log('Types de congé disponibles:', typesConge.map(t => t.nom))
     console.log('TypeCongeMap:', typeCongeMap)
@@ -249,27 +280,34 @@ export async function POST(request) {
       )
     }
 
+    // Helper: retrouver l'id du type "exceptionnel" ou "administratif" depuis la base
+    const getTypeIdByKeyword = (keyword) => {
+      const k = keyword.toLowerCase()
+      const found = typesConge.find((t) => t.nom.toLowerCase().includes(k))
+      return found ? found.id : null
+    }
+
     // Trouver les colonnes de soldes (format: "Type Année" ou "TypeAnnee")
     const soldeColumns = []
     headerRow.forEach((header, index) => {
       if (!header) return
-      const headerStr = header.toString().trim()
+      // Remplacer espaces insécables et caractères spéciaux par un espace normal
+      const headerStr = header.toString().replace(/\s+/g, ' ').replace(/\u00A0/g, ' ').trim()
       if (!headerStr) return
       
-      // Normaliser l'en-tête pour la recherche
+      // Normaliser l'en-tête pour la recherche (sans espaces pour TypeAnnee)
       const headerNormalized = normalizeHeader(headerStr)
       
       // Chercher les patterns comme "Administratif 2024", "Exceptionnel 2025", etc.
-      // Pattern 1: "Type Année" (ex: "Administratif 2024", "Exceptionnel 2025")
-      // Note: "excepcionel" (sans 't') est une faute d'orthographe courante
+      // Pattern 1: "Type Année" avec un ou plusieurs espaces (y compris espaces insécables)
       let match = headerStr.match(/(administratif|exceptionnel|excepcionel|administrative)\s+(\d{4})/i)
       
-      // Pattern 2: "TypeAnnee" (ex: "Administratif2024", "Exceptionnel2025")
+      // Pattern 2: "TypeAnnee" sans espace (ex: "Administratif2024", "Exceptionnel2025")
       if (!match) {
         match = headerNormalized.match(/(administratif|exceptionnel|excepcionel|administrative)(\d{4})/)
       }
       
-      // Pattern 3: Chercher dans le header normalisé
+      // Pattern 3: type puis n'importe quoi puis 4 chiffres
       if (!match) {
         const normalizedMatch = headerNormalized.match(/(administratif|exceptionnel|excepcionel|administrative).*?(\d{4})/)
         if (normalizedMatch) {
@@ -279,35 +317,35 @@ export async function POST(request) {
       
       if (match) {
         const typeRaw = match[1].toLowerCase()
-        // Normaliser le type (enlever accents)
         const type = typeRaw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         const annee = parseInt(match[2], 10)
         
-        // Chercher dans le map (avec et sans accents)
-        // Pour "exceptionnel" vs "excepcionel", chercher les deux variantes
         let typeCongeId = typeCongeMap[type] || typeCongeMap[typeRaw]
-        
-        // Si c'est "exceptionnel" (de l'Excel), chercher aussi "excepcionel" (de la base)
         if (!typeCongeId && (type === 'exceptionnel' || typeRaw === 'exceptionnel')) {
           typeCongeId = typeCongeMap['exceptionnel'] || typeCongeMap['excepcionel']
         }
-        
-        // Si c'est "excepcionel" (de l'Excel), chercher aussi "exceptionnel" (de la base)
         if (!typeCongeId && (type === 'excepcionel' || typeRaw === 'excepcionel')) {
           typeCongeId = typeCongeMap['excepcionel'] || typeCongeMap['exceptionnel']
+        }
+        // Fallback: chercher dans la base par mot-clé si le map n'a pas le type (ex: "Exceptionnel" dans le nom du type)
+        if (!typeCongeId) {
+          if (typeRaw.includes('exceptionnel') || typeRaw.includes('excepcionel')) {
+            typeCongeId = getTypeIdByKeyword('exceptionnel') || getTypeIdByKeyword('excepcionel')
+          } else if (typeRaw.includes('administratif') || typeRaw.includes('administrative')) {
+            typeCongeId = getTypeIdByKeyword('administratif') || getTypeIdByKeyword('administrative')
+          }
         }
         
         if (typeCongeId && annee >= 2000 && annee <= 2100) {
           soldeColumns.push({
             index,
-            type: typeRaw, // Utiliser le type original trouvé
+            type: typeRaw.includes('exceptionnel') || typeRaw.includes('excepcionel') ? 'exceptionnel' : 'administratif',
             annee,
             typeCongeId,
             header: headerStr,
           })
-        } else {
-          console.log(`Type de congé non trouvé pour: "${typeRaw}" (type: "${type}") (header: "${headerStr}")`)
-          console.log(`Tentatives: typeCongeMap["exceptionnel"] = ${typeCongeMap['exceptionnel']}, typeCongeMap["excepcionel"] = ${typeCongeMap['excepcionel']}, typeCongeMap["${type}"] = ${typeCongeMap[type]}, typeCongeMap["${typeRaw}"] = ${typeCongeMap[typeRaw]}`)
+        } else if (annee >= 2000 && annee <= 2100) {
+          console.log(`Type de congé non trouvé pour: "${typeRaw}" (header: "${headerStr}"). Types en base: ${typesConge.map(t => t.nom).join(', ')}`)
         }
       }
     })
@@ -357,11 +395,16 @@ export async function POST(request) {
       },
     })
 
-    // Récupérer les options pour créer des professeurs si nécessaire
-    const [grades, specialites] = await Promise.all([
+    // Récupérer les options pour créer des professeurs (champs obligatoires + optionnels)
+    const [grades, specialites, categories, titres] = await Promise.all([
       gradeIndex !== -1 ? prisma.grade.findMany() : Promise.resolve([]),
-      specialiteIndex !== -1 ? prisma.specialite.findMany() : Promise.resolve([]),
+      prisma.specialite.findMany(),
+      prisma.categoriePersonnel.findMany(),
+      prisma.titre.findMany(),
     ])
+    const defaultSpecialiteId = specialites.length > 0 ? specialites[0].id : null
+    const defaultCategorieId = categories.length > 0 ? categories[0].id : null
+    const defaultTitreId = titres.length > 0 ? titres[0].id : null
 
     // Fonction pour trouver un professeur par nom et prénom ou PPR
     const findProfesseur = (nom, prenom, pprValue) => {
@@ -416,8 +459,8 @@ export async function POST(request) {
         }
       }
 
-      // Essayer de trouver et connecter la spécialité si fournie
-      let specialiteId = null
+      // Essayer de trouver la spécialité si fournie, sinon utiliser la première par défaut
+      let specialiteId = defaultSpecialiteId
       if (specialiteValue && specialiteIndex !== -1) {
         const specialiteStr = specialiteValue.toString().trim().toLowerCase()
         const specialite = specialites.find(s => s.nom.toLowerCase() === specialiteStr)
@@ -426,13 +469,20 @@ export async function POST(request) {
         }
       }
 
-      // Construire l'objet data avec seulement les champs fournis
+      if (!defaultSpecialiteId || !defaultCategorieId || !defaultTitreId) {
+        throw new Error(
+          'Impossible de créer un professeur : il manque des données de référence (spécialité, catégorie ou titre). Créez-en au moins une de chaque dans l\'application.'
+        )
+      }
+
       const data = {
         nom: nom.trim(),
         prenom: prenom.trim(),
         ppr,
+        specialite_id: specialiteId,
+        categorie_personnel_id: defaultCategorieId,
+        titre_id: defaultTitreId,
         ...(gradeId !== null && { grade_id: gradeId }),
-        ...(specialiteId !== null && { specialite_id: specialiteId }),
       }
 
       const newProfesseur = await prisma.professeur.create({ data })
@@ -514,8 +564,8 @@ export async function POST(request) {
         }
 
         try {
-          // Calculer la date d'expiration (fin d'année + 2 ans)
-          const expireLe = new Date(soldeCol.annee + 2, 11, 31) // 31 décembre de l'année + 2
+          // Calculer la date d'expiration : 1 an pour exceptionnel, 2 ans pour administratif
+          const expireLe = getExpireLe(soldeCol.annee, soldeCol.type || 'administratif')
 
           // Vérifier si un solde existe déjà
           const existingSolde = await prisma.soldeConge.findUnique({

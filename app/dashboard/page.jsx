@@ -184,123 +184,121 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-slate-200 bg-white p-4 mb-4">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="filter-service" className="text-xs text-slate-600">
-                    Service
-                  </Label>
-                  <Select
-                    value={filters.service_id || 'all'}
-                    onValueChange={(value) =>
-                      setFilters({ ...filters, service_id: value })
-                    }
-                  >
-                    <SelectTrigger id="filter-service" className="h-9">
-                      <SelectValue placeholder="Tous les services" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous les services</SelectItem>
-                      {services.map((service) => (
-                        <SelectItem key={service.id} value={service.id.toString()}>
-                          {service.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="filter-type" className="text-xs text-slate-600">
-                    Type de Congé
-                  </Label>
-                  <Select
-                    value={filters.type_conge_id || 'all'}
-                    onValueChange={(value) =>
-                      setFilters({ ...filters, type_conge_id: value })
-                    }
-                  >
-                    <SelectTrigger id="filter-type" className="h-9">
-                      <SelectValue placeholder="Tous les types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous les types</SelectItem>
-                      {typesConge.map((type) => (
-                        <SelectItem key={type.id} value={type.id.toString()}>
-                          {type.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="filter-nom-complet" className="text-xs text-slate-600">
-                    Nom complet
-                  </Label>
-                  <Input
-                    id="filter-nom-complet"
-                    placeholder="Nom complet (titre, prénom, nom)..."
-                    value={filters.nom_complet}
-                    onChange={(e) => setFilters({ ...filters, nom_complet: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-service" className="text-xs text-slate-600">
+                  Service
+                </Label>
+                <Select
+                  value={filters.service_id || 'all'}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, service_id: value })
+                  }
+                >
+                  <SelectTrigger id="filter-service" className="h-9 w-full">
+                    <SelectValue placeholder="Tous les services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les services</SelectItem>
+                    {services.map((service) => (
+                      <SelectItem key={service.id} value={service.id.toString()}>
+                        {service.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="filter-ppr" className="text-xs text-slate-600">
-                    PPR
-                  </Label>
-                  <Input
-                    id="filter-ppr"
-                    placeholder="PPR..."
-                    value={filters.ppr}
-                    onChange={(e) => setFilters({ ...filters, ppr: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-type" className="text-xs text-slate-600">
+                  Type de Congé
+                </Label>
+                <Select
+                  value={filters.type_conge_id || 'all'}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, type_conge_id: value })
+                  }
+                >
+                  <SelectTrigger id="filter-type" className="h-9 w-full">
+                    <SelectValue placeholder="Tous les types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les types</SelectItem>
+                    {typesConge.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="filter-date-debut" className="text-xs text-slate-600">
-                    Date Début
-                  </Label>
-                  <Input
-                    id="filter-date-debut"
-                    type="date"
-                    value={filters.date_debut}
-                    onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-nom-complet" className="text-xs text-slate-600">
+                  Nom complet
+                </Label>
+                <Input
+                  id="filter-nom-complet"
+                  placeholder="Nom complet..."
+                  value={filters.nom_complet}
+                  onChange={(e) => setFilters({ ...filters, nom_complet: e.target.value })}
+                  className="h-9 w-full"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="filter-date-fin" className="text-xs text-slate-600">
-                    Date Fin
-                  </Label>
-                  <Input
-                    id="filter-date-fin"
-                    type="date"
-                    value={filters.date_fin}
-                    onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-ppr" className="text-xs text-slate-600">
+                  PPR
+                </Label>
+                <Input
+                  id="filter-ppr"
+                  placeholder="PPR..."
+                  value={filters.ppr}
+                  onChange={(e) => setFilters({ ...filters, ppr: e.target.value })}
+                  className="h-9 w-full"
+                />
+              </div>
 
-                <div className="space-y-2 flex items-end">
-                  {hasActiveFilters && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleClearFilters}
-                      className="w-full h-9"
-                    >
-                      <X className="h-4 w-4 mr-1.5" />
-                      Effacer
-                    </Button>
-                  )}
-                </div>
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-date-debut" className="text-xs text-slate-600">
+                  Date Début
+                </Label>
+                <Input
+                  id="filter-date-debut"
+                  type="date"
+                  value={filters.date_debut}
+                  onChange={(e) => setFilters({ ...filters, date_debut: e.target.value })}
+                  className="h-9 w-full"
+                />
+              </div>
+
+              <div className="space-y-2 min-w-0">
+                <Label htmlFor="filter-date-fin" className="text-xs text-slate-600">
+                  Date Fin
+                </Label>
+                <Input
+                  id="filter-date-fin"
+                  type="date"
+                  value={filters.date_fin}
+                  onChange={(e) => setFilters({ ...filters, date_fin: e.target.value })}
+                  className="h-9 w-full"
+                />
+              </div>
+
+              <div className="space-y-2 min-w-0 flex flex-col justify-end">
+                {hasActiveFilters ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="w-full h-9"
+                  >
+                    <X className="h-4 w-4 mr-1.5" />
+                    Effacer
+                  </Button>
+                ) : (
+                  <div className="h-9" />
+                )}
               </div>
             </div>
           </div>

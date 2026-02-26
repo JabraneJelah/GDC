@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { Pagination } from '@/components/ui/pagination'
-import { X, Upload, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { X, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -45,6 +45,7 @@ export default function ProfesseursPage() {
   const [open, setOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [messageDialogIsError, setMessageDialogIsError] = useState(true)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -54,6 +55,11 @@ export default function ProfesseursPage() {
   const [deleting, setDeleting] = useState(false)
   const [selectedProfesseurs, setSelectedProfesseurs] = useState(new Set())
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
+  const [bulkAddSoldesDialogOpen, setBulkAddSoldesDialogOpen] = useState(false)
+  const [bulkAddYear, setBulkAddYear] = useState(new Date().getFullYear().toString())
+  const [bulkAddLoading, setBulkAddLoading] = useState(false)
+  const [bulkAddResult, setBulkAddResult] = useState(null)
+  const [exportLoading, setExportLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const selectAllCheckboxRef = useRef(null)
   const [categories, setCategories] = useState([])
@@ -200,11 +206,13 @@ export default function ProfesseursPage() {
         fetchProfesseurs()
       } else {
         const data = await response.json()
+        setMessageDialogIsError(true)
         setErrorMessage(data.error || 'Erreur lors de la création')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
+      setMessageDialogIsError(true)
       setErrorMessage('Erreur lors de la création')
       setErrorDialogOpen(true)
     }
@@ -213,6 +221,7 @@ export default function ProfesseursPage() {
   const handleImportExcel = async (e) => {
     e.preventDefault()
     if (!importFile) {
+      setMessageDialogIsError(true)
       setErrorMessage('Veuillez sélectionner un fichier Excel')
       setErrorDialogOpen(true)
       return
@@ -268,12 +277,14 @@ export default function ProfesseursPage() {
           }
         }
         
+        setMessageDialogIsError(true)
         setErrorMessage(errorMsg)
         setErrorDialogOpen(true)
         setImporting(false)
       }
     } catch (error) {
       console.error('Erreur:', error)
+      setMessageDialogIsError(true)
       setErrorMessage('Erreur lors de l\'import')
       setErrorDialogOpen(true)
     } finally {
@@ -303,6 +314,7 @@ export default function ProfesseursPage() {
         fetchProfesseurs()
       } else {
         const data = await response.json()
+        setMessageDialogIsError(true)
         setErrorMessage(data.error || 'Erreur lors de la suppression')
         setErrorDialogOpen(true)
         setDeleteDialogOpen(false)
@@ -310,6 +322,7 @@ export default function ProfesseursPage() {
       }
     } catch (error) {
       console.error('Erreur:', error)
+      setMessageDialogIsError(true)
       setErrorMessage('Erreur lors de la suppression')
       setErrorDialogOpen(true)
       setDeleteDialogOpen(false)
@@ -356,22 +369,84 @@ export default function ProfesseursPage() {
         setSelectedProfesseurs(new Set())
         setCurrentPage(1)
         fetchProfesseurs()
-        // Optionally show success message
-        setErrorMessage(`✅ ${data.message}`)
+        setMessageDialogIsError(false)
+        setErrorMessage(data.message || 'Suppression effectuée avec succès')
         setErrorDialogOpen(true)
       } else {
         const data = await response.json()
+        setMessageDialogIsError(true)
         setErrorMessage(data.error || 'Erreur lors de la suppression multiple')
         setErrorDialogOpen(true)
         setBulkDeleteDialogOpen(false)
       }
     } catch (error) {
       console.error('Erreur:', error)
+      setMessageDialogIsError(true)
       setErrorMessage('Erreur lors de la suppression multiple')
       setErrorDialogOpen(true)
       setBulkDeleteDialogOpen(false)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleBulkAddAnnualSoldes = async (e) => {
+    e.preventDefault()
+    setBulkAddLoading(true)
+    setBulkAddResult(null)
+    try {
+      const response = await fetch('/api/soldes/bulk-add-annual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ annee: parseInt(bulkAddYear, 10) }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setBulkAddResult(data)
+        fetchProfesseurs()
+      } else {
+        setMessageDialogIsError(true)
+        setErrorMessage(data.error || "Erreur lors de l'ajout en masse des soldes")
+        setErrorDialogOpen(true)
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      setMessageDialogIsError(true)
+      setErrorMessage("Erreur lors de l'ajout en masse des soldes")
+      setErrorDialogOpen(true)
+    } finally {
+      setBulkAddLoading(false)
+    }
+  }
+
+  const handleExportSoldes = async () => {
+    setExportLoading(true)
+    try {
+      const res = await fetch('/api/soldes/export-excel', { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setMessageDialogIsError(true)
+        setErrorMessage(data.error || 'Erreur lors de l\'export')
+        setErrorDialogOpen(true)
+        return
+      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition')
+      const filenameMatch = disposition?.match(/filename="?([^";]+)"?/)
+      const filename = filenameMatch?.[1] || `soldes-conges-${new Date().toISOString().slice(0, 10)}.xlsx`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Erreur export:', error)
+      setMessageDialogIsError(true)
+      setErrorMessage('Erreur lors de l\'export Excel')
+      setErrorDialogOpen(true)
+    } finally {
+      setExportLoading(false)
     }
   }
 
@@ -390,6 +465,86 @@ export default function ProfesseursPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Professeurs</h1>
         <div className="flex flex-col sm:flex-row gap-2">
+          <Dialog open={bulkAddSoldesDialogOpen} onOpenChange={(open) => {
+            setBulkAddSoldesDialogOpen(open)
+            if (!open) setBulkAddResult(null)
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                Ajouter Soldes Annuels
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Ajouter les soldes annuels à tous les professeurs</DialogTitle>
+
+              </DialogHeader>
+              <form onSubmit={handleBulkAddAnnualSoldes} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-add-year">Année</Label>
+                  <Select
+                    value={bulkAddYear}
+                    onValueChange={setBulkAddYear}
+                    disabled={bulkAddLoading}
+                  >
+                    <SelectTrigger id="bulk-add-year">
+                      <SelectValue placeholder="Sélectionner l'année" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const y = new Date().getFullYear() - 2 + i
+                        return (
+                          <SelectItem key={y} value={y.toString()}>
+                            {y}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {bulkAddResult ? (
+                  bulkAddResult.summary.professeursTotal === 0 ? (
+                    <div className="p-3 rounded-md bg-slate-50 border border-slate-200 space-y-2">
+                      <p className="font-medium text-slate-800">Aucun professeur</p>
+                      <p className="text-sm text-slate-600">Aucun solde n&apos;a été affecté.</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-md bg-green-50 border border-green-200 space-y-2">
+                      <p className="font-medium text-green-800">Opération terminée</p>
+                      <p className="text-sm text-green-700">
+                        {bulkAddResult.summary.professeursMisAJour} professeur(s) mis à jour sur {bulkAddResult.summary.professeursTotal} au total.
+                      </p>
+                      <p className="text-sm text-green-700">
+                        {bulkAddResult.summary.soldesCrees} solde(s) créé(s), {bulkAddResult.summary.soldesIgnores} déjà existant(s).
+                      </p>
+                    </div>
+                  )
+                ) : null}
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={bulkAddLoading} className="flex-1">
+                    {bulkAddLoading ? 'Ajout en cours...' : 'Ajouter à tous'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setBulkAddSoldesDialogOpen(false)}
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={handleExportSoldes}
+            disabled={exportLoading}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {exportLoading ? 'Export...' : 'Exporter Soldes (Excel)'}
+          </Button>
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full sm:w-auto">
@@ -416,24 +571,9 @@ export default function ProfesseursPage() {
                   
                 </div>
                 {importResult && (
-                  <div className="p-4 bg-slate-50 rounded-md space-y-2">
-                    <h4 className="font-semibold text-slate-700">Résultat de l'import:</h4>
-                    <div className="text-sm space-y-1">
-                      <p>✅ Succès: {importResult.summary.success}</p>
-                      <p>❌ Erreurs: {importResult.summary.errors}</p>
-                      <p>⏭️ Ignorés: {importResult.summary.skipped}</p>
-                    </div>
-                    {importResult.details.errors.length > 0 && (
-                      <div className="mt-2">
-                        <p className="font-semibold text-red-600">Erreurs:</p>
-                        <ul className="text-xs text-red-600 max-h-32 overflow-y-auto">
-                          {importResult.details.errors.slice(0, 10).map((err, idx) => (
-                            <li key={idx}>Ligne {err.row}: {err.reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-sm text-slate-700 p-3 bg-slate-50 rounded-md">
+                    L'import s'est terminé. Succès : {importResult.summary.success}, Erreurs : {importResult.summary.errors}, Ignorés : {importResult.summary.skipped}.
+                  </p>
                 )}
                 <div className="flex gap-2">
                   <Button type="submit" disabled={importing || !importFile} className="flex-1">
@@ -463,14 +603,12 @@ export default function ProfesseursPage() {
           </Dialog>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">Nouveau Professeur</Button>
+              <Button className="w-full sm:w-auto cursor-pointer">Nouveau Professeur</Button>
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] w-full max-w-[95vw] sm:max-w-2xl flex flex-col">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Nouveau Professeur</DialogTitle>
-              <DialogDescription>
-                Créer une nouvelle fiche professeur
-              </DialogDescription>
+              
             </DialogHeader>
             <div className="flex-1 overflow-y-auto pr-2 -mr-2 min-h-0">
               <form onSubmit={handleSubmit} className="space-y-4">       
@@ -796,7 +934,7 @@ export default function ProfesseursPage() {
                       {professeur.specialite?.nom || '-'}
                     </TableCell>
                     <TableCell>
-                      {professeur.Hopital?.nom || '-'}
+                      {professeur.hopital?.nom || '-'}
                     </TableCell>
                     <TableCell>
                       {soldesNonExpires.length > 0 ? (
@@ -856,7 +994,9 @@ export default function ProfesseursPage() {
       <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-600">Erreur</DialogTitle>
+            <DialogTitle className={messageDialogIsError ? 'text-red-600' : 'text-green-600'}>
+              {messageDialogIsError ? 'Erreur' : 'Succès'}
+            </DialogTitle>
             <DialogDescription className="text-slate-700 whitespace-pre-line">
               {errorMessage}
             </DialogDescription>
@@ -954,9 +1094,7 @@ export default function ProfesseursPage() {
                   Cette action est irréversible et ne peut pas être annulée.
                 </p>
               </div>
-              <p className="text-red-600 font-medium mt-3">
-                Cette action est irréversible.
-              </p>
+
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">

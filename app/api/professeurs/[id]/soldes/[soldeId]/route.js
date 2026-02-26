@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getExpireLe } from '@/lib/solde-expiration'
 
 // PUT - Mettre à jour un solde
 export async function PUT(request, { params }) {
@@ -46,7 +47,7 @@ export async function PUT(request, { params }) {
         )
       }
 
-      // Vérifier si un autre solde existe déjà pour cette année + type
+      // Vérifier si un autre solde existe déjà pour cette année et ce type
       if (anneeInt !== existingSolde.annee) {
         const duplicateSolde = await prisma.soldeConge.findUnique({
           where: {
@@ -67,8 +68,11 @@ export async function PUT(request, { params }) {
       }
 
       updateData.annee = anneeInt
-      // Recalculer la date d'expiration
-      updateData.expire_le = new Date(anneeInt + 2, 11, 31)
+      // Recalculer la date d'expiration selon le type (1 an exceptionnel, 2 ans autre)
+      const typeForExpire = await prisma.typeConge.findUnique({
+        where: { id: existingSolde.type_conge_id },
+      })
+      updateData.expire_le = getExpireLe(anneeInt, typeForExpire || { nom: '' })
     }
 
     if (jours_total !== undefined) {
@@ -129,6 +133,9 @@ export async function PUT(request, { params }) {
       }
 
       updateData.type_conge_id = typeCongeIdInt
+      // Recalculer la date d'expiration selon le type (1 an exceptionnel, 2 ans autre)
+      const anneeForExpire = updateData.annee ?? existingSolde.annee
+      updateData.expire_le = getExpireLe(anneeForExpire, typeConge)
     }
 
     if (jours_restants !== undefined) {

@@ -20,9 +20,13 @@ export async function PUT(request, { params }) {
     const body = await request.json()
     const { username, nom_complet, actif, reset_password } = body
 
-    // Vérifier unicité username si modifié
+    // Vérifier unicité username si modifié (insensible à la casse)
     if (username) {
-      const existing = await prisma.utilisateurRH.findUnique({ where: { username } })
+      const existing = await prisma.utilisateurRH.findFirst({
+        where: {
+          username: { equals: username, mode: 'insensitive' },
+        },
+      })
       if (existing && existing.id !== id) {
         return NextResponse.json(
           { error: 'Un utilisateur avec ce nom d\'utilisateur existe déjà' },

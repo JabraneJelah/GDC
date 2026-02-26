@@ -36,6 +36,7 @@ export default function UtilisateursPage() {
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successDialogOpen, setSuccessDialogOpen] = useState(false)
+  const [successDialogContent, setSuccessDialogContent] = useState({ title: '', message: '' })
   const [editingUser, setEditingUser] = useState(null)
   const [editFormData, setEditFormData] = useState({
     username: '',
@@ -86,6 +87,7 @@ export default function UtilisateursPage() {
 
       if (res.ok) {
         setFormData({ username: '', nom_complet: '' })
+        setSuccessDialogContent({ title: 'Utilisateur créé', message: 'Le compte a été créé avec succès.' })
         setSuccessDialogOpen(true)
         setCurrentPage(1)
         fetchUtilisateurs()
@@ -125,7 +127,8 @@ export default function UtilisateursPage() {
       })
       if (res.ok) {
         setEditingUser(null)
-        setEditFormData({ email: '', nom_complet: '' })
+        setEditFormData({ username: '', nom_complet: '' })
+        setSuccessDialogContent({ title: 'Utilisateur modifié', message: "L'utilisateur a été modifié avec succès." })
         setSuccessDialogOpen(true)
         fetchUtilisateurs()
       } else {
@@ -176,6 +179,7 @@ export default function UtilisateursPage() {
         body: JSON.stringify({ reset_password: true }),
       })
       if (res.ok) {
+        setSuccessDialogContent({ title: 'Mot de passe réinitialisé', message: 'Le mot de passe a été réinitialisé avec succès.' })
         setSuccessDialogOpen(true)
       } else {
         const data = await res.json()
@@ -416,9 +420,9 @@ export default function UtilisateursPage() {
       <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-slate-700">Utilisateur créé</DialogTitle>
+            <DialogTitle className="text-slate-700">{successDialogContent.title}</DialogTitle>
             <DialogDescription className="text-slate-700">
-              Le compte a été créé avec succès.
+              {successDialogContent.message}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end">

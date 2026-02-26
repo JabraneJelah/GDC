@@ -37,7 +37,7 @@ export function Sidebar() {
 
   // Vérifier si on est dans une page du référentiel pour ouvrir le menu
   useEffect(() => {
-    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades']
+    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades', '/jours-feries']
     if (referentielPaths.some(path => pathname.startsWith(path))) {
       setIsReferentielOpen(true)
     }
@@ -75,6 +75,7 @@ export function Sidebar() {
         { href: '/types-conge', label: 'Types de congé' },
         { href: '/categories-personnel', label: 'Catégorie personnel' },
         { href: '/hopitaux', label: 'Hôpitaux' },
+        { href: '/jours-feries', label: 'Jours fériés' },
       ],
     },
   ]
