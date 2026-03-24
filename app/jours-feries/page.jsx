@@ -26,6 +26,36 @@ import { Pencil, Trash2 } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
+function ymdFromDate(d) {
+  const x = new Date(d)
+  return (
+    x.getFullYear() +
+    '-' +
+    String(x.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(x.getDate()).padStart(2, '0')
+  )
+}
+
+function inclusiveCalendarDays(dateDebut, dateFin) {
+  const s = new Date(dateDebut.getFullYear(), dateDebut.getMonth(), dateDebut.getDate())
+  const e = new Date(dateFin.getFullYear(), dateFin.getMonth(), dateFin.getDate())
+  return Math.round((e - s) / 86400000) + 1
+}
+
+/** Affichage table : un jour ou plage avec durée */
+function formatPeriodeCell(jour) {
+  const start = new Date(jour.date_debut)
+  const end = new Date(jour.date_fin)
+  const fmt = (d) =>
+    d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  if (ymdFromDate(start) === ymdFromDate(end)) {
+    return fmt(start)
+  }
+  const n = inclusiveCalendarDays(start, end)
+  return `${fmt(start)} → ${fmt(end)} (${n}j)`
+}
+
 export default function JoursFeriesPage() {
   const [joursFeries, setJoursFeries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +67,8 @@ export default function JoursFeriesPage() {
   const [editingJour, setEditingJour] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [formData, setFormData] = useState({
-    date: '',
+    date_debut: '',
+    date_fin: '',
     nom: '',
     actif: true,
   })
@@ -62,6 +93,18 @@ export default function JoursFeriesPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!formData.date_debut || !formData.date_fin) {
+      setErrorMessage('La date de début et la date de fin sont obligatoires.')
+      setErrorDialogOpen(true)
+      return
+    }
+    const d0 = new Date(formData.date_debut + 'T00:00:00')
+    const d1 = new Date(formData.date_fin + 'T00:00:00')
+    if (d1 < d0) {
+      setErrorMessage('La date de fin doit être postérieure ou égale à la date de début.')
+      setErrorDialogOpen(true)
+      return
+    }
     try {
       const url = editingJour
         ? `/api/jours-feries/${editingJour.id}`
@@ -80,7 +123,8 @@ export default function JoursFeriesPage() {
         setOpen(false)
         setEditingJour(null)
         setFormData({
-          date: '',
+          date_debut: '',
+          date_fin: '',
           nom: '',
           actif: true,
         })
@@ -100,10 +144,11 @@ export default function JoursFeriesPage() {
 
   const handleEdit = (jour) => {
     setEditingJour(jour)
-    // Formater la date pour l'input (YYYY-MM-DD)
-    const dateStr = new Date(jour.date).toISOString().split('T')[0]
+    const deb = ymdFromDate(new Date(jour.date_debut))
+    const fin = ymdFromDate(new Date(jour.date_fin))
     setFormData({
-      date: dateStr,
+      date_debut: deb,
+      date_fin: fin,
       nom: jour.nom,
       actif: jour.actif,
     })
@@ -149,12 +194,23 @@ export default function JoursFeriesPage() {
     if (!open) {
       setEditingJour(null)
       setFormData({
-        date: '',
+        date_debut: '',
+        date_fin: '',
         nom: '',
         actif: true,
       })
     }
   }
+
+  const holidaySpanDays =
+    formData.date_debut && formData.date_fin
+      ? (() => {
+          const a = new Date(formData.date_debut + 'T00:00:00')
+          const b = new Date(formData.date_fin + 'T00:00:00')
+          if (b < a) return 0
+          return inclusiveCalendarDays(a, b)
+        })()
+      : 0
 
   if (loading) {
     return (
@@ -190,17 +246,39 @@ export default function JoursFeriesPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="date">Date *</Label>
+                <Label htmlFor="date_debut">Date début *</Label>
                 <Input
-                  id="date"
+                  id="date_debut"
                   type="date"
-                  value={formData.date}
+                  value={formData.date_debut}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData((prev) => ({
+                      ...prev,
+                      date_debut: v,
+                      date_fin: v,
+                    }))
+                  }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date_fin">Date fin *</Label>
+                <Input
+                  id="date_fin"
+                  type="date"
+                  value={formData.date_fin}
                   onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
+                    setFormData({ ...formData, date_fin: e.target.value })
                   }
                   required
                 />
               </div>
+              {holidaySpanDays > 1 && (
+                <p className="text-xs text-slate-600">
+                  Période de {holidaySpanDays} jours
+                </p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="nom">Nom *</Label>
                 <Input
@@ -242,7 +320,7 @@ export default function JoursFeriesPage() {
         <Table>
           <TableHeader className="bg-slate-100">
             <TableRow>
-              <TableHead>Date</TableHead>
+              <TableHead>Période</TableHead>
               <TableHead>Nom</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead>Actions</TableHead>
@@ -259,12 +337,7 @@ export default function JoursFeriesPage() {
               paginatedJoursFeries.map((jour) => (
                 <TableRow key={jour.id} className="bg-white hover:bg-slate-50">
                   <TableCell className="font-medium">
-                    {new Date(jour.date).toLocaleDateString('fr-FR', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                    {formatPeriodeCell(jour)}
                   </TableCell>
                   <TableCell>{jour.nom}</TableCell>
                   <TableCell>
@@ -319,7 +392,12 @@ export default function JoursFeriesPage() {
           <DialogHeader>
             <DialogTitle>Confirmer la suppression</DialogTitle>
             <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer le jour férié "{jourToDelete?.nom}" du {jourToDelete && new Date(jourToDelete.date).toLocaleDateString('fr-FR')} ? Cette action est irréversible.
+              {jourToDelete ? (
+                <>
+                  Êtes-vous sûr de vouloir supprimer « {jourToDelete.nom} » (
+                  {formatPeriodeCell(jourToDelete)}) ? Cette action est irréversible.
+                </>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">

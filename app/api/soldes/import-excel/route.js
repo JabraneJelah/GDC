@@ -4,6 +4,26 @@ import { getCurrentUser } from '@/lib/auth'
 import { getExpireLe } from '@/lib/solde-expiration'
 import * as XLSX from 'xlsx'
 
+/** Correspondance tolérante (insensible à la casse / accents) pour grade ou spécialité */
+function matchReferentielName(input, candidates) {
+  if (!input || !candidates?.length) return null
+  const raw = input.toString().trim()
+  const norm = (s) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\./g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  const nInput = norm(raw)
+  for (const c of candidates) {
+    const n = norm(c.nom)
+    if (n === nInput || n.includes(nInput) || nInput.includes(n)) return c
+  }
+  return null
+}
+
 /** Message court et compréhensible pour l'utilisateur (pas de détails techniques backend) */
 function messageErreurUtilisateur(err) {
   const msg = err?.message || String(err)
@@ -88,8 +108,8 @@ export async function POST(request) {
         .trim()
     }
     
-    // Chercher la ligne d'en-têtes dans les 10 premières lignes
-    for (let i = 0; i < Math.min(10, data.length); i++) {
+    // Chercher la ligne d'en-têtes dans les 30 premières lignes (fichiers avec lignes vides en tête)
+    for (let i = 0; i < Math.min(30, data.length); i++) {
       const row = data[i]
       if (!row || !Array.isArray(row)) continue
       
@@ -369,28 +389,10 @@ export async function POST(request) {
     // Debug: logger les colonnes de solde trouvées
     console.log('Colonnes de solde trouvées:', soldeColumns.map(c => ({ header: c.header, type: c.type, annee: c.annee })))
 
-    if (soldeColumns.length === 0) {
-      // Trouver toutes les colonnes qui pourraient être des soldes (contiennent un nombre à 4 chiffres)
-      const potentialSoldeColumns = headerRow
-        .map((h, idx) => ({ index: idx, header: h ? String(h).trim() : '' }))
-        .filter(col => {
-          if (!col.header) return false
-          // Chercher un nombre à 4 chiffres (année)
-          return /\d{4}/.test(col.header)
-        })
-      
-      return NextResponse.json(
-        { 
-          error: 'Aucune colonne de solde trouvée. Format attendu: "Administratif 2024", "Exceptionnel 2025", etc.',
-          debug: {
-            availableTypes: typesConge.map(t => t.nom),
-            typeCongeMap,
-            allHeaders: foundColumns.map(c => c.original),
-            potentialSoldeColumns: potentialSoldeColumns.map(c => c.header),
-            searchedPatterns: ['Administratif YYYY', 'Exceptionnel YYYY', 'Administrative YYYY']
-          }
-        },
-        { status: 400 }
+    const importSansColonneSolde = soldeColumns.length === 0
+    if (importSansColonneSolde) {
+      console.log(
+        'Import Excel: aucune colonne de solde détectée — import des professeurs uniquement (sans solde initial).'
       )
     }
 
@@ -399,6 +401,7 @@ export async function POST(request) {
       success: [],
       errors: [],
       skipped: [],
+      warnings: [],
     }
 
     // Récupérer tous les professeurs pour le matching
@@ -413,7 +416,7 @@ export async function POST(request) {
 
     // Récupérer les options pour créer des professeurs (champs obligatoires + optionnels)
     const [grades, specialites, categories, titres] = await Promise.all([
-      gradeIndex !== -1 ? prisma.grade.findMany() : Promise.resolve([]),
+      prisma.grade.findMany(),
       prisma.specialite.findMany(),
       prisma.categoriePersonnel.findMany(),
       prisma.titre.findMany(),
@@ -443,45 +446,40 @@ export async function POST(request) {
     }
 
     // Fonction pour créer un professeur
-    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue) => {
-      // Générer un PPR unique si non fourni
-      let ppr = pprValue?.toString().trim() || ''
-      if (!ppr) {
-        // Générer un PPR basé sur nom et prénom + timestamp
-        const timestamp = Date.now().toString().slice(-6)
-        const initials = (nom?.charAt(0) || '') + (prenom?.charAt(0) || '')
-        ppr = `${initials}${timestamp}`
-        
-        // Vérifier l'unicité
-        let counter = 1
-        while (professeurs.some(p => p.ppr === ppr)) {
-          ppr = `${initials}${timestamp}${counter}`
-          counter++
-        }
-      } else {
-        // Vérifier que le PPR n'existe pas déjà
-        if (professeurs.some(p => p.ppr === ppr)) {
-          throw new Error(`Le PPR ${ppr} existe déjà`)
-        }
+    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, rowNumForLog) => {
+      const ppr =
+        pprValue != null && String(pprValue).trim() !== ''
+          ? String(pprValue).trim()
+          : null
+
+      if (ppr && professeurs.some((p) => p.ppr === ppr)) {
+        throw new Error(`Le PPR ${ppr} existe déjà`)
       }
 
-      // Essayer de trouver et connecter le grade si fourni
+      // Grade / spécialité : correspondance tolérante
       let gradeId = null
-      if (gradeValue && gradeIndex !== -1) {
-        const gradeStr = gradeValue.toString().trim().toLowerCase()
-        const grade = grades.find(g => g.nom.toLowerCase() === gradeStr)
+      if (gradeValue != null && String(gradeValue).trim() !== '') {
+        const grade = matchReferentielName(gradeValue, grades)
         if (grade) {
           gradeId = grade.id
+        } else {
+          results.warnings.push({
+            row: rowNumForLog,
+            message: `Grade non reconnu : « ${String(gradeValue).trim()} » (ignoré)`,
+          })
         }
       }
 
-      // Essayer de trouver la spécialité si fournie, sinon utiliser la première par défaut
       let specialiteId = defaultSpecialiteId
-      if (specialiteValue && specialiteIndex !== -1) {
-        const specialiteStr = specialiteValue.toString().trim().toLowerCase()
-        const specialite = specialites.find(s => s.nom.toLowerCase() === specialiteStr)
+      if (specialiteValue != null && String(specialiteValue).trim() !== '') {
+        const specialite = matchReferentielName(specialiteValue, specialites)
         if (specialite) {
           specialiteId = specialite.id
+        } else {
+          results.warnings.push({
+            row: rowNumForLog,
+            message: `Spécialité non reconnue : « ${String(specialiteValue).trim()} » — utilisation de la spécialité par défaut`,
+          })
         }
       }
 
@@ -508,7 +506,7 @@ export async function POST(request) {
         id: newProfesseur.id,
         nom: newProfesseur.nom,
         prenom: newProfesseur.prenom,
-        ppr: newProfesseur.ppr,
+        ppr: newProfesseur.ppr ?? null,
       })
 
       return newProfesseur
@@ -540,7 +538,7 @@ export async function POST(request) {
       // Si le professeur n'existe pas, le créer automatiquement
       if (!professeur) {
         try {
-          professeur = await createProfesseur(nom, prenom, pprValue, gradeValue, specialiteValue)
+          professeur = await createProfesseur(nom, prenom, pprValue, gradeValue, specialiteValue, i + 1)
           results.success.push({
             row: i + 1,
             action: 'professeur_created',
@@ -660,13 +658,16 @@ export async function POST(request) {
         success: results.success.length,
         errors: results.errors.length,
         skipped: results.skipped.length,
+        soldeColumnsDetected: soldeColumns.length,
+        importSansColonneSolde,
+        warnings: results.warnings.length,
       },
       details: results,
     })
   } catch (error) {
     console.error('Erreur lors de l\'import Excel:', error)
     const message = /prisma|invocation|ECONNREFUSED|database|connect/i.test(error.message || '')
-      ? 'Impossible d\'accéder à la base de données. Vérifiez qu\'elle est démarrée et que le fichier respecte le format (colonnes Nom, Prénom, et soldes du type "Administratif 2024", "Exceptionnel 2025", etc.).'
+      ? 'Impossible d\'accéder à la base de données. Vérifiez qu\'elle est démarrée. Le fichier doit au minimum contenir les colonnes Nom et Prénom (colonnes de solde optionnelles).'
       : messageErreurUtilisateur(error)
     return NextResponse.json(
       { error: message },

@@ -1,38 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-
-/**
- * Calcule le nombre de jours ouvrables entre deux dates (exclut samedi, dimanche et jours fériés actifs).
- */
-async function getWorkingDaysBetween(dateDebutStr, dateFinStr, prismaClient) {
-  const start = new Date(dateDebutStr + 'T00:00:00')
-  const end = new Date(dateFinStr + 'T00:00:00')
-  if (end < start) return 0
-
-  const joursFeries = await prismaClient.jourFerie.findMany({
-    where: {
-      actif: true,
-      date: { gte: start, lte: end },
-    },
-    select: { date: true },
-  })
-  const ferieSet = new Set(
-    joursFeries.map((j) => j.date.toISOString().slice(0, 10))
-  )
-
-  let count = 0
-  const current = new Date(start)
-  while (current <= end) {
-    const dayOfWeek = current.getDay()
-    const ymd = current.toISOString().slice(0, 10)
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-    const isFerie = ferieSet.has(ymd)
-    if (!isWeekend && !isFerie) count++
-    current.setDate(current.getDate() + 1)
-  }
-  return count
-}
+import { getWorkingDaysBetween } from '@/lib/working-days'
 
 // GET - Liste des congés
 export async function GET(request) {
@@ -54,6 +23,7 @@ export async function GET(request) {
         date_debut: true,
         date_fin: true,
         duree_jours: true,
+        hors_solde: true,
         reference_doc: true,
         cree_le: true,
         professeur: {
@@ -83,7 +53,7 @@ export async function GET(request) {
           },
         },
       },
-      orderBy: { date_debut: 'desc' },
+      orderBy: { cree_le: 'desc' },
     })
 
     return NextResponse.json(conges)
@@ -114,7 +84,10 @@ export async function POST(request) {
       reference_doc,
       nom_interim,
       prenom_interim,
+      hors_solde: horsSoldeRaw,
     } = body
+
+    const hors_solde = horsSoldeRaw === true
 
     // Accepter type_conge_id en nombre ou chaîne (évite erreur si le front envoie "1" ou 1)
     const type_conge_id = typeCongeIdRaw != null && typeCongeIdRaw !== ''
@@ -168,6 +141,7 @@ export async function POST(request) {
       )
     }
 
+    if (!hors_solde) {
     // Gestion des soldes : consommer d'abord depuis le solde de l'année du congé
     const maintenant = new Date()
     const anneeConge = new Date(date_debut).getFullYear()
@@ -264,6 +238,8 @@ export async function POST(request) {
       }
     }
 
+    } // fin bloc solde (hors_solde === false)
+
     // Créer le congé (nom_interim/prenom_interim retirés du schéma)
     const conge = await prisma.conge.create({
       data: {
@@ -272,6 +248,7 @@ export async function POST(request) {
         date_debut: new Date(date_debut),
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
+        hors_solde,
         reference_doc: reference_doc || null,
         cree_par_rh_id: currentUser.userId,
       },

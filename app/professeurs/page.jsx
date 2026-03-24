@@ -571,9 +571,21 @@ export default function ProfesseursPage() {
                   
                 </div>
                 {importResult && (
-                  <p className="text-sm text-slate-700 p-3 bg-slate-50 rounded-md">
-                    L'import s'est terminé. Succès : {importResult.summary.success}, Erreurs : {importResult.summary.errors}, Ignorés : {importResult.summary.skipped}.
-                  </p>
+                  <div className="space-y-2">
+                    {importResult.summary?.importSansColonneSolde && (
+                      <p className="text-sm text-blue-900 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                        Aucune colonne de solde détectée — les professeurs sont importés sans solde initial.
+                      </p>
+                    )}
+                    {importResult.summary?.warnings > 0 && (
+                      <p className="text-xs text-amber-900 p-2 bg-amber-50 border border-amber-100 rounded-md">
+                        {importResult.summary.warnings} avertissement(s) (grade ou spécialité non reconnus sur certaines lignes — voir le détail de la réponse si besoin).
+                      </p>
+                    )}
+                    <p className="text-sm text-slate-700 p-3 bg-slate-50 rounded-md">
+                      L'import s'est terminé. Succès : {importResult.summary.success}, Erreurs : {importResult.summary.errors}, Ignorés : {importResult.summary.skipped}.
+                    </p>
+                  </div>
                 )}
                 <div className="flex gap-2">
                   <Button type="submit" disabled={importing || !importFile} className="flex-1">
@@ -755,7 +767,7 @@ export default function ProfesseursPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ppr">PPR *</Label>
+                <Label htmlFor="ppr">PPR</Label>
                 <Input
                   id="ppr"
                   value={formData.ppr}
@@ -929,7 +941,7 @@ export default function ProfesseursPage() {
                     </TableCell>
                     <TableCell>{professeur.nom}</TableCell>
                     <TableCell>{professeur.prenom}</TableCell>
-                    <TableCell>{professeur.ppr}</TableCell>
+                    <TableCell>{professeur.ppr ?? '—'}</TableCell>
                     <TableCell>
                       {professeur.specialite?.nom || '-'}
                     </TableCell>
@@ -1023,7 +1035,7 @@ export default function ProfesseursPage() {
                     <strong>
                       {professeurToDelete.titre?.nom ? `${professeurToDelete.titre.nom} ` : ''}{professeurToDelete.prenom} {professeurToDelete.nom}
                     </strong>{' '}
-                    (PPR: {professeurToDelete.ppr}) ?
+                    {professeurToDelete.ppr ? `(PPR: ${professeurToDelete.ppr})` : '(sans PPR)'} ?
                   </p>
                   {professeurToDelete._count?.conges > 0 && (
                     <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">

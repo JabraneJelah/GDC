@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+function normalizeDayStart(value) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 // PUT - Mettre à jour un jour férié
 export async function PUT(request, { params }) {
   try {
@@ -29,9 +36,8 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { date, nom, actif } = body
+    const { date_debut, date_fin, nom, actif } = body
 
-    // Vérifier si le jour férié existe
     const existing = await prisma.jourFerie.findUnique({
       where: { id: jourFerieId },
     })
@@ -45,28 +51,29 @@ export async function PUT(request, { params }) {
 
     const updateData = {}
 
-    // Si la date est modifiée, vérifier qu'elle n'existe pas déjà
-    if (date) {
-      const dateObj = new Date(date)
-      dateObj.setHours(0, 0, 0, 0)
-
-      if (dateObj.getTime() !== existing.date.getTime()) {
-        const dateExists = await prisma.jourFerie.findFirst({
-          where: {
-            date: dateObj,
-            NOT: { id: jourFerieId },
-          },
-        })
-
-        if (dateExists) {
-          return NextResponse.json(
-            { error: 'Un jour férié existe déjà pour cette date' },
-            { status: 400 }
-          )
-        }
+    if (date_debut !== undefined || date_fin !== undefined) {
+      if (date_debut === undefined || date_fin === undefined) {
+        return NextResponse.json(
+          { error: 'date_debut et date_fin doivent être fournies ensemble' },
+          { status: 400 }
+        )
       }
-
-      updateData.date = dateObj
+      const debut = normalizeDayStart(date_debut)
+      const fin = normalizeDayStart(date_fin)
+      if (!debut || !fin) {
+        return NextResponse.json(
+          { error: 'Dates invalides' },
+          { status: 400 }
+        )
+      }
+      if (fin < debut) {
+        return NextResponse.json(
+          { error: 'La date de fin doit être postérieure ou égale à la date de début' },
+          { status: 400 }
+        )
+      }
+      updateData.date_debut = debut
+      updateData.date_fin = fin
     }
 
     if (nom !== undefined) {
@@ -77,7 +84,6 @@ export async function PUT(request, { params }) {
       updateData.actif = actif
     }
 
-    // Mettre à jour le jour férié
     const jourFerie = await prisma.jourFerie.update({
       where: { id: jourFerieId },
       data: updateData,
@@ -119,7 +125,6 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    // Vérifier si le jour férié existe
     const existing = await prisma.jourFerie.findUnique({
       where: { id: jourFerieId },
     })
@@ -131,7 +136,6 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    // Supprimer le jour férié
     await prisma.jourFerie.delete({
       where: { id: jourFerieId },
     })

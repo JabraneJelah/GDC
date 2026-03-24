@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) {
-  console.error('❌ DATABASE_URL is not set in .env')
+  console.error(' DATABASE_URL is not set in .env')
   process.exit(1)
 }
 
@@ -60,9 +60,9 @@ async function main() {
         actif: true,
       },
     })
-    console.log(`✅ Utilisateur RH créé: ${defaultUsername} / ${defaultPassword}`)
+    console.log(`Utilisateur RH créé: ${defaultUsername} / ${defaultPassword}`)
   } else {
-    console.log(`⏭️  Utilisateur RH déjà existant: ${defaultUsername}`)
+    console.log(` Utilisateur RH déjà existant: ${defaultUsername}`)
   }
 
   console.log('✨ Seeding completed!')
@@ -70,7 +70,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('❌ Error seeding database:', e)
+    console.error('Error seeding database:', e)
     process.exit(1)
   })
   .finally(async () => {

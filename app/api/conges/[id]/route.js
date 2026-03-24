@@ -1,27 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-
-/** Jours ouvrables entre deux dates (exclut week-end et jours fériés). */
-async function getWorkingDaysBetween(dateDebutStr, dateFinStr, prismaClient) {
-  const start = new Date(dateDebutStr + 'T00:00:00')
-  const end = new Date(dateFinStr + 'T00:00:00')
-  if (end < start) return 0
-  const joursFeries = await prismaClient.jourFerie.findMany({
-    where: { actif: true, date: { gte: start, lte: end } },
-    select: { date: true },
-  })
-  const ferieSet = new Set(joursFeries.map((j) => j.date.toISOString().slice(0, 10)))
-  let count = 0
-  const current = new Date(start)
-  while (current <= end) {
-    const dayOfWeek = current.getDay()
-    const ymd = current.toISOString().slice(0, 10)
-    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !ferieSet.has(ymd)) count++
-    current.setDate(current.getDate() + 1)
-  }
-  return count
-}
+import { getWorkingDaysBetween } from '@/lib/working-days'
 
 // PUT - Mettre à jour un congé
 export async function PUT(request, { params }) {
@@ -52,6 +32,7 @@ export async function PUT(request, { params }) {
       reference_doc,
       nom_interim,
       prenom_interim,
+      hors_solde: horsSoldeBody,
     } = body
 
     // Vérifier si le congé existe
@@ -68,6 +49,16 @@ export async function PUT(request, { params }) {
         { error: 'Congé non trouvé' },
         { status: 404 }
       )
+    }
+
+    if (horsSoldeBody !== undefined && horsSoldeBody !== null) {
+      const requested = horsSoldeBody === true
+      if (requested !== existingConge.hors_solde) {
+        return NextResponse.json(
+          { error: 'Le mode solde / hors solde ne peut pas être modifié. Supprimez ce congé et recréez-le si nécessaire.' },
+          { status: 400 }
+        )
+      }
     }
 
     if (!professeur_id || !type_conge_id || !date_debut || !date_fin) {
@@ -135,7 +126,7 @@ export async function PUT(request, { params }) {
     const typeCongeAChange = typeCongeIdInt !== existingConge.type_conge_id
     const anneeAChange = nouvelleAnnee !== ancienneAnnee
 
-    if (differenceDuree !== 0 || professeurAChange || typeCongeAChange || anneeAChange) {
+    if (!existingConge.hors_solde && (differenceDuree !== 0 || professeurAChange || typeCongeAChange || anneeAChange)) {
       // ÉTAPE 1: Restaurer les jours de l'ancien congé
       // Utiliser la même logique que DELETE pour restaurer correctement
       if (ancienneDuree > 0) {
@@ -297,6 +288,7 @@ export async function PUT(request, { params }) {
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
         reference_doc: reference_doc || null,
+        hors_solde: existingConge.hors_solde,
       },
       include: {
         professeur: {
@@ -364,6 +356,11 @@ export async function DELETE(request, { params }) {
     // Calculer l'année du congé
     const annee = new Date(existingConge.date_debut).getFullYear()
     const dureeJours = existingConge.duree_jours
+
+    if (existingConge.hors_solde) {
+      await prisma.conge.delete({ where: { id } })
+      return NextResponse.json({ message: 'Congé supprimé avec succès' })
+    }
 
     // Restaurer les jours dans le solde de congé
     // Stratégie : restaurer dans les soldes existants, en priorité le solde de l'année du congé

@@ -119,10 +119,17 @@ export async function PUT(request, { params }) {
       )
     }
 
+    const newPpr =
+      ppr === undefined
+        ? undefined
+        : ppr == null || String(ppr).trim() === ''
+          ? null
+          : String(ppr).trim()
+
     // Vérifier si le PPR est modifié et s'il existe déjà
-    if (ppr && ppr !== existing.ppr) {
-      const pprExists = await prisma.professeur.findUnique({
-        where: { ppr },
+    if (newPpr !== undefined && newPpr !== existing.ppr && newPpr) {
+      const pprExists = await prisma.professeur.findFirst({
+        where: { ppr: newPpr, NOT: { id } },
       })
 
       if (pprExists) {
@@ -137,7 +144,7 @@ export async function PUT(request, { params }) {
     const updateData = {
       nom: nom || existing.nom,
       prenom: prenom || existing.prenom,
-      ppr: ppr || existing.ppr,
+      ...(newPpr !== undefined ? { ppr: newPpr } : {}),
       telephone: telephone !== undefined ? telephone : existing.telephone,
     }
 

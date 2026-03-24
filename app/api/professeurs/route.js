@@ -151,13 +151,16 @@ export async function POST(request) {
       telephone,
     } = body
 
-    // 3️⃣ Validation basique - nom, prenom, ppr, spécialité, catégorie et titre sont obligatoires
-    if (!nom || !prenom || !ppr) {
+    // 3️⃣ Validation basique - nom, prénom, spécialité, catégorie et titre sont obligatoires (PPR optionnel)
+    if (!nom || !prenom) {
       return NextResponse.json(
-        { error: 'Les champs Nom, Prénom et PPR sont obligatoires' },
+        { error: 'Les champs Nom et Prénom sont obligatoires' },
         { status: 400 }
       )
     }
+
+    const pprTrim =
+      ppr != null && String(ppr).trim() !== '' ? String(ppr).trim() : null
 
     const specialiteId = specialite_id ? Number(specialite_id) : null
     const categoriePersonnelId = categorie_personnel_id ? Number(categorie_personnel_id) : null
@@ -238,23 +241,25 @@ export async function POST(request) {
       }
     }
 
-    // 6️⃣ Vérifier unicité du PPR
-    const existing = await prisma.professeur.findUnique({
-      where: { ppr },
-    })
+    // 6️⃣ Vérifier unicité du PPR (si renseigné)
+    if (pprTrim) {
+      const existingPpr = await prisma.professeur.findFirst({
+        where: { ppr: pprTrim },
+      })
 
-    if (existing) {
-      return NextResponse.json(
-        { error: 'Ce PPR est déjà utilisé' },
-        { status: 400 }
-      )
+      if (existingPpr) {
+        return NextResponse.json(
+          { error: 'Ce PPR est déjà utilisé' },
+          { status: 400 }
+        )
+      }
     }
 
     // 7️⃣ Création du professeur (utiliser les IDs directement pour les champs optionnels)
     const data = {
       nom,
       prenom,
-      ppr,
+      ppr: pprTrim,
       cin: cin != null && String(cin).trim() !== '' ? String(cin).trim() : null,
       telephone: telephone || null,
     }

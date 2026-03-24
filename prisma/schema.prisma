@@ -7,6 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  
+
 }
 
 
@@ -101,7 +103,7 @@ model Professeur {
   id                      String              @id @default(uuid())
   nom                     String
   prenom                  String
-  ppr                     String              @unique // Numéro PPR unique
+  ppr                     String?             @unique // Numéro PPR unique (optionnel si inconnu à l’import)
   cin                     String?
   specialite_id           Int
   categorie_personnel_id  Int
@@ -164,6 +166,7 @@ model Conge {
   date_debut      DateTime
   date_fin        DateTime
   duree_jours     Int
+  hors_solde      Boolean       @default(false) // true = enregistré sans consommer de solde
   reference_doc   String?       // Référence du document papier
   cree_par_rh_id  String
   cree_le         DateTime      @default(now())
@@ -176,14 +179,16 @@ model Conge {
   @@map("conges")
 }
 
-// Jours Fériés - Référentiel des jours fériés
+// Jours Fériés - Référentiel des jours fériés (plage : un jour = date_debut = date_fin)
 model JourFerie {
-  id        Int      @id @default(autoincrement())
-  date      DateTime @unique // Date du jour férié (normalisée à 00:00)
-  nom       String   // Nom du jour férié (ex: "Fête du Travail")
-  actif     Boolean  @default(true)
+  id         Int      @id @default(autoincrement())
+  date_debut DateTime
+  date_fin   DateTime
+  nom        String
+  actif      Boolean  @default(true)
 
-  @@index([date])
+  @@index([date_debut])
+  @@index([date_fin])
   @@index([actif])
   @@map("jours_feries")
 }

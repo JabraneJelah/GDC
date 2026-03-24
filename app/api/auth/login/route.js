@@ -4,6 +4,24 @@ import { verifyPassword, generateToken, hashPassword } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
+async function findUserWithTimeout(username, timeoutMs = 10000) {
+  console.log('LOGIN: starting user lookup');
+
+  const findUserPromise = prisma.utilisateurRH.findFirst({
+    where: {
+      username: { equals: username, mode: 'insensitive' },
+    },
+  })
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error('Database timeout while looking up user'))
+    }, timeoutMs)
+  })
+
+  return Promise.race([findUserPromise, timeoutPromise])
+}
+
 export async function POST(request) {
   console.log("LOGIN API CALLED");
 
@@ -18,11 +36,7 @@ export async function POST(request) {
       )
     }
 
-    const utilisateur = await prisma.utilisateurRH.findFirst({
-      where: {
-        username: { equals: username, mode: 'insensitive' },
-      },
-    })
+    const utilisateur = await findUserWithTimeout(username)
 
     if (!utilisateur) {
       console.log("User not found:", username)
@@ -100,7 +114,7 @@ export async function POST(request) {
     // Set cookie with proper configuration
     response.cookies.set('auth_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, 
     })
@@ -109,8 +123,15 @@ export async function POST(request) {
     return response
   } catch (error) {
     console.error('Erreur lors de la connexion:', error)
+    const isDbUnavailable =
+      error?.message?.includes('timeout') ||
+      error?.message?.includes('ECONNREFUSED') ||
+      error?.message?.includes('connect')
+    const message = isDbUnavailable
+      ? 'Base de données indisponible. Vérifiez que le serveur est démarré.'
+      : 'Erreur serveur'
     return NextResponse.json(
-      { error: 'Erreur serveur', details: process.env.NODE_ENV === 'development' ? error.message : undefined },
+      { error: message, details: process.env.NODE_ENV === 'development' ? error.message : undefined },
       { status: 500 }
     )
   }

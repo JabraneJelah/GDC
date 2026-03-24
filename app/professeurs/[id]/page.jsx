@@ -31,7 +31,27 @@ import {
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { Download, FileText, Pencil, Trash2, Plus } from 'lucide-react'
+
+const parseReferenceDoc = (value) => {
+  if (!value) return { referenceNumber: '', fileUrl: '', fileName: '', fileType: '' }
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        referenceNumber: parsed.referenceNumber || '',
+        fileUrl: parsed.fileUrl || '',
+        fileName: parsed.fileName || '',
+        fileType: parsed.fileType || '',
+      }
+    }
+  } catch (_) {
+    // Compatibilité avec les anciennes valeurs texte.
+  }
+  return { referenceNumber: value, fileUrl: '', fileName: '', fileType: '' }
+}
+
+const HISTORIQUE_CONGES_PAGE_SIZE = 8
 
 export default function ProfesseurDetailsPage() {
   const params = useParams()
@@ -58,6 +78,7 @@ export default function ProfesseurDetailsPage() {
   const [services, setServices] = useState([])
   const [hopitaux, setHopitaux] = useState([])
   const [grades, setGrades] = useState([])
+  const [historiqueCongesPage, setHistoriqueCongesPage] = useState(1)
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -79,6 +100,17 @@ export default function ProfesseurDetailsPage() {
       // Les autres options seront chargées seulement quand nécessaire (lazy loading)
     }
   }, [params.id])
+
+  const congesSignature = professeur
+    ? [...(professeur.conges || [])]
+        .map((c) => c.id)
+        .sort((a, b) => a - b)
+        .join(',')
+    : ''
+
+  useEffect(() => {
+    setHistoriqueCongesPage(1)
+  }, [congesSignature])
 
   const fetchOptions = async () => {
     try {
@@ -312,6 +344,19 @@ export default function ProfesseurDetailsPage() {
   if (!professeur) {
     return <div>Professeur non trouvé</div>
   }
+
+  const congesList = professeur.conges ?? []
+  const totalHistoriquePages = Math.ceil(congesList.length / HISTORIQUE_CONGES_PAGE_SIZE)
+  const historiquePageSafe =
+    totalHistoriquePages === 0
+      ? 1
+      : Math.min(Math.max(1, historiqueCongesPage), totalHistoriquePages)
+  const historiqueStart = (historiquePageSafe - 1) * HISTORIQUE_CONGES_PAGE_SIZE
+  const historiqueCongesPageRows = congesList.slice(
+    historiqueStart,
+    historiqueStart + HISTORIQUE_CONGES_PAGE_SIZE
+  )
+  const showHistoriquePagination = congesList.length > HISTORIQUE_CONGES_PAGE_SIZE
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -654,14 +699,14 @@ export default function ProfesseurDetailsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {professeur.conges.length === 0 ? (
+              {congesList.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center">
                     Aucun congé enregistré
                   </TableCell>
                 </TableRow>
               ) : (
-                professeur.conges.map((conge) => (
+                historiqueCongesPageRows.map((conge) => (
                   <TableRow key={conge.id}>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
@@ -676,13 +721,84 @@ export default function ProfesseurDetailsPage() {
                     </TableCell>
                     <TableCell>{conge.duree_jours}</TableCell>
                     <TableCell>{professeur.grade?.nom || '-'}</TableCell>
-                    <TableCell>{conge.reference_doc || '-'}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const ref = parseReferenceDoc(conge.reference_doc)
+                        if (!ref.referenceNumber && !ref.fileUrl) return '-'
+                        return (
+                          <div className="space-y-1">
+                            {ref.referenceNumber && (
+                              <div className="text-xs text-slate-700">{ref.referenceNumber}</div>
+                            )}
+                            {ref.fileUrl && (
+                              ref.fileType?.startsWith('image/') ? (
+                                <div className="flex items-center gap-2">
+                                  <a href={ref.fileUrl} target="_blank" rel="noreferrer" className="inline-block">
+                                    <img
+                                      src={ref.fileUrl}
+                                      alt={ref.fileName || 'Pièce justificative'}
+                                      className="h-10 w-10 rounded border border-slate-200 object-cover"
+                                    />
+                                  </a>
+                                  <a
+                                    href={ref.fileUrl}
+                                    download={ref.fileName || true}
+                                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                    Télécharger
+                                  </a>
+                                </div>
+                              ) : (
+                                <a
+                                  href={ref.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download={ref.fileName || true}
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                >
+                                  <FileText className="h-3 w-3 text-red-600" />
+                                  <span>{ref.fileName || 'Ouvrir PDF'}</span>
+                                </a>
+                              )
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </TableCell>
                     <TableCell>{conge.cree_par_rh.nom_complet}</TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
+          {showHistoriquePagination && (
+            <div className="flex items-center justify-center gap-4 pt-4 mt-4 border-t border-slate-200">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={historiquePageSafe <= 1}
+                onClick={() => setHistoriqueCongesPage((p) => Math.max(1, p - 1))}
+              >
+                Précédent
+              </Button>
+              <p className="text-sm text-slate-700 min-w-[7rem] text-center">
+                Page {historiquePageSafe} / {totalHistoriquePages}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={historiquePageSafe >= totalHistoriquePages}
+                onClick={() =>
+                  setHistoriqueCongesPage((p) => Math.min(totalHistoriquePages, p + 1))
+                }
+              >
+                Suivant
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

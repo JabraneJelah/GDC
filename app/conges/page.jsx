@@ -29,9 +29,50 @@ import {
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
 import { Badge } from '@/components/ui/badge'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { FileText, Pencil, Trash2, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
+
+/** Étend les plages de jours fériés en ensemble de clés YYYY-MM-DD (dates locales). */
+function expandJourFerieRangesToYmdSet(joursFeries) {
+  const set = new Set()
+  for (const j of joursFeries) {
+    if (!j?.date_debut || !j?.date_fin) continue
+    const start = new Date(j.date_debut)
+    const end = new Date(j.date_fin)
+    const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    while (cur <= endDay) {
+      const ymd =
+        cur.getFullYear() +
+        '-' +
+        String(cur.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(cur.getDate()).padStart(2, '0')
+      set.add(ymd)
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
+  return set
+}
+
+const parseReferenceDoc = (value) => {
+  if (!value) return { referenceNumber: '', fileUrl: '', fileName: '', fileType: '' }
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        referenceNumber: parsed.referenceNumber || '',
+        fileUrl: parsed.fileUrl || '',
+        fileName: parsed.fileName || '',
+        fileType: parsed.fileType || '',
+      }
+    }
+  } catch (_) {
+    // Compatibilité avec les anciennes valeurs texte.
+  }
+  return { referenceNumber: value, fileUrl: '', fileName: '', fileType: '' }
+}
 
 export default function CongesPage() {
   const [conges, setConges] = useState([])
@@ -64,8 +105,12 @@ export default function CongesPage() {
   const [professeurSearch, setProfesseurSearch] = useState('')
   const [professeurSearchOpen, setProfesseurSearchOpen] = useState(false)
   const [calculatingDateRetour, setCalculatingDateRetour] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [filePreviewUrl, setFilePreviewUrl] = useState('')
+  const [existingReferenceFile, setExistingReferenceFile] = useState(null)
   // Date de reprise au travail (jour suivant le dernier jour de congé) — affichée comme "date de retour"
   const [dateRetourTravailDisplay, setDateRetourTravailDisplay] = useState('')
+  const [horsSolde, setHorsSolde] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -143,14 +188,7 @@ export default function CongesPage() {
       const res = await fetch(`/api/jours-feries?from=${dateDebut}&to=${toStr}`)
       if (res.ok) {
         const joursFeries = await res.json()
-        ferieSet = new Set(
-          joursFeries.map((j) => {
-            const d = new Date(j.date)
-            return d.getFullYear() + '-' +
-              String(d.getMonth() + 1).padStart(2, '0') + '-' +
-              String(d.getDate()).padStart(2, '0')
-          })
-        )
+        ferieSet = expandJourFerieRangesToYmdSet(joursFeries)
       }
     } catch (e) {
       console.error('Erreur chargement jours fériés:', e)
@@ -202,7 +240,18 @@ export default function CongesPage() {
       prenom_interim: '',
     })
     setDateRetourTravailDisplay('')
+    setSelectedFile(null)
+    setFilePreviewUrl('')
+    setExistingReferenceFile(null)
+    setHorsSolde(false)
     setEditingConge(null)
+  }
+
+  const clearReferenceFile = () => {
+    if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+    setFilePreviewUrl('')
+    setSelectedFile(null)
+    setExistingReferenceFile(null)
   }
 
   const handleSubmit = async (e) => {
@@ -229,10 +278,38 @@ export default function CongesPage() {
     try {
       const url = editingConge ? `/api/conges/${editingConge.id}` : '/api/conges'
       const method = editingConge ? 'PUT' : 'POST'
+      let uploadedFile = existingReferenceFile
+
+      if (selectedFile) {
+        const uploadData = new FormData()
+        uploadData.append('file', selectedFile)
+        const uploadRes = await fetch('/api/conges/upload', {
+          method: 'POST',
+          body: uploadData,
+        })
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => null)
+          throw new Error(err?.error || 'Échec de l\'upload de la pièce justificative')
+        }
+        uploadedFile = await uploadRes.json()
+      }
+
+      const referencePayload = uploadedFile?.fileUrl
+        ? JSON.stringify({
+            fileUrl: uploadedFile.fileUrl,
+            fileName: uploadedFile.fileName || '',
+            fileType: uploadedFile.fileType || '',
+          })
+        : ''
+
       const payload = {
         ...formData,
         type_conge_id: typeCongeId,
         duree_jours: parseInt(formData.duree_jours, 10) || 0,
+        reference_doc: referencePayload,
+      }
+      if (!editingConge) {
+        payload.hors_solde = horsSolde
       }
       const response = await fetch(url, {
         method,
@@ -285,6 +362,19 @@ export default function CongesPage() {
       nom_interim: conge.nom_interim || '',
       prenom_interim: conge.prenom_interim || '',
     })
+    const reference = parseReferenceDoc(conge.reference_doc)
+    setExistingReferenceFile(
+      reference.fileUrl
+        ? {
+            fileUrl: reference.fileUrl,
+            fileName: reference.fileName,
+            fileType: reference.fileType,
+          }
+        : null
+    )
+    setSelectedFile(null)
+    setFilePreviewUrl('')
+    setHorsSolde(!!conge.hors_solde)
     setDateRetourTravailDisplay(nextWorkingDayAfter(lastDay, new Set()))
     setEditOpen(true)
   }
@@ -337,7 +427,7 @@ export default function CongesPage() {
     if (open && formData.professeur_id) {
       const prof = professeurs.find(p => p.id === formData.professeur_id)
       if (prof) {
-        setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom} (${prof.ppr})`)
+        setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}${prof.ppr ? ` (${prof.ppr})` : ''}`)
       }
     } else if (!open) {
       setProfesseurSearch('')
@@ -390,8 +480,8 @@ export default function CongesPage() {
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">Nouveau Congé</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[80vh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+            <DialogHeader className="flex-shrink-0 space-y-1.5 px-6 pt-6 pb-2 pr-12 text-left">
               <DialogTitle>{editingConge ? 'Modifier le Congé' : 'Nouveau Congé'}</DialogTitle>
               <DialogDescription>
                 {editingConge
@@ -399,6 +489,7 @@ export default function CongesPage() {
                   : ''}
               </DialogDescription>
             </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="professeur_id">Professeur *</Label>
@@ -406,11 +497,11 @@ export default function CongesPage() {
                   {(() => {
                     const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
                     const displayValue = selectedProf
-                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom} (${selectedProf.ppr})`.trim()
+                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}${selectedProf.ppr ? ` (${selectedProf.ppr})` : ''}`.trim()
                       : professeurSearch
                     const searchLower = professeurSearch.toLowerCase()
                     const filtered = professeurs.filter((prof) => {
-                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
                       return nomComplet.includes(searchLower)
                     }).slice(0, 10)
                     return (
@@ -443,7 +534,7 @@ export default function CongesPage() {
                                     setProfesseurSearchOpen(false)
                                   }}
                                 >
-                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
                                 </div>
                               ))
                             ) : (
@@ -488,17 +579,6 @@ export default function CongesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date_fin">Date de retour au travail (calculée) *</Label>
-                <Input
-                  id="date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="bg-slate-100"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="duree_jours">Durée du congé (jours ouvrables) *</Label>
                 <Input
                   id="duree_jours"
@@ -510,6 +590,17 @@ export default function CongesPage() {
                     setFormData(prev => ({ ...prev, duree_jours: v }))
                   }}
                   placeholder="Ex: 5"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date_fin">Date de retour au travail (calculée) *</Label>
+                <Input
+                  id="date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
+                  readOnly
+                  className="bg-slate-100"
                   required
                 />
               </div>
@@ -535,6 +626,68 @@ export default function CongesPage() {
                   placeholder="Prénom de la personne en intérim"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="reference_file">Pièce justificative / Référence</Label>
+                <div className="rounded-md border border-slate-200 p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="reference_file"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+                        setSelectedFile(file)
+                        setExistingReferenceFile(null)
+                        if (file.type.startsWith('image/')) {
+                          setFilePreviewUrl(URL.createObjectURL(file))
+                        } else {
+                          setFilePreviewUrl('')
+                        }
+                      }}
+                    />
+                    {(selectedFile || existingReferenceFile) && (
+                      <Button type="button" variant="ghost" size="sm" onClick={clearReferenceFile} className="h-9 w-9 p-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {(selectedFile || existingReferenceFile) && (
+                    <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
+                      {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
+                        <img
+                          src={filePreviewUrl || existingReferenceFile?.fileUrl}
+                          alt="Aperçu pièce justificative"
+                          className="h-20 w-20 object-cover rounded border border-slate-200"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-slate-700">
+                          <FileText className="h-4 w-4 text-red-600" />
+                          <span>{selectedFile?.name || existingReferenceFile?.fileName || 'Document PDF'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-md border border-slate-200 p-3">
+                <input
+                  id="hors_solde"
+                  type="checkbox"
+                  checked={horsSolde}
+                  onChange={(e) => setHorsSolde(e.target.checked)}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300"
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="hors_solde" className="text-slate-800">
+                    Hors solde
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    Enregistrer ce congé sans déduire de jours de solde (aucun solde requis).
+                  </p>
+                </div>
+              </div>
               <Button
                 type="submit"
                 className="w-full"
@@ -543,18 +696,20 @@ export default function CongesPage() {
                 {calculatingDateRetour ? 'Calcul de la date de retour...' : (editingConge ? 'Modifier' : 'Enregistrer')}
               </Button>
             </form>
+            </div>
           </DialogContent>
         </Dialog>
 
         {/*  modification model */}
         <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[80vh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+            <DialogHeader className="flex-shrink-0 space-y-1.5 px-6 pt-6 pb-2 pr-12 text-left">
               <DialogTitle>Modifier le Congé</DialogTitle>
               <DialogDescription>
                 Modifier les informations du congé
               </DialogDescription>
             </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="edit_professeur_id">Professeur *</Label>
@@ -562,11 +717,11 @@ export default function CongesPage() {
                   {(() => {
                     const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
                     const displayValue = selectedProf
-                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom} (${selectedProf.ppr})`.trim()
+                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}${selectedProf.ppr ? ` (${selectedProf.ppr})` : ''}`.trim()
                       : professeurSearch
                     const searchLower = professeurSearch.toLowerCase()
                     const filtered = professeurs.filter((prof) => {
-                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr}`.toLowerCase()
+                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
                       return nomComplet.includes(searchLower)
                     }).slice(0, 10)
                     return (
@@ -599,7 +754,7 @@ export default function CongesPage() {
                                     setProfesseurSearchOpen(false)
                                   }}
                                 >
-                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom} ({prof.ppr})
+                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
                                 </div>
                               ))
                             ) : (
@@ -644,17 +799,6 @@ export default function CongesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_date_fin">Date de retour au travail (calculée) *</Label>
-                <Input
-                  id="edit_date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="bg-slate-100"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="edit_duree_jours">Durée du congé (jours ouvrables) *</Label>
                 <Input
                   id="edit_duree_jours"
@@ -662,6 +806,17 @@ export default function CongesPage() {
                   min={1}
                   value={formData.duree_jours}
                   onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_date_fin">Date de retour au travail (calculée) *</Label>
+                <Input
+                  id="edit_date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
+                  readOnly
+                  className="bg-slate-100"
                   required
                 />
               </div>
@@ -687,10 +842,63 @@ export default function CongesPage() {
                   placeholder="Prénom de la personne en intérim"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_reference_file">Pièce justificative / Référence</Label>
+                <div className="rounded-md border border-slate-200 p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="edit_reference_file"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+                        setSelectedFile(file)
+                        setExistingReferenceFile(null)
+                        if (file.type.startsWith('image/')) {
+                          setFilePreviewUrl(URL.createObjectURL(file))
+                        } else {
+                          setFilePreviewUrl('')
+                        }
+                      }}
+                    />
+                    {(selectedFile || existingReferenceFile) && (
+                      <Button type="button" variant="ghost" size="sm" onClick={clearReferenceFile} className="h-9 w-9 p-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {(selectedFile || existingReferenceFile) && (
+                    <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
+                      {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
+                        <img
+                          src={filePreviewUrl || existingReferenceFile?.fileUrl}
+                          alt="Aperçu pièce justificative"
+                          className="h-20 w-20 object-cover rounded border border-slate-200"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-slate-700">
+                          <FileText className="h-4 w-4 text-red-600" />
+                          <span>{selectedFile?.name || existingReferenceFile?.fileName || 'Document PDF'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span className="font-medium text-slate-800">Hors solde :</span>{' '}
+                {editingConge?.hors_solde ? 'Oui' : 'Non'}
+                <span className="block text-xs text-slate-500 mt-1">
+                  Le mode ne peut pas être modifié ici. Supprimez et recréez le congé pour changer.
+                </span>
+              </div>
               <Button type="submit" className="w-full" disabled={calculatingDateRetour}>
                 {calculatingDateRetour ? 'Calcul...' : 'Modifier'}
               </Button>
             </form>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -757,7 +965,7 @@ export default function CongesPage() {
                 <SelectItem value="all">Tous les professeurs</SelectItem>
                 {professeurs.map((prof) => (
                   <SelectItem key={prof.id} value={prof.id}>
-                    {prof.prenom} {prof.nom} ({prof.ppr})
+                    {prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -864,7 +1072,40 @@ export default function CongesPage() {
                       ? `${conge.nom_interim} ${conge.prenom_interim}`
                       : '-'}
                   </TableCell>
-                  <TableCell>{conge.reference_doc || '-'}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const ref = parseReferenceDoc(conge.reference_doc)
+                      if (!ref.referenceNumber && !ref.fileUrl) return '-'
+                      return (
+                        <div className="space-y-1">
+                          {ref.referenceNumber && (
+                            <div className="text-xs text-slate-700">{ref.referenceNumber}</div>
+                          )}
+                          {ref.fileUrl && (
+                            ref.fileType?.startsWith('image/') ? (
+                              <a href={ref.fileUrl} target="_blank" rel="noreferrer" className="inline-block">
+                                <img
+                                  src={ref.fileUrl}
+                                  alt={ref.fileName || 'Pièce justificative'}
+                                  className="h-10 w-10 rounded border border-slate-200 object-cover"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={ref.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                              >
+                                <FileText className="h-3 w-3" />
+                                <span>{ref.fileName || 'Ouvrir PDF'}</span>
+                              </a>
+                            )
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </TableCell>
                   <TableCell>{conge.cree_par_rh?.nom_complet || '-'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
