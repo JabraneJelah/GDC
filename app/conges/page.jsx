@@ -56,6 +56,17 @@ function expandJourFerieRangesToYmdSet(joursFeries) {
   return set
 }
 
+function toCongesUploadApiUrl(fileUrl) {
+  if (!fileUrl) return ''
+  if (fileUrl.startsWith('/api/uploads/conges/')) return fileUrl
+  const marker = '/uploads/conges/'
+  const idx = fileUrl.indexOf(marker)
+  if (idx === -1) return fileUrl
+  const filename = fileUrl.slice(idx + marker.length)
+  if (!filename || filename.includes('/') || filename.includes('\\')) return fileUrl
+  return `/api/uploads/conges/${filename}`
+}
+
 const parseReferenceDoc = (value) => {
   if (!value) return { referenceNumber: '', fileUrl: '', fileName: '', fileType: '' }
   try {
@@ -657,7 +668,7 @@ export default function CongesPage() {
                     <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
                       {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
                         <img
-                          src={filePreviewUrl || existingReferenceFile?.fileUrl}
+                          src={filePreviewUrl || toCongesUploadApiUrl(existingReferenceFile?.fileUrl)}
                           alt="Aperçu pièce justificative"
                           className="h-20 w-20 object-cover rounded border border-slate-200"
                         />
@@ -873,7 +884,7 @@ export default function CongesPage() {
                     <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
                       {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
                         <img
-                          src={filePreviewUrl || existingReferenceFile?.fileUrl}
+                          src={filePreviewUrl || toCongesUploadApiUrl(existingReferenceFile?.fileUrl)}
                           alt="Aperçu pièce justificative"
                           className="h-20 w-20 object-cover rounded border border-slate-200"
                         />
@@ -1083,16 +1094,16 @@ export default function CongesPage() {
                           )}
                           {ref.fileUrl && (
                             ref.fileType?.startsWith('image/') ? (
-                              <a href={ref.fileUrl} target="_blank" rel="noreferrer" className="inline-block">
+                              <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" className="inline-block">
                                 <img
-                                  src={ref.fileUrl}
+                                  src={toCongesUploadApiUrl(ref.fileUrl)}
                                   alt={ref.fileName || 'Pièce justificative'}
                                   className="h-10 w-10 rounded border border-slate-200 object-cover"
                                 />
                               </a>
                             ) : (
                               <a
-                                href={ref.fileUrl}
+                                href={toCongesUploadApiUrl(ref.fileUrl)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"

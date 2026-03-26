@@ -33,6 +33,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Download, FileText, Pencil, Trash2, Plus } from 'lucide-react'
 
+function toCongesUploadApiUrl(fileUrl) {
+  if (!fileUrl) return ''
+  if (fileUrl.startsWith('/api/uploads/conges/')) return fileUrl
+  const marker = '/uploads/conges/'
+  const idx = fileUrl.indexOf(marker)
+  if (idx === -1) return fileUrl
+  const filename = fileUrl.slice(idx + marker.length)
+  if (!filename || filename.includes('/') || filename.includes('\\')) return fileUrl
+  return `/api/uploads/conges/${filename}`
+}
+
 const parseReferenceDoc = (value) => {
   if (!value) return { referenceNumber: '', fileUrl: '', fileName: '', fileType: '' }
   try {
@@ -733,15 +744,15 @@ export default function ProfesseurDetailsPage() {
                             {ref.fileUrl && (
                               ref.fileType?.startsWith('image/') ? (
                                 <div className="flex items-center gap-2">
-                                  <a href={ref.fileUrl} target="_blank" rel="noreferrer" className="inline-block">
+                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" className="inline-block">
                                     <img
-                                      src={ref.fileUrl}
+                                      src={toCongesUploadApiUrl(ref.fileUrl)}
                                       alt={ref.fileName || 'Pièce justificative'}
                                       className="h-10 w-10 rounded border border-slate-200 object-cover"
                                     />
                                   </a>
                                   <a
-                                    href={ref.fileUrl}
+                                    href={toCongesUploadApiUrl(ref.fileUrl)}
                                     download={ref.fileName || true}
                                     className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                                   >
@@ -751,7 +762,7 @@ export default function ProfesseurDetailsPage() {
                                 </div>
                               ) : (
                                 <a
-                                  href={ref.fileUrl}
+                                  href={toCongesUploadApiUrl(ref.fileUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   download={ref.fileName || true}
