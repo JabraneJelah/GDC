@@ -289,12 +289,16 @@ export async function POST(request) {
              normalized.includes('firstname')
     })
     
-    const gradeIndex = headerRow.findIndex((h) => 
+    const gradeIndex = headerRow.findIndex((h) =>
       normalizeHeader(h).includes('grade')
     )
     const specialiteIndex = headerRow.findIndex((h) => 
       normalizeHeader(h).includes('specialite') || normalizeHeader(h).includes('spécialité')
     )
+    const serviceIndex = headerRow.findIndex((h) => {
+      const normalized = normalizeHeader(h)
+      return normalized.includes('service') || normalized.includes('département') || normalized.includes('departement')
+    })
     const pprIndex = headerRow.findIndex((h) => 
       normalizeHeader(h) === 'ppr' || normalizeHeader(h).includes('ppr')
     )
@@ -411,15 +415,17 @@ export async function POST(request) {
         nom: true,
         prenom: true,
         ppr: true,
+        service_id: true,
       },
     })
 
     // Récupérer les options pour créer des professeurs (champs obligatoires + optionnels)
-    const [grades, specialites, categories, titres] = await Promise.all([
+    const [grades, specialites, categories, titres, services] = await Promise.all([
       prisma.grade.findMany(),
       prisma.specialite.findMany(),
       prisma.categoriePersonnel.findMany(),
       prisma.titre.findMany(),
+      prisma.service.findMany(),
     ])
     const defaultSpecialiteId = specialites.length > 0 ? specialites[0].id : null
     const defaultCategorieId = categories.length > 0 ? categories[0].id : null
@@ -446,7 +452,15 @@ export async function POST(request) {
     }
 
     // Fonction pour créer un professeur
-    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, rowNumForLog) => {
+    const createProfesseur = async (
+      nom,
+      prenom,
+      pprValue,
+      gradeValue,
+      specialiteValue,
+      serviceValue,
+      rowNumForLog
+    ) => {
       const ppr =
         pprValue != null && String(pprValue).trim() !== ''
           ? String(pprValue).trim()
@@ -483,6 +497,19 @@ export async function POST(request) {
         }
       }
 
+      let serviceId = null
+      if (serviceValue != null && String(serviceValue).trim() !== '') {
+        const service = matchReferentielName(serviceValue, services)
+        if (service) {
+          serviceId = service.id
+        } else {
+          results.warnings.push({
+            row: rowNumForLog,
+            message: `Service non reconnu : « ${String(serviceValue).trim()} » (ignoré)`,
+          })
+        }
+      }
+
       if (!defaultSpecialiteId || !defaultCategorieId || !defaultTitreId) {
         throw new Error(
           'Impossible de créer un professeur : il manque des données de référence (spécialité, catégorie ou titre). Créez-en au moins une de chaque dans l\'application.'
@@ -497,6 +524,7 @@ export async function POST(request) {
         categorie_personnel_id: defaultCategorieId,
         titre_id: defaultTitreId,
         ...(gradeId !== null && { grade_id: gradeId }),
+        ...(serviceId !== null && { service_id: serviceId }),
       }
 
       const newProfesseur = await prisma.professeur.create({ data })
@@ -507,6 +535,7 @@ export async function POST(request) {
         nom: newProfesseur.nom,
         prenom: newProfesseur.prenom,
         ppr: newProfesseur.ppr ?? null,
+        service_id: newProfesseur.service_id ?? null,
       })
 
       return newProfesseur
@@ -522,6 +551,7 @@ export async function POST(request) {
       const pprValue = pprIndex !== -1 ? row[pprIndex]?.toString().trim() : null
       const gradeValue = gradeIndex !== -1 ? row[gradeIndex]?.toString().trim() : null
       const specialiteValue = specialiteIndex !== -1 ? row[specialiteIndex]?.toString().trim() : null
+      const serviceValue = serviceIndex !== -1 ? row[serviceIndex]?.toString().trim() : null
 
       if (!nom || !prenom) {
         results.skipped.push({
@@ -538,7 +568,7 @@ export async function POST(request) {
       // Si le professeur n'existe pas, le créer automatiquement
       if (!professeur) {
         try {
-          professeur = await createProfesseur(nom, prenom, pprValue, gradeValue, specialiteValue, i + 1)
+          professeur = await createProfesseur(nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, i + 1)
           results.success.push({
             row: i + 1,
             action: 'professeur_created',
@@ -553,6 +583,30 @@ export async function POST(request) {
             prenom,
           })
           continue
+        }
+      } else if (serviceValue != null && String(serviceValue).trim() !== '') {
+        // Si le professeur existe déjà, compléter le service uniquement si vide
+        try {
+          const service = matchReferentielName(serviceValue, services)
+          if (service) {
+            const cached = professeurs.find((p) => p.id === professeur.id)
+            const currentServiceId = cached?.service_id ?? null
+            if (!currentServiceId) {
+              await prisma.professeur.update({
+                where: { id: professeur.id },
+                data: { service_id: service.id },
+              })
+              if (cached) cached.service_id = service.id
+              results.success.push({
+                row: i + 1,
+                action: 'service_set',
+                professeur: `${prenom} ${nom}`,
+                service: service.nom,
+              })
+            }
+          }
+        } catch (_) {
+          // ne pas bloquer l'import si la mise à jour du service échoue
         }
       }
 
