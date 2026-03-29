@@ -72,26 +72,14 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full border border-white/[0.06]" />
 
         <div className="relative z-10 flex flex-1 flex-col justify-center md:justify-start md:pt-8 lg:pt-14">
-          <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-sm">
-            <Building2 className="h-5 w-5 text-sky-300/90" aria-hidden />
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-300">
-              Espace RH
-            </span>
-          </div>
+
           <h1 className="text-balance text-2xl font-semibold tracking-tight text-white sm:text-3xl lg:text-[1.75rem] xl:text-3xl">
-            Gestion des Congés
+          Plateforme de gestion des congés
           </h1>
-          <p className="mt-3 max-w-sm text-pretty text-sm leading-relaxed text-slate-300 sm:text-base">
-            Portail sécurisé pour la gestion des congés du personnel enseignant — planification,
-            soldes et suivi administratif.
-          </p>
+
           <div className="mt-8 hidden items-center gap-3 text-slate-400 md:flex">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5">
-              <CalendarRange className="h-5 w-5 text-sky-400/80" aria-hidden />
-            </div>
-            <p className="max-w-[220px] text-xs leading-snug text-slate-400">
-              Outil interne réservé au personnel des ressources humaines.
-            </p>
+
+
           </div>
         </div>
 

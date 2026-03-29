@@ -15,6 +15,8 @@ export async function GET(request) {
     const prenom = searchParams.get('prenom') || ''
     const ppr = searchParams.get('ppr') || ''
     const hopital_id = searchParams.get('hopital_id') || ''
+    const service_id = searchParams.get('service_id') || ''
+    const grade_id = searchParams.get('grade_id') || ''
 
     const maintenant = new Date()
     
@@ -41,7 +43,21 @@ export async function GET(request) {
         })
       }
     }
-    
+
+    if (service_id) {
+      const serviceIdInt = parseInt(service_id, 10)
+      if (!isNaN(serviceIdInt)) {
+        conditions.push({ service_id: serviceIdInt })
+      }
+    }
+
+    if (grade_id) {
+      const gradeIdInt = parseInt(grade_id, 10)
+      if (!isNaN(gradeIdInt)) {
+        conditions.push({ grade_id: gradeIdInt })
+      }
+    }
+
     if (conditions.length > 0) {
       whereClause = { AND: conditions }
     } else {

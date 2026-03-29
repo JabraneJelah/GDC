@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { Pagination } from '@/components/ui/pagination'
-import { X, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download } from 'lucide-react'
+import { X, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download, Eye } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -41,6 +41,8 @@ export default function ProfesseursPage() {
     prenom: '',
     ppr: '',
     hopital_id: '',
+    service_id: '',
+    grade_id: '',
   })
   const [open, setOpen] = useState(false)
   const [errorDialogOpen, setErrorDialogOpen] = useState(false)
@@ -85,7 +87,7 @@ export default function ProfesseursPage() {
     fetchOptions()
     setCurrentPage(1)
     setSelectedProfesseurs(new Set())
-  }, [filters.nom, filters.prenom, filters.ppr, filters.hopital_id])
+  }, [filters.nom, filters.prenom, filters.ppr, filters.hopital_id, filters.service_id, filters.grade_id])
 
   // Set indeterminate state for select all checkbox
   useEffect(() => {
@@ -154,7 +156,13 @@ export default function ProfesseursPage() {
       if (filters.hopital_id) {
         params.append('hopital_id', filters.hopital_id)
       }
-      
+      if (filters.service_id) {
+        params.append('service_id', filters.service_id)
+      }
+      if (filters.grade_id) {
+        params.append('grade_id', filters.grade_id)
+      }
+
       const url = params.toString() ? `/api/professeurs?${params.toString()}` : '/api/professeurs'
       const response = await fetch(url)
       if (response.ok) {
@@ -174,6 +182,8 @@ export default function ProfesseursPage() {
       prenom: '',
       ppr: '',
       hopital_id: '',
+      service_id: '',
+      grade_id: '',
     })
     setCurrentPage(1)
   }
@@ -789,7 +799,7 @@ export default function ProfesseursPage() {
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-end">
             <div className="flex-1 w-full sm:w-auto">
               <Label htmlFor="filter-nom" className="text-xs text-slate-600 mb-1.5 block">
                 Nom
@@ -859,7 +869,55 @@ export default function ProfesseursPage() {
                 </SelectContent>
               </Select>
             </div>
-            {(filters.nom || filters.prenom || filters.ppr || filters.hopital_id) && (
+            <div className="flex-1 w-full sm:w-auto min-w-[10rem]">
+              <Label htmlFor="filter-service" className="text-xs text-slate-600 mb-1.5 block">
+                Service
+              </Label>
+              <Select
+                value={filters.service_id || 'all'}
+                onValueChange={(value) => {
+                  setFilters({ ...filters, service_id: value === 'all' ? '' : value })
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger id="filter-service" className="w-full">
+                  <SelectValue placeholder="Tous les services" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {services.map((service) => (
+                    <SelectItem key={service.id} value={service.id.toString()}>
+                      {service.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 w-full sm:w-auto min-w-[10rem]">
+              <Label htmlFor="filter-grade" className="text-xs text-slate-600 mb-1.5 block">
+                Grade
+              </Label>
+              <Select
+                value={filters.grade_id || 'all'}
+                onValueChange={(value) => {
+                  setFilters({ ...filters, grade_id: value === 'all' ? '' : value })
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger id="filter-grade" className="w-full">
+                  <SelectValue placeholder="Tous les grades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {grades.map((grade) => (
+                    <SelectItem key={grade.id} value={grade.id.toString()}>
+                      {grade.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(filters.nom || filters.prenom || filters.ppr || filters.hopital_id || filters.service_id || filters.grade_id) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -908,6 +966,8 @@ export default function ProfesseursPage() {
               <TableHead>Prénom</TableHead>
               <TableHead>PPR</TableHead>
               <TableHead>Spécialité</TableHead>
+              <TableHead>Grade</TableHead>
+              <TableHead>Service</TableHead>
               <TableHead>Hopitale</TableHead>
               <TableHead>Solde Congé</TableHead>
               <TableHead>Congés</TableHead>
@@ -946,6 +1006,12 @@ export default function ProfesseursPage() {
                       {professeur.specialite?.nom || '-'}
                     </TableCell>
                     <TableCell>
+                      {professeur.grade?.nom || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {professeur.service?.nom || '-'}
+                    </TableCell>
+                    <TableCell>
                       {professeur.hopital?.nom || '-'}
                     </TableCell>
                     <TableCell>
@@ -968,21 +1034,24 @@ export default function ProfesseursPage() {
                     </TableCell>
                     <TableCell>{professeur._count.conges}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link href={`/professeurs/${professeur.id}`}>
-                          <Button variant="outline" size="sm" className="w-full sm:w-auto">
-                            Voir détails
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteClick(professeur)}
-                          className="w-full sm:w-auto"
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href={`/professeurs/${professeur.id}`}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-slate-500 hover:text-blue-600 transition-colors duration-200"
+                          title="Voir détails"
                         >
-                          <Trash2 className="h-4 w-4 mr-1.5" />
-                          Supprimer
-                        </Button>
+                          <Eye className="h-4 w-4 shrink-0" aria-hidden />
+                          <span>Détails</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(professeur)}
+                          className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:text-red-500 transition-colors duration-200"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden />
+                          <span className="sr-only">Supprimer</span>
+                        </button>
                       </div>
                     </TableCell>
                   </TableRow>

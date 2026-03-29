@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -31,7 +31,7 @@ import {
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Download, FileText, Pencil, Trash2, Plus } from 'lucide-react'
+import { Download, FileText, Pencil, Trash2, Plus, Upload } from 'lucide-react'
 
 function toCongesUploadApiUrl(fileUrl) {
   if (!fileUrl) return ''
@@ -42,6 +42,17 @@ function toCongesUploadApiUrl(fileUrl) {
   const filename = fileUrl.slice(idx + marker.length)
   if (!filename || filename.includes('/') || filename.includes('\\')) return fileUrl
   return `/api/uploads/conges/${filename}`
+}
+
+function toDecisionsUploadApiUrl(fileUrl) {
+  if (!fileUrl) return ''
+  if (fileUrl.startsWith('/api/uploads/decisions/')) return fileUrl
+  const marker = '/uploads/decisions/'
+  const idx = fileUrl.indexOf(marker)
+  if (idx === -1) return fileUrl
+  const filename = fileUrl.slice(idx + marker.length)
+  if (!filename || filename.includes('/') || filename.includes('\\')) return fileUrl
+  return `/api/uploads/decisions/${filename}`
 }
 
 const parseReferenceDoc = (value) => {
@@ -60,6 +71,21 @@ const parseReferenceDoc = (value) => {
     // Compatibilité avec les anciennes valeurs texte.
   }
   return { referenceNumber: value, fileUrl: '', fileName: '', fileType: '' }
+}
+
+const parseDecisionDoc = (value) => {
+  if (!value) return { fileUrl: '', fileName: '', fileType: '' }
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        fileUrl: parsed.fileUrl || '',
+        fileName: parsed.fileName || '',
+        fileType: parsed.fileType || '',
+      }
+    }
+  } catch (_) {}
+  return { fileUrl: '', fileName: '', fileType: '' }
 }
 
 const HISTORIQUE_CONGES_PAGE_SIZE = 8
@@ -90,6 +116,9 @@ export default function ProfesseurDetailsPage() {
   const [hopitaux, setHopitaux] = useState([])
   const [grades, setGrades] = useState([])
   const [historiqueCongesPage, setHistoriqueCongesPage] = useState(1)
+  const decisionFileInputRef = useRef(null)
+  const decisionTargetCongeIdRef = useRef(null)
+  const [decisionBusyCongeId, setDecisionBusyCongeId] = useState(null)
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -204,6 +233,52 @@ export default function ProfesseurDetailsPage() {
       setProfesseur(null)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openDecisionPicker = (congeId) => {
+    decisionTargetCongeIdRef.current = congeId
+    decisionFileInputRef.current?.click()
+  }
+
+  const handleDecisionFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    const targetId = decisionTargetCongeIdRef.current
+    decisionTargetCongeIdRef.current = null
+    e.target.value = ''
+    if (!file || !targetId) return
+
+    setDecisionBusyCongeId(targetId)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/conges/${targetId}/decision`, { method: 'POST', body: fd })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Échec du téléversement de la décision')
+        setErrorDialogOpen(true)
+        return
+      }
+      await fetchProfesseur()
+    } finally {
+      setDecisionBusyCongeId(null)
+    }
+  }
+
+  const handleDeleteDecision = async (congeId) => {
+    if (!window.confirm('Retirer la décision de congé de cet enregistrement ?')) return
+    setDecisionBusyCongeId(congeId)
+    try {
+      const res = await fetch(`/api/conges/${congeId}/decision`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setErrorMessage(err.error || 'Échec de la suppression')
+        setErrorDialogOpen(true)
+        return
+      }
+      await fetchProfesseur()
+    } finally {
+      setDecisionBusyCongeId(null)
     }
   }
   
@@ -706,13 +781,14 @@ export default function ProfesseurDetailsPage() {
                 <TableHead>Durée (jours)</TableHead>
                 <TableHead>Grade</TableHead>
                 <TableHead>Référence doc</TableHead>
+                <TableHead>Décision</TableHead>
                 <TableHead>Créé par</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {congesList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">
+                  <TableCell colSpan={8} className="text-center">
                     Aucun congé enregistré
                   </TableCell>
                 </TableRow>
@@ -777,12 +853,103 @@ export default function ProfesseurDetailsPage() {
                         )
                       })()}
                     </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const dec = parseDecisionDoc(conge.decision_doc)
+                        const busy = decisionBusyCongeId === conge.id
+                        if (!dec.fileUrl) {
+                          return (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1 px-2 text-xs"
+                              disabled={busy}
+                              onClick={() => openDecisionPicker(conge.id)}
+                              title="Ajouter une décision de congé"
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                              Ajouter
+                            </Button>
+                          )
+                        }
+                        const apiUrl = toDecisionsUploadApiUrl(dec.fileUrl)
+                        return (
+                          <div className="flex flex-wrap items-center gap-1">
+                            {dec.fileType?.startsWith('image/') ? (
+                              <a
+                                href={apiUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-block"
+                                title={dec.fileName || 'Décision'}
+                              >
+                                <img
+                                  src={apiUrl}
+                                  alt={dec.fileName || 'Décision'}
+                                  className="h-10 w-10 rounded border border-slate-200 object-cover"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={apiUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={dec.fileName || true}
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                title={dec.fileName || 'Ouvrir la décision'}
+                              >
+                                <FileText className="h-3 w-3 text-red-600 shrink-0" />
+                                <span className="max-w-[8rem] truncate">{dec.fileName || 'PDF'}</span>
+                              </a>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              disabled={busy}
+                              onClick={() => openDecisionPicker(conge.id)}
+                              title="Remplacer la décision"
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                            </Button>
+                            <a
+                              href={apiUrl}
+                              download={dec.fileName || true}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+                              title="Télécharger"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={busy}
+                              onClick={() => handleDeleteDecision(conge.id)}
+                              title="Supprimer la décision"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )
+                      })()}
+                    </TableCell>
                     <TableCell>{conge.cree_par_rh.nom_complet}</TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
+          <input
+            ref={decisionFileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/jpeg,image/png,application/pdf,.pdf,.png,.jpg,.jpeg"
+            onChange={handleDecisionFileChange}
+          />
           {showHistoriquePagination && (
             <div className="flex items-center justify-center gap-4 pt-4 mt-4 border-t border-slate-200">
               <Button

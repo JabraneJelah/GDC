@@ -168,6 +168,7 @@ model Conge {
   duree_jours     Int
   hors_solde      Boolean       @default(false) // true = enregistré sans consommer de solde
   reference_doc   String?       // Référence du document papier
+  decision_doc    String?       // JSON: fileName, fileUrl, fileType (décision officielle)
   cree_par_rh_id  String
   cree_le         DateTime      @default(now())
 
