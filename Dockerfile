@@ -1,68 +1,62 @@
-FROM node:20-alpine AS base
+# gestion-conges-professeurs — Next.js standalone production image
+# Stages: deps → builder → runner. Runtime: entrypoint (optional pg_dump backup, migrate, then server.js)
 
-FROM base AS deps
-# =========================
-# Base image
-# =========================
 FROM node:20-alpine AS base
-
-# =========================
-# Dependencies stage
-# =========================
-FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
+# --- Dependencies ---
+FROM base AS deps
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# =========================
-# Builder stage
-# =========================
+# --- Build ---
 FROM base AS builder
-WORKDIR /app
-
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-
+# Prisma Client only (isolated dummy URL for generate; no migrate at build)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-
-# Generate Prisma Client قبل build
 RUN npx prisma generate --schema=prisma/schema.prisma
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# =========================
-# Runner stage (production)
-# =========================
+# Slim runtime node_modules for runner (keep Prisma CLI + prod deps; drop devDependencies)
+RUN npm prune --omit=dev
+
+# --- Runtime (standalone + Prisma CLI for migrate deploy at startup) ---
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# pg_dump/psql for optional pre-migrate backup + manual restore; su-exec so entrypoint can chown /backups then drop to nextjs
+RUN apk add --no-cache postgresql-client su-exec
 
-# Copy standalone Next output
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.js ./prisma.config.js
 
-COPY --from=builder /app/node_modules ./node_modules
+# Replace standalone’s traced node_modules with pruned prod tree so `npx prisma migrate deploy` resolves hoisted CLI deps
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# Copy Prisma
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY docker/entrypoint.sh /entrypoint.sh
+COPY --chown=nextjs:nodejs docker/scan-pending-migrations.cjs /app/docker/scan-pending-migrations.cjs
+COPY docker/restore-backup.sh /usr/local/bin/restore-backup
+RUN chmod 755 /entrypoint.sh /usr/local/bin/restore-backup
 
-# Copy Prisma runtime files
-
-
-USER nextjs
+# Entrypoint starts as root to chown /backups for the volume, then re-execs as nextjs (see entrypoint.sh).
+USER root
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["/entrypoint.sh"]

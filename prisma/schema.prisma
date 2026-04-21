@@ -11,6 +11,38 @@ datasource db {
 
 }
 
+// =========================
+// Module: Dossiers Explicatifs
+// =========================
+
+// Statut du dossier (cycle de vie workflow)
+enum StatutDossierExplicatif {
+  BROUILLON
+  NOTIFIE
+  EN_ATTENTE_REPONSE
+  REPONSE_RECUE
+  EN_EVALUATION
+  CLOTURE
+}
+
+// Décision sur la réponse (termes métier imposés)
+enum DecisionReponseExplicative {
+  CONVAINCANTE
+  NON_CONVAINCANTE
+}
+
+// Origine du document joint au dossier
+enum OrigineDocumentDossier {
+  TELEVERSE
+  GENERE
+}
+
+// Format source d'un template stocké
+enum FormatTemplateDocument {
+  DOCX
+  PDF
+}
+
 
 // Utilisateurs RH - Personnel RH qui utilise l'application
 model UtilisateurRH {
@@ -29,6 +61,141 @@ model UtilisateurRH {
   @@index([email, actif])
   @@index([username])
   @@map("utilisateurs_rh")
+}
+
+// Types de faute/infraction (référentiel)
+model TypeFaute {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  nom         String
+  description String?
+  actif       Boolean  @default(true)
+  cree_le     DateTime @default(now())
+
+  // Relations
+  templates   DocumentTemplate[]
+  dossiers    DossierExplicatif[]
+
+  @@index([actif])
+  @@map("types_faute")
+}
+
+// Templates de documents gérés dans l'application (DOCX/PDF)
+model DocumentTemplate {
+  id            String        @id @default(uuid())
+  identifiant   String        @unique
+  nom           String
+  code          String?
+  description   String?
+  format_source FormatTemplateDocument
+  chemin_fichier String
+  version       Int           @default(1)
+  actif         Boolean       @default(true)
+  cree_le       DateTime      @default(now())
+
+  // Relations
+  type_faute_id Int
+  type_faute    TypeFaute     @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
+
+  cree_par_rh_id String?
+  cree_par_rh    UtilisateurRH? @relation("DocumentTemplateCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
+
+  documents_dossier DossierDocument[]
+
+  @@index([actif])
+  @@index([type_faute_id])
+  @@map("documents_templates")
+}
+
+// Dossier de demande d'explication / lettre explicative (entité centrale)
+model DossierExplicatif {
+  id                     String                   @id @default(uuid())
+  reference              String                   @unique
+
+  nom_complet            String
+  matricule              String
+  profil                 String
+  service                String
+
+  date_faute             DateTime
+  details                String?
+
+  statut                 StatutDossierExplicatif  @default(BROUILLON)
+  decision_reponse       DecisionReponseExplicative?
+
+  date_notification      DateTime?
+  date_limite_reponse    DateTime?
+  date_reponse_recue     DateTime?
+  en_retard              Boolean                  @default(false)
+
+  cree_le                DateTime                 @default(now())
+
+  // Relations
+  type_faute_id          Int
+  type_faute             TypeFaute                @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
+
+  cree_par_rh_id         String
+  cree_par_rh            UtilisateurRH            @relation("DossierCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: Restrict)
+
+  decision_par_rh_id     String?
+  decision_par_rh        UtilisateurRH?           @relation("DossierDecisionParRH", fields: [decision_par_rh_id], references: [id], onDelete: SetNull)
+
+  cloture_par_rh_id      String?
+  cloture_par_rh         UtilisateurRH?           @relation("DossierClotureParRH", fields: [cloture_par_rh_id], references: [id], onDelete: SetNull)
+
+  documents              DossierDocument[]
+  historique             DossierHistory[]
+
+  @@index([statut])
+  @@index([matricule])
+  @@index([type_faute_id])
+  @@map("dossiers_explicatifs")
+}
+
+// Documents attachés/générés pour un dossier
+model DossierDocument {
+  id                String               @id @default(uuid())
+  identifiant       String               @unique
+  titre             String
+  chemin_fichier    String
+  origine           OrigineDocumentDossier
+  categorie         String?
+  cree_le           DateTime             @default(now())
+
+  // Relations
+  dossier_id        String
+  dossier           DossierExplicatif    @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
+
+  template_id       String?
+  template          DocumentTemplate?    @relation(fields: [template_id], references: [id], onDelete: SetNull)
+
+  cree_par_rh_id    String?
+  cree_par_rh       UtilisateurRH?       @relation("DossierDocumentCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
+
+  @@index([dossier_id])
+  @@index([template_id])
+  @@index([origine])
+  @@map("dossiers_documents")
+}
+
+// Historique/audit des actions importantes sur un dossier
+model DossierHistory {
+  id            String                  @id @default(uuid())
+  dossier_id    String
+  action        String
+  description   String?
+  ancien_statut StatutDossierExplicatif?
+  nouveau_statut StatutDossierExplicatif?
+  cree_le       DateTime                @default(now())
+
+  // Relations
+  dossier       DossierExplicatif       @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
+  effectue_par_rh_id String
+  effectue_par_rh    UtilisateurRH      @relation("DossierHistoryEffectueParRH", fields: [effectue_par_rh_id], references: [id], onDelete: Restrict)
+
+  @@index([dossier_id])
+  @@index([cree_le])
+  @@map("dossiers_historique")
 }
 
 // Catégories de Personnel
