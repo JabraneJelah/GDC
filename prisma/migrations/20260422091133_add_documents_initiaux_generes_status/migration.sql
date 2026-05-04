@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "StatutDossierExplicatif" ADD VALUE 'DOCUMENTS_INITIAUX_GENERES';

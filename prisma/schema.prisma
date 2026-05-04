@@ -7,8 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  
-
 }
 
 // =========================
@@ -17,10 +15,15 @@ datasource db {
 
 // Statut du dossier (cycle de vie workflow)
 enum StatutDossierExplicatif {
+  ENREGISTRE
+  DOCUMENTS_INITIAUX_GENERES
   BROUILLON
   NOTIFIE
   EN_ATTENTE_REPONSE
   REPONSE_RECUE
+  REPONSE_CONVAINCANTE
+  REPONSE_NON_CONVAINCANTE
+  PROCEDURE_SUIVANTE_GENEREE
   EN_EVALUATION
   CLOTURE
 }
@@ -29,6 +32,12 @@ enum StatutDossierExplicatif {
 enum DecisionReponseExplicative {
   CONVAINCANTE
   NON_CONVAINCANTE
+}
+
+// Type de procedure suivante apres reponse non convaincante
+enum TypeProcedureExplicative {
+  AVERTISSEMENT
+  RETENUE
 }
 
 // Origine du document joint au dossier
@@ -43,19 +52,31 @@ enum FormatTemplateDocument {
   PDF
 }
 
+enum TemplateUsage {
+  LETTRE_EXPLICATIVE
+  BORDEREAU_NOTIFICATION
+  AVERTISSEMENT
+  RETENUE
+}
 
 // Utilisateurs RH - Personnel RH qui utilise l'application
 model UtilisateurRH {
   id           String   @id @default(uuid())
   email        String?  @unique
   username     String?  @unique
-  mot_de_passe String   // Hash bcrypt
+  mot_de_passe String // Hash bcrypt
   nom_complet  String
   actif        Boolean  @default(true)
   cree_le      DateTime @default(now())
 
   // Relations
-  conges_crees Conge[]
+  conges_crees                   Conge[]
+  document_templates_crees       DocumentTemplate[]  @relation("DocumentTemplateCreeParRH")
+  dossiers_explicatifs_crees     DossierExplicatif[] @relation("DossierCreeParRH")
+  dossiers_explicatifs_decides   DossierExplicatif[] @relation("DossierDecisionParRH")
+  dossiers_explicatifs_clotures  DossierExplicatif[] @relation("DossierClotureParRH")
+  dossiers_documents_crees       DossierDocument[]   @relation("DossierDocumentCreeParRH")
+  dossiers_historiques_effectues DossierHistory[]    @relation("DossierHistoryEffectueParRH")
 
   @@index([actif])
   @@index([email, actif])
@@ -73,8 +94,8 @@ model TypeFaute {
   cree_le     DateTime @default(now())
 
   // Relations
-  templates   DocumentTemplate[]
-  dossiers    DossierExplicatif[]
+  templates DocumentTemplate[]
+  dossiers  DossierExplicatif[]
 
   @@index([actif])
   @@map("types_faute")
@@ -82,25 +103,27 @@ model TypeFaute {
 
 // Templates de documents gérés dans l'application (DOCX/PDF)
 model DocumentTemplate {
-  id            String        @id @default(uuid())
-  identifiant   String        @unique
-  nom           String
-  code          String?
-  description   String?
-  format_source FormatTemplateDocument
+  id             String                 @id @default(uuid())
+  identifiant    String                 @unique
+  nom            String
+  code           String?
+  description    String?
+  format_source  FormatTemplateDocument
+  usage          TemplateUsage?
   chemin_fichier String
-  version       Int           @default(1)
-  actif         Boolean       @default(true)
-  cree_le       DateTime      @default(now())
+  version        Int                    @default(1)
+  actif          Boolean                @default(true)
+  cree_le        DateTime               @default(now())
 
   // Relations
   type_faute_id Int
-  type_faute    TypeFaute     @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
+  type_faute    TypeFaute @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
 
   cree_par_rh_id String?
   cree_par_rh    UtilisateurRH? @relation("DocumentTemplateCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
 
-  documents_dossier DossierDocument[]
+  documents_dossier               DossierDocument[]
+  dossiers_procedure_selectionnee DossierExplicatif[] @relation("DossierProcedureTemplate")
 
   @@index([actif])
   @@index([type_faute_id])
@@ -109,68 +132,77 @@ model DocumentTemplate {
 
 // Dossier de demande d'explication / lettre explicative (entité centrale)
 model DossierExplicatif {
-  id                     String                   @id @default(uuid())
-  reference              String                   @unique
+  id        String @id @default(uuid())
+  reference String @unique
 
-  nom_complet            String
-  matricule              String
-  profil                 String
-  service                String
+  nom_complet   String
+  matricule     String
+  profil        String
+  service       String
+  professeur_id String?
 
-  date_faute             DateTime
-  details                String?
+  date_faute DateTime
+  details    String?
 
-  statut                 StatutDossierExplicatif  @default(BROUILLON)
-  decision_reponse       DecisionReponseExplicative?
+  statut                     StatutDossierExplicatif     @default(BROUILLON)
+  decision_reponse           DecisionReponseExplicative?
+  type_procedure_selectionne TypeProcedureExplicative?
 
-  date_notification      DateTime?
-  date_limite_reponse    DateTime?
-  date_reponse_recue     DateTime?
-  en_retard              Boolean                  @default(false)
+  date_notification   DateTime?
+  date_limite_reponse DateTime?
+  date_reponse_recue  DateTime?
+  en_retard           Boolean   @default(false)
 
-  cree_le                DateTime                 @default(now())
+  cree_le DateTime @default(now())
 
   // Relations
-  type_faute_id          Int
-  type_faute             TypeFaute                @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
+  type_faute_id Int
+  type_faute    TypeFaute @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
 
-  cree_par_rh_id         String
-  cree_par_rh            UtilisateurRH            @relation("DossierCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: Restrict)
+  cree_par_rh_id String
+  cree_par_rh    UtilisateurRH @relation("DossierCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: Restrict)
 
-  decision_par_rh_id     String?
-  decision_par_rh        UtilisateurRH?           @relation("DossierDecisionParRH", fields: [decision_par_rh_id], references: [id], onDelete: SetNull)
+  decision_par_rh_id String?
+  decision_par_rh    UtilisateurRH? @relation("DossierDecisionParRH", fields: [decision_par_rh_id], references: [id], onDelete: SetNull)
 
-  cloture_par_rh_id      String?
-  cloture_par_rh         UtilisateurRH?           @relation("DossierClotureParRH", fields: [cloture_par_rh_id], references: [id], onDelete: SetNull)
+  cloture_par_rh_id String?
+  cloture_par_rh    UtilisateurRH? @relation("DossierClotureParRH", fields: [cloture_par_rh_id], references: [id], onDelete: SetNull)
 
-  documents              DossierDocument[]
-  historique             DossierHistory[]
+  template_procedure_id String?
+  template_procedure    DocumentTemplate? @relation("DossierProcedureTemplate", fields: [template_procedure_id], references: [id], onDelete: SetNull)
+
+  professeur Professeur? @relation("DossierProfesseur", fields: [professeur_id], references: [id], onDelete: SetNull)
+
+  documents  DossierDocument[]
+  historique DossierHistory[]
 
   @@index([statut])
   @@index([matricule])
+  @@index([professeur_id])
   @@index([type_faute_id])
+  @@index([template_procedure_id])
   @@map("dossiers_explicatifs")
 }
 
 // Documents attachés/générés pour un dossier
 model DossierDocument {
-  id                String               @id @default(uuid())
-  identifiant       String               @unique
-  titre             String
-  chemin_fichier    String
-  origine           OrigineDocumentDossier
-  categorie         String?
-  cree_le           DateTime             @default(now())
+  id             String                 @id @default(uuid())
+  identifiant    String                 @unique
+  titre          String
+  chemin_fichier String
+  origine        OrigineDocumentDossier
+  categorie      String?
+  cree_le        DateTime               @default(now())
 
   // Relations
-  dossier_id        String
-  dossier           DossierExplicatif    @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
+  dossier_id String
+  dossier    DossierExplicatif @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
 
-  template_id       String?
-  template          DocumentTemplate?    @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  template_id String?
+  template    DocumentTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
 
-  cree_par_rh_id    String?
-  cree_par_rh       UtilisateurRH?       @relation("DossierDocumentCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
+  cree_par_rh_id String?
+  cree_par_rh    UtilisateurRH? @relation("DossierDocumentCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
 
   @@index([dossier_id])
   @@index([template_id])
@@ -180,18 +212,18 @@ model DossierDocument {
 
 // Historique/audit des actions importantes sur un dossier
 model DossierHistory {
-  id            String                  @id @default(uuid())
-  dossier_id    String
-  action        String
-  description   String?
-  ancien_statut StatutDossierExplicatif?
+  id             String                   @id @default(uuid())
+  dossier_id     String
+  action         String
+  description    String?
+  ancien_statut  StatutDossierExplicatif?
   nouveau_statut StatutDossierExplicatif?
-  cree_le       DateTime                @default(now())
+  cree_le        DateTime                 @default(now())
 
   // Relations
-  dossier       DossierExplicatif       @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
+  dossier            DossierExplicatif @relation(fields: [dossier_id], references: [id], onDelete: Cascade)
   effectue_par_rh_id String
-  effectue_par_rh    UtilisateurRH      @relation("DossierHistoryEffectueParRH", fields: [effectue_par_rh_id], references: [id], onDelete: Restrict)
+  effectue_par_rh    UtilisateurRH     @relation("DossierHistoryEffectueParRH", fields: [effectue_par_rh_id], references: [id], onDelete: Restrict)
 
   @@index([dossier_id])
   @@index([cree_le])
@@ -200,8 +232,8 @@ model DossierHistory {
 
 // Catégories de Personnel
 model CategoriePersonnel {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id  Int    @id @default(autoincrement())
+  nom String @unique
 
   // Relations
   professeurs Professeur[]
@@ -211,8 +243,8 @@ model CategoriePersonnel {
 
 // Spécialités
 model Specialite {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id  Int    @id @default(autoincrement())
+  nom String @unique
 
   // Relations
   professeurs Professeur[]
@@ -222,8 +254,8 @@ model Specialite {
 
 // Titres
 model Titre {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id  Int    @id @default(autoincrement())
+  nom String @unique
 
   // Relations
   professeurs Professeur[]
@@ -233,8 +265,8 @@ model Titre {
 
 // Services
 model Service {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id  Int    @id @default(autoincrement())
+  nom String @unique
 
   // Relations
   professeurs Professeur[]
@@ -244,8 +276,8 @@ model Service {
 
 // Hôpitaux
 model Hopital {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id      Int      @id @default(autoincrement())
+  nom     String   @unique
   cree_le DateTime @default(now())
 
   // Relations
@@ -256,8 +288,8 @@ model Hopital {
 
 // Grades
 model Grade {
-  id    Int    @id @default(autoincrement())
-  nom   String @unique
+  id  Int    @id @default(autoincrement())
+  nom String @unique
 
   // Relations
   professeurs Professeur[]
@@ -267,59 +299,60 @@ model Grade {
 
 // Professeurs - Identités des professeurs
 model Professeur {
-  id                      String              @id @default(uuid())
-  nom                     String
-  prenom                  String
-  ppr                     String?             @unique // Numéro PPR unique (optionnel si inconnu à l’import)
-  cin                     String?
-  specialite_id           Int
-  categorie_personnel_id  Int
-  titre_id                Int
-  service_id              Int?
-  hopital_id              Int?
-  grade_id                Int?
-  telephone               String?
-  cree_le                 DateTime            @default(now())
+  id                     String   @id @default(uuid())
+  nom                    String
+  prenom                 String
+  ppr                    String?  @unique // Numéro PPR unique (optionnel si inconnu à l’import)
+  cin                    String?
+  specialite_id          Int
+  categorie_personnel_id Int
+  titre_id               Int
+  service_id             Int?
+  hopital_id             Int?
+  grade_id               Int?
+  telephone              String?
+  cree_le                DateTime @default(now())
 
   // Relations
-  specialite              Specialite          @relation(fields: [specialite_id], references: [id])
-  categorie_personnel     CategoriePersonnel  @relation(fields: [categorie_personnel_id], references: [id])
-  titre                   Titre               @relation(fields: [titre_id], references: [id])
-  service                 Service?            @relation(fields: [service_id], references: [id], onDelete: SetNull)
-  hopital                 Hopital?            @relation(fields: [hopital_id], references: [id], onDelete: SetNull)
-  grade                   Grade?              @relation(fields: [grade_id], references: [id], onDelete: SetNull)
-  conges                  Conge[]
-  soldes                  SoldeConge[]
+  specialite           Specialite          @relation(fields: [specialite_id], references: [id])
+  categorie_personnel  CategoriePersonnel  @relation(fields: [categorie_personnel_id], references: [id])
+  titre                Titre               @relation(fields: [titre_id], references: [id])
+  service              Service?            @relation(fields: [service_id], references: [id], onDelete: SetNull)
+  hopital              Hopital?            @relation(fields: [hopital_id], references: [id], onDelete: SetNull)
+  grade                Grade?              @relation(fields: [grade_id], references: [id], onDelete: SetNull)
+  conges               Conge[]
+  soldes               SoldeConge[]
+  dossiers_explicatifs DossierExplicatif[] @relation("DossierProfesseur")
 
   @@map("professeurs")
 }
 
 // Types de Congé
 model TypeConge {
-  id                   Int    @id @default(autoincrement())
+  id                   Int     @id @default(autoincrement())
   nom                  String // Annuel, Maladie, Exceptionnel
   document_obligatoire Boolean @default(false)
 
   // Relations
-  conges               Conge[]
-  soldes               SoldeConge[]
+  conges Conge[]
+  soldes SoldeConge[]
 
   @@map("types_conge")
 }
 
 // Soldes de Congé - Gestion automatique des soldes annuels (par type de congé)
 model SoldeConge {
-  id             String    @id @default(uuid())
+  id             String   @id @default(uuid())
   professeur_id  String
-  annee          Int       // Année du solde
-  type_conge_id  Int       // Type : Annuel, Exceptionnel, etc.
-  jours_total    Int       @default(22) // 22 jours par défaut
-  jours_restants Int       // Jours restants
-  expire_le      DateTime  // Exceptionnel: 31/12 année; Administratif/autre: 31/12 année+1 (voir lib/solde-expiration.js)
+  annee          Int // Année du solde
+  type_conge_id  Int // Type : Annuel, Exceptionnel, etc.
+  jours_total    Int      @default(22) // 22 jours par défaut
+  jours_restants Int // Jours restants
+  expire_le      DateTime // Exceptionnel: 31/12 année; Administratif/autre: 31/12 année+1 (voir lib/solde-expiration.js)
 
   // Relations
-  professeur     Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
-  type_conge     TypeConge  @relation(fields: [type_conge_id], references: [id], onDelete: Restrict)
+  professeur Professeur @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+  type_conge TypeConge  @relation(fields: [type_conge_id], references: [id], onDelete: Restrict)
 
   @@unique([professeur_id, annee, type_conge_id])
   @@map("soldes_conge")
@@ -327,22 +360,22 @@ model SoldeConge {
 
 // Congés - Enregistrements des congés
 model Conge {
-  id              String        @id @default(uuid())
-  professeur_id   String
-  type_conge_id   Int
-  date_debut      DateTime
-  date_fin        DateTime
-  duree_jours     Int
-  hors_solde      Boolean       @default(false) // true = enregistré sans consommer de solde
-  reference_doc   String?       // Référence du document papier
-  decision_doc    String?       // JSON: fileName, fileUrl, fileType (décision officielle)
-  cree_par_rh_id  String
-  cree_le         DateTime      @default(now())
+  id             String   @id @default(uuid())
+  professeur_id  String
+  type_conge_id  Int
+  date_debut     DateTime
+  date_fin       DateTime
+  duree_jours    Int
+  hors_solde     Boolean  @default(false) // true = enregistré sans consommer de solde
+  reference_doc  String? // Référence du document papier
+  decision_doc   String? // JSON: fileName, fileUrl, fileType (décision officielle)
+  cree_par_rh_id String
+  cree_le        DateTime @default(now())
 
   // Relations
-  professeur      Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
-  type_conge      TypeConge     @relation(fields: [type_conge_id], references: [id])
-  cree_par_rh     UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
+  professeur  Professeur    @relation(fields: [professeur_id], references: [id], onDelete: Cascade)
+  type_conge  TypeConge     @relation(fields: [type_conge_id], references: [id])
+  cree_par_rh UtilisateurRH @relation(fields: [cree_par_rh_id], references: [id])
 
   @@map("conges")
 }

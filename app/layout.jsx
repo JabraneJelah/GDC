@@ -1,4 +1,4 @@
-import { Inter } from "next/font/google";
+import { Inter, IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,6 +8,13 @@ const inter = Inter({
   style: ["normal", "italic"],
   display: "swap",
   adjustFontFallback: true,
+});
+
+const ibmPlexArabic = IBM_Plex_Sans_Arabic({
+  variable: "--font-ibm-arabic",
+  subsets: ["arabic"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata = {
@@ -22,7 +29,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.variable} antialiased bg-[#F8FAFC] text-[#334155]`}>
+      <body className={`${inter.variable} ${ibmPlexArabic.variable} antialiased bg-white text-[#334155]`}>
         {children}
       </body>
     </html>

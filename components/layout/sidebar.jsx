@@ -15,7 +15,8 @@ import {
   ChevronRight,
   User,
   LogOut,
-  GraduationCap
+  GraduationCap,
+  FileText
 } from 'lucide-react'
 
 export function Sidebar() {
@@ -63,6 +64,16 @@ export function Sidebar() {
       href: '/conges',
       label: 'Gestion des congés',
       icon: Calendar,
+    },
+    {
+      href: '/dossiers-explicatifs',
+      label: 'الملفات التوضيحية',
+      icon: FileText,
+    },
+    {
+      href: '/document-templates',
+      label: 'نماذج الوثائق',
+      icon: FileText,
     },
     {
       label: 'Référentiel',
@@ -225,4 +236,3 @@ export function Sidebar() {
     </>
   )
 }
-

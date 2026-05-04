@@ -89,7 +89,7 @@ export default function LoginPage() {
       </aside>
 
       {/* Form panel */}
-      <main className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100/90 px-5 py-10 sm:px-8 md:px-10 lg:px-14">
+      <main className="flex flex-1 flex-col items-center justify-center bg-white px-5 py-10 sm:px-8 md:px-10 lg:px-14">
         <div className="w-full max-w-[420px] rounded-2xl border border-slate-200/90 bg-white p-8 shadow-lg shadow-slate-200/40 sm:p-9">
           <div className="mb-8 space-y-2">
             <h2 className="text-xl font-semibold tracking-tight text-slate-800">
