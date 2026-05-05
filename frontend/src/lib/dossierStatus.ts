@@ -7,6 +7,8 @@ export const DOSSIER_STATUS_LABELS = {
   REPONSE_NON_CONVAINCANTE: "الجواب غير مقنع",
   PROCEDURE_SUIVANTE_GENEREE: "تم إنشاء المسطرة اللاحقة",
   CLOTURE: "تم إغلاق الملف",
+  A_ARCHIVER: "في انتظار الأرشفة",
+  ARCHIVE: "مؤرشف",
 } as const
 
 export const DOSSIER_NEXT_ACTION_LABELS = {
@@ -28,6 +30,8 @@ export const DOSSIER_STATUS_COLORS = {
   REPONSE_NON_CONVAINCANTE: "danger",
   PROCEDURE_SUIVANTE_GENEREE: "info",
   CLOTURE: "success",
+  A_ARCHIVER: "warning",
+  ARCHIVE: "success",
 } as const
 
 export type DossierStatus = keyof typeof DOSSIER_STATUS_LABELS

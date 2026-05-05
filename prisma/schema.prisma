@@ -26,6 +26,8 @@ enum StatutDossierExplicatif {
   PROCEDURE_SUIVANTE_GENEREE
   EN_EVALUATION
   CLOTURE
+  A_ARCHIVER
+  ARCHIVE
 }
 
 // Décision sur la réponse (termes métier imposés)
@@ -75,6 +77,7 @@ model UtilisateurRH {
   dossiers_explicatifs_crees     DossierExplicatif[] @relation("DossierCreeParRH")
   dossiers_explicatifs_decides   DossierExplicatif[] @relation("DossierDecisionParRH")
   dossiers_explicatifs_clotures  DossierExplicatif[] @relation("DossierClotureParRH")
+  dossiers_explicatifs_archives  DossierExplicatif[] @relation("DossierArchiveParRH")
   dossiers_documents_crees       DossierDocument[]   @relation("DossierDocumentCreeParRH")
   dossiers_historiques_effectues DossierHistory[]    @relation("DossierHistoryEffectueParRH")
 
@@ -167,6 +170,10 @@ model DossierExplicatif {
 
   cloture_par_rh_id String?
   cloture_par_rh    UtilisateurRH? @relation("DossierClotureParRH", fields: [cloture_par_rh_id], references: [id], onDelete: SetNull)
+
+  date_archivage    DateTime?
+  archive_par_rh_id String?
+  archive_par_rh    UtilisateurRH? @relation("DossierArchiveParRH", fields: [archive_par_rh_id], references: [id], onDelete: SetNull)
 
   template_procedure_id String?
   template_procedure    DocumentTemplate? @relation("DossierProcedureTemplate", fields: [template_procedure_id], references: [id], onDelete: SetNull)

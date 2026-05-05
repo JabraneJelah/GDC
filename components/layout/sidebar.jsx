@@ -4,15 +4,15 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  Settings, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  Settings,
+  Menu,
   X,
   ChevronDown,
-  ChevronRight,
+  ChevronLeft,
   User,
   LogOut,
   GraduationCap,
@@ -31,14 +31,12 @@ export function Sidebar() {
     router.refresh()
   }
 
-  // Fermer le menu mobile quand on change de page
   useEffect(() => {
     setIsMobileOpen(false)
   }, [pathname])
 
-  // Vérifier si on est dans une page du référentiel pour ouvrir le menu
   useEffect(() => {
-    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades', '/jours-feries']
+    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades', '/jours-feries', '/types-fautes']
     if (referentielPaths.some(path => pathname.startsWith(path))) {
       setIsReferentielOpen(true)
     }
@@ -47,22 +45,22 @@ export function Sidebar() {
   const menuItems = [
     {
       href: '/dashboard',
-      label: 'Tableau de bord',
+      label: 'لوحة القيادة',
       icon: LayoutDashboard,
     },
     {
       href: '/professeurs',
-      label: 'Professeurs',
+      label: 'الأساتذة',
       icon: GraduationCap,
     },
     {
       href: '/utilisateurs',
-      label: 'Gestion des utilisateurs',
+      label: 'إدارة المستخدمين',
       icon: Users,
     },
     {
       href: '/conges',
-      label: 'Gestion des congés',
+      label: 'إدارة العطل',
       icon: Calendar,
     },
     {
@@ -76,17 +74,18 @@ export function Sidebar() {
       icon: FileText,
     },
     {
-      label: 'Référentiel',
+      label: 'المرجعيات',
       icon: Settings,
       children: [
-        { href: '/services', label: 'Services' },
-        { href: '/specialites', label: 'Spécialités' },
-        { href: '/titres', label: 'Titres' },
-        { href: '/grades', label: 'Grades' },
-        { href: '/types-conge', label: 'Types de congé' },
-        { href: '/categories-personnel', label: 'Catégorie personnel' },
-        { href: '/hopitaux', label: 'Hôpitaux' },
-        { href: '/jours-feries', label: 'Jours fériés' },
+        { href: '/services', label: 'المصالح' },
+        { href: '/specialites', label: 'التخصصات' },
+        { href: '/titres', label: 'الألقاب' },
+        { href: '/grades', label: 'الدرجات' },
+        { href: '/types-conge', label: 'أنواع العطل' },
+        { href: '/categories-personnel', label: 'الفئات' },
+        { href: '/hopitaux', label: 'المستشفيات' },
+        { href: '/jours-feries', label: 'العطل الرسمية' },
+        { href: '/types-fautes', label: 'أنواع المخالفات' },
       ],
     },
   ]
@@ -94,11 +93,11 @@ export function Sidebar() {
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0]">
         <Link href="/dashboard" className="text-base font-semibold text-[#334155]">
-          Gestion des Congés
+          إدارة الموارد البشرية
         </Link>
         <Button
           variant="ghost"
@@ -131,11 +130,11 @@ export function Sidebar() {
                   {isReferentielOpen ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronLeft className="h-4 w-4" />
                   )}
                 </button>
                 {isReferentielOpen && (
-                  <div className="ml-4 mt-1 space-y-1">
+                  <div className="mr-4 mt-1 space-y-1">
                     {item.children.map((child) => (
                       <Link
                         key={child.href}
@@ -177,21 +176,21 @@ export function Sidebar() {
         <Link href="/profile">
           <Button
             variant="ghost"
-            className={`w-full justify-start gap-3 ${
+            className={`w-full justify-end gap-3 ${
               pathname === '/profile' ? 'bg-[#F8FAFC]' : ''
             }`}
           >
+            <span>الملف الشخصي</span>
             <User className="h-5 w-5" />
-            <span>Mon Profil</span>
           </Button>
         </Link>
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="w-full justify-start gap-3 text-[#334155] hover:bg-[#F8FAFC]"
+          className="w-full justify-end gap-3 text-[#334155] hover:bg-[#F8FAFC]"
         >
+          <span>تسجيل الخروج</span>
           <LogOut className="h-5 w-5" />
-          <span>Déconnexion</span>
         </Button>
       </div>
     </div>
@@ -200,7 +199,7 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="lg:hidden fixed top-4 right-4 z-50">
         <Button
           variant="outline"
           size="sm"
@@ -224,15 +223,15 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-[#E2E8F0] z-50 transform transition-transform duration-300 ease-in-out ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed top-0 right-0 h-full w-64 bg-white border-l border-[#E2E8F0] z-50 transform transition-transform duration-300 ease-in-out ${
+          isMobileOpen ? 'translate-x-0' : 'translate-x-full'
         } lg:translate-x-0`}
       >
         <SidebarContent />
       </aside>
 
-      {/* Desktop spacer - hidden on mobile */}
-      <div className="hidden lg:block w-64 flex-shrink-0" />
+      {/* Desktop spacer - hidden on mobile, ordered last so sidebar sits on the right */}
+      <div className="hidden lg:block lg:order-last w-64 flex-shrink-0" />
     </>
   )
 }

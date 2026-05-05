@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Footer } from '@/components/layout/footer'
 import { Sidebar } from '@/components/layout/sidebar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,22 +26,22 @@ import {
   getDossierStatusLabel,
   getStatusColor,
 } from '@/frontend/src/lib/dossierStatus'
+import { AppCard } from '@/components/dossiers-explicatifs/AppCard'
+import { InfoGrid } from '@/components/dossiers-explicatifs/InfoGrid'
+import { WorkflowStepper } from '@/components/dossiers-explicatifs/WorkflowStepper'
+import { StepActionPanel } from '@/components/dossiers-explicatifs/StepActionPanel'
+import { DocumentsTable } from '@/components/dossiers-explicatifs/DocumentsTable'
+import { UploadField } from '@/components/dossiers-explicatifs/UploadField'
 import {
-  Check,
-  User,
-  Hash,
-  Building2,
-  Hospital,
-  Stethoscope,
-  GraduationCap,
+  Archive,
   ArrowRight,
   Calendar,
-  Eye,
   FileText,
   Download,
   AlertTriangle,
   CheckCircle2,
-  Clock,
+  User,
+  Hash,
 } from 'lucide-react'
 
 const statusBadgeStyles = {
@@ -77,6 +76,8 @@ const statusStepIndex = {
   REPONSE_NON_CONVAINCANTE: 5,
   PROCEDURE_SUIVANTE_GENEREE: 6,
   CLOTURE: 6,
+  A_ARCHIVER: 6,
+  ARCHIVE: 6,
 }
 
 const procedureLabels = {
@@ -123,7 +124,7 @@ function PageShell({ children }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 pt-16 lg:pt-4">
+        <main className="flex-1 bg-[#FBFCFD] pt-16 lg:pt-4">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             {children}
           </div>
@@ -151,36 +152,8 @@ function getDocumentName(document) {
   return document?.titre || document?.nom || document?.identifiant || '-'
 }
 
-function getDocumentCategoryLabel(category) {
-  const labels = {
-    procedure_suivante: 'المسطرة اللاحقة',
-    lettre_explicative: 'رسالة توضيحية',
-    bordereau_notification: 'إشعار / جدول إرسال',
-    preuve_notification: 'وصل الاستلام',
-    reponse_agent: 'جواب المعني بالأمر',
-  }
-
-  return labels[category] || category || '-'
-}
-
-function getDocumentOriginLabel(origin) {
-  const labels = {
-    GENERE: 'مولدة',
-    TELEVERSE: 'مرفوعة',
-  }
-
-  return labels[origin] || origin || '-'
-}
-
 function isDocumentReady(document) {
   return Boolean(document?.chemin_fichier && !document.chemin_fichier.startsWith('pending://'))
-}
-
-function getDocumentStateLabel(document) {
-  if (document?.chemin_fichier?.startsWith('pending://')) return 'في انتظار التوليد'
-  if (isDocumentReady(document)) return 'جاهز'
-
-  return 'غير متاح'
 }
 
 function getDocumentDownloadUrl(dossierId, documentId) {
@@ -193,141 +166,7 @@ function getTypeFauteLabel(typeFaute) {
   return typeFauteArabicLabels[typeFaute.code] || typeFaute.nom || null
 }
 
-function DocumentList({ documents, dossierId, emptyText = 'لا توجد وثائق مرتبطة بهذه المرحلة' }) {
-  if (!documents.length) {
-    return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-medium text-slate-500">
-        {emptyText}
-      </div>
-    )
-  }
 
-  return (
-    <div className="space-y-2">
-      {documents.map((document) => (
-        <div
-          key={document.id}
-          className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div className="flex min-w-0 items-start gap-3 text-right">
-            <div className="mt-0.5 shrink-0 rounded-lg bg-slate-100 p-2">
-              <FileText className="size-4 text-slate-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{getDocumentName(document)}</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {getDocumentCategoryLabel(document.categorie)} · {getDocumentOriginLabel(document.origine)} · {formatDate(document.cree_le) || '-'}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-              isDocumentReady(document)
-                ? 'bg-green-100 text-green-700'
-                : document.chemin_fichier?.startsWith('pending://')
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-slate-100 text-slate-600'
-            }`}>
-              {isDocumentReady(document)
-                ? <><CheckCircle2 className="size-3" /> جاهز</>
-                : document.chemin_fichier?.startsWith('pending://')
-                  ? <><Clock className="size-3" /> في انتظار التوليد</>
-                  : 'غير متاح'
-              }
-            </span>
-            {isDocumentReady(document) ? (
-              <a
-                href={getDocumentDownloadUrl(dossierId, document.id)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:border-slate-300"
-              >
-                <Download className="size-3.5" />
-                تحميل
-              </a>
-            ) : null}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function WorkflowStepper({ currentStepIndex, viewedStepIndex, onStepClick }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-      <div className="overflow-x-auto pb-2">
-        <div className="flex min-w-[860px] items-start" dir="rtl">
-          {workflowSteps.map((step, index) => {
-            const isCompleted = index < currentStepIndex
-            const isCurrent = index === currentStepIndex
-            const isViewed = index === viewedStepIndex
-            const isClickable = isCompleted || isCurrent
-
-            return (
-              <div key={step.label} className="flex flex-1 items-start">
-                <button
-                  type="button"
-                  onClick={() => isClickable && onStepClick(index)}
-                  disabled={!isClickable}
-                  className={`group flex min-w-[100px] flex-col items-center text-center transition-all duration-200 ${
-                    isClickable ? 'cursor-pointer' : 'cursor-default'
-                  }`}
-                >
-                  {/* Circle */}
-                  <span className={`relative flex size-10 items-center justify-center rounded-full border-2 font-bold transition-all duration-200 ${
-                    isCompleted
-                      ? 'border-green-500 bg-green-500 text-white shadow-sm group-hover:scale-110 group-hover:shadow-md'
-                      : isCurrent
-                        ? 'border-blue-600 bg-blue-600 text-white shadow-lg ring-4 ring-blue-100'
-                        : 'border-slate-200 bg-slate-50 text-slate-400'
-                  } ${isViewed && !isCurrent ? 'ring-2 ring-offset-2 ring-blue-400' : ''}`}>
-                    {isCompleted
-                      ? <Check className="size-5 stroke-[2.5]" />
-                      : <span className="text-sm font-bold">{index + 1}</span>
-                    }
-                    {isCurrent && (
-                      <span className="absolute -inset-1.5 animate-ping rounded-full bg-blue-400 opacity-25" />
-                    )}
-                  </span>
-
-                  {/* Label */}
-                  <p className={`mt-2.5 whitespace-nowrap text-[13px] font-semibold leading-tight transition-all duration-200 ${
-                    isCompleted
-                      ? 'text-slate-700 group-hover:text-green-700'
-                      : isCurrent
-                        ? 'text-blue-700'
-                        : 'text-slate-400'
-                  } ${isViewed ? 'underline decoration-dotted underline-offset-2' : ''}`}>
-                    {step.label}
-                  </p>
-
-                  {/* Sub-label */}
-                  <p className={`mt-0.5 text-[10px] font-medium tracking-wide ${
-                    isCompleted ? 'text-green-600' : isCurrent ? 'text-blue-500' : 'text-slate-300'
-                  }`}>
-                    {isCompleted ? 'مكتملة' : isCurrent ? 'الحالية' : 'قادمة'}
-                  </p>
-                </button>
-
-                {/* Connector */}
-                {index < workflowSteps.length - 1 ? (
-                  <div className={`mx-1 mt-5 h-[3px] flex-1 rounded-full transition-colors duration-300 ${
-                    index < currentStepIndex - 1
-                      ? 'bg-green-400'
-                      : index === currentStepIndex - 1
-                        ? 'bg-gradient-to-l from-blue-500 to-green-400'
-                        : index === currentStepIndex
-                          ? 'bg-gradient-to-l from-slate-200 to-blue-300'
-                          : 'bg-slate-200'
-                  }`} />
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function translateApiError(message, status) {
   if (!message) return getContextualActionError(status)
@@ -394,6 +233,9 @@ export default function DossierExplicatifDetailPage() {
   const [procedureTemplateId, setProcedureTemplateId] = useState('')
   const [initialConfirmOpen, setInitialConfirmOpen] = useState(false)
   const [procedureConfirmOpen, setProcedureConfirmOpen] = useState(false)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
   const [viewedStepIndex, setViewedStepIndex] = useState(0)
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
@@ -508,6 +350,13 @@ export default function DossierExplicatifDetailPage() {
   useEffect(() => {
     setViewedStepIndex(currentStepIndex)
   }, [currentStepIndex])
+
+  // Auto-dismiss success messages after 2.5 s
+  useEffect(() => {
+    if (!actionSuccess) return
+    const id = setTimeout(() => setActionSuccess(''), 2500)
+    return () => clearTimeout(id)
+  }, [actionSuccess])
 
   const actionFeedback = (
     <>
@@ -662,6 +511,26 @@ export default function DossierExplicatifDetailPage() {
     handleAction()
   }
 
+  const handleArchive = async () => {
+    if (!dossierId || archiveLoading) return
+    setArchiveError('')
+    setArchiveLoading(true)
+    try {
+      const res = await fetch(`/api/dossiers-explicatifs/${dossierId}/archive`, { method: 'POST' })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(body?.error || 'archive failed')
+      setArchiveConfirmOpen(false)
+      setActionSuccess('تم أرشفة الملف بنجاح')
+      await fetchDossier({ showLoading: false })
+    } catch (err) {
+      setArchiveError(
+        err.message?.includes('deja archive') ? 'هذا الملف مؤرشف مسبقا' : 'تعذر أرشفة الملف، حاول مرة أخرى'
+      )
+    } finally {
+      setArchiveLoading(false)
+    }
+  }
+
   // Interactive content for the current active step
   const renderCurrentStepContent = () => {
     if (!dossier) return null
@@ -680,13 +549,57 @@ export default function DossierExplicatifDetailPage() {
       )
     }
 
+    if (dossier.statut === 'A_ARCHIVER') {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-right">
+            <Archive className="size-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-800">في انتظار الأرشفة</p>
+              {dossier.date_cloture ? (
+                <p className="mt-0.5 text-sm text-amber-600">أُغلق بتاريخ: {formatDate(dossier.date_cloture) || '-'}</p>
+              ) : null}
+            </div>
+          </div>
+          {actionFeedback}
+          <Button
+            type="button"
+            onClick={() => { setArchiveError(''); setArchiveConfirmOpen(true) }}
+            disabled={archiveLoading}
+            className="w-full bg-amber-600 hover:bg-amber-700 sm:w-auto"
+          >
+            <Archive className="size-4 ml-1.5" />
+            {archiveLoading ? 'جاري الأرشفة...' : 'أرشفة الملف'}
+          </Button>
+        </div>
+      )
+    }
+
+    if (dossier.statut === 'ARCHIVE') {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-right">
+            <Archive className="size-5 shrink-0 text-slate-500" />
+            <div>
+              <p className="font-semibold text-slate-700">هذا الملف مؤرشف</p>
+              {dossier.date_archivage ? (
+                <p className="mt-0.5 text-sm text-slate-500">تاريخ الأرشفة: {formatDate(dossier.date_archivage) || '-'}</p>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs font-medium text-slate-500">
+            🔒 وضع القراءة فقط — لا يمكن تنفيذ أي إجراء على هذا الملف
+          </div>
+        </div>
+      )
+    }
+
     if (dossier.statut === 'ENREGISTRE') {
       return (
         <div className="space-y-4">
           <p className="leading-relaxed text-sm text-slate-600">
             سيتم إنشاء الوثائق اعتمادا على النماذج النشطة المرتبطة بنفس نوع المخالفة.
           </p>
-          <DocumentList documents={initialDocuments} dossierId={dossier.id} />
           {actionFeedback}
           <Button
             type="button"
@@ -703,7 +616,6 @@ export default function DossierExplicatifDetailPage() {
     if (dossier.statut === 'DOCUMENTS_INITIAUX_GENERES') {
       return (
         <div className="space-y-4">
-          <DocumentList documents={initialDocuments} dossierId={dossier.id} />
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date_notification" className={fieldLabelClassName}>تاريخ التبليغ</Label>
@@ -719,21 +631,19 @@ export default function DossierExplicatifDetailPage() {
                 disabled={actionLoading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="notification_proof" className={fieldLabelClassName}>تحميل وصل الاستلام</Label>
-              <Input
+            <div>
+              <UploadField
                 id="notification_proof"
-                type="file"
+                label="وصل الاستلام"
                 accept="application/pdf,image/jpeg,image/png"
+                selectedFile={notificationProofFile}
                 onChange={(event) => {
                   setNotificationProofFile(event.target.files?.[0] || null)
                   setActionError('')
                 }}
-                className={fileInputClassName}
+                helperText="PDF أو JPG أو PNG"
                 disabled={actionLoading}
               />
-              <p className="text-xs font-medium text-slate-500">الصيغ المقبولة: PDF أو JPG أو PNG</p>
-              {notificationProofFile ? <p className="text-xs font-medium text-slate-700">{notificationProofFile.name}</p> : null}
             </div>
           </div>
           {actionFeedback}
@@ -752,7 +662,6 @@ export default function DossierExplicatifDetailPage() {
     if (dossier.statut === 'NOTIFIE') {
       return (
         <div className="space-y-4">
-          {notificationProofDocument ? <DocumentList documents={[notificationProofDocument]} dossierId={dossier.id} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date_reponse" className={fieldLabelClassName}>تاريخ التوصل بالجواب</Label>
@@ -768,21 +677,19 @@ export default function DossierExplicatifDetailPage() {
                 disabled={actionLoading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="response_document" className={fieldLabelClassName}>تحميل وثيقة الجواب</Label>
-              <Input
+            <div>
+              <UploadField
                 id="response_document"
-                type="file"
+                label="وثيقة الجواب"
                 accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                selectedFile={responseProofFile}
                 onChange={(event) => {
                   setResponseProofFile(event.target.files?.[0] || null)
                   setActionError('')
                 }}
-                className={fileInputClassName}
+                helperText="PDF أو JPG أو PNG أو DOCX"
                 disabled={actionLoading}
               />
-              <p className="text-xs font-medium text-slate-500">الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX</p>
-              {responseProofFile ? <p className="text-xs font-medium text-slate-700">{responseProofFile.name}</p> : null}
             </div>
           </div>
           {actionFeedback}
@@ -801,7 +708,6 @@ export default function DossierExplicatifDetailPage() {
     if (dossier.statut === 'REPONSE_RECUE') {
       return (
         <div className="space-y-4">
-          {responseProofDocument ? <DocumentList documents={[responseProofDocument]} dossierId={dossier.id} /> : null}
           <div className="space-y-2">
             <Label className={fieldLabelClassName}>تقييم الجواب</Label>
             <Select
@@ -929,7 +835,6 @@ export default function DossierExplicatifDetailPage() {
     if (dossier.statut === 'REPONSE_CONVAINCANTE' || dossier.statut === 'PROCEDURE_SUIVANTE_GENEREE') {
       return (
         <div className="space-y-4">
-          {procedureDocuments.length > 0 ? <DocumentList documents={procedureDocuments} dossierId={dossier.id} /> : null}
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-right text-sm text-amber-800">
             سيطلب منك تأكيد إغلاق الملف قبل تنفيذ العملية
           </div>
@@ -1003,13 +908,30 @@ export default function DossierExplicatifDetailPage() {
         return (
           <div className="space-y-3">
             <p className="leading-relaxed text-sm text-slate-500">الوثائق الأولية التي تم إنشاؤها:</p>
-            <DocumentList documents={initialDocuments} dossierId={dossier.id} emptyText="لم يتم إنشاء وثائق أولية" />
+            {initialDocuments.length > 0 ? (
+              <div className="space-y-2">
+                {initialDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <FileText className="size-4 shrink-0 text-slate-400" />
+                    <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(doc)}</span>
+                    {isDocumentReady(doc) ? (
+                      <a href={getDocumentDownloadUrl(dossier.id, doc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                        <Download className="size-3" />
+                        تحميل
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">لم يتم إنشاء وثائق أولية</p>
+            )}
           </div>
         )
 
       case 2:
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {dossier.date_notification ? (
               <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                 <div className="shrink-0 rounded-lg bg-white p-2 shadow-sm">
@@ -1022,21 +944,25 @@ export default function DossierExplicatifDetailPage() {
               </div>
             ) : null}
             {notificationProofDocument ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-700">وصل الاستلام</p>
-                <DocumentList documents={[notificationProofDocument]} dossierId={dossier.id} />
+              <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <FileText className="size-4 shrink-0 text-slate-400" />
+                <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(notificationProofDocument)}</span>
+                {isDocumentReady(notificationProofDocument) ? (
+                  <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                    <Download className="size-3" />
+                    تحميل
+                  </a>
+                ) : null}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400">
-                لا يوجد وصل استلام مرفوع
-              </div>
+              <p className="text-sm text-slate-400">لا يوجد وصل استلام مرفوع</p>
             )}
           </div>
         )
 
       case 3:
         return (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {dossier.date_reponse ? (
               <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                 <div className="shrink-0 rounded-lg bg-white p-2 shadow-sm">
@@ -1049,14 +975,18 @@ export default function DossierExplicatifDetailPage() {
               </div>
             ) : null}
             {responseProofDocument ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-700">وثيقة الجواب</p>
-                <DocumentList documents={[responseProofDocument]} dossierId={dossier.id} />
+              <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <FileText className="size-4 shrink-0 text-slate-400" />
+                <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(responseProofDocument)}</span>
+                {isDocumentReady(responseProofDocument) ? (
+                  <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                    <Download className="size-3" />
+                    تحميل
+                  </a>
+                ) : null}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400">
-                لا توجد وثيقة جواب مرفوعة
-              </div>
+              <p className="text-sm text-slate-400">لا توجد وثيقة جواب مرفوعة</p>
             )}
           </div>
         )
@@ -1101,11 +1031,54 @@ export default function DossierExplicatifDetailPage() {
         return (
           <div className="space-y-3">
             <p className="leading-relaxed text-sm text-slate-500">وثائق المسطرة اللاحقة:</p>
-            <DocumentList documents={procedureDocuments} dossierId={dossier.id} emptyText="لم يتم إنشاء وثائق مسطرة" />
+            {procedureDocuments.length > 0 ? (
+              <div className="space-y-2">
+                {procedureDocuments.map((doc) => (
+                  <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <FileText className="size-4 shrink-0 text-slate-400" />
+                    <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(doc)}</span>
+                    {isDocumentReady(doc) ? (
+                      <a href={getDocumentDownloadUrl(dossier.id, doc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                        <Download className="size-3" />
+                        تحميل
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">لم يتم إنشاء وثائق مسطرة</p>
+            )}
           </div>
         )
 
-      case 6:
+      case 6: {
+        if (dossier.statut === 'ARCHIVE') {
+          return (
+            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-5 text-right">
+              <Archive className="size-6 shrink-0 text-slate-500" />
+              <div>
+                <p className="font-semibold text-slate-700">مؤرشف</p>
+                {dossier.date_archivage ? (
+                  <p className="mt-0.5 text-sm text-slate-500">تاريخ الأرشفة: {formatDate(dossier.date_archivage) || '-'}</p>
+                ) : null}
+              </div>
+            </div>
+          )
+        }
+        if (dossier.statut === 'A_ARCHIVER') {
+          return (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-5 text-right">
+              <Archive className="size-6 shrink-0 text-amber-500" />
+              <div>
+                <p className="font-semibold text-amber-800">في انتظار الأرشفة</p>
+                {dossier.date_cloture ? (
+                  <p className="mt-0.5 text-sm text-amber-600">أُغلق بتاريخ: {formatDate(dossier.date_cloture) || '-'}</p>
+                ) : null}
+              </div>
+            </div>
+          )
+        }
         return (
           <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-5 text-right">
             <CheckCircle2 className="size-6 shrink-0 text-green-600" />
@@ -1117,6 +1090,7 @@ export default function DossierExplicatifDetailPage() {
             </div>
           </div>
         )
+      }
 
       default:
         return null
@@ -1175,13 +1149,13 @@ export default function DossierExplicatifDetailPage() {
   }
 
   const employeeFields = [
-    { label: 'الاسم الكامل', value: dossier.nom_complet, icon: User },
-    { label: 'رقم التأجير', value: dossier.matricule, icon: Hash },
-    { label: 'الدرجة', value: dossier.professeur?.grade?.nom || dossier.profil, icon: GraduationCap },
-    { label: 'المصلحة', value: dossier.professeur?.service?.nom || dossier.service, icon: Building2 },
-    { label: 'المستشفى', value: dossier.professeur?.hopital?.nom, icon: Hospital },
-    { label: 'التخصص', value: dossier.professeur?.specialite?.nom, icon: Stethoscope },
-  ].filter((field) => field.value)
+    { label: 'الاسم الكامل', value: dossier.nom_complet },
+    { label: 'رقم التأجير', value: dossier.matricule },
+    { label: 'الدرجة', value: dossier.professeur?.grade?.nom || dossier.profil },
+    { label: 'المصلحة', value: dossier.professeur?.service?.nom || dossier.service },
+    { label: 'المستشفى', value: dossier.professeur?.hopital?.nom },
+    { label: 'التخصص', value: dossier.professeur?.specialite?.nom },
+  ]
 
   return (
     <PageShell>
@@ -1232,192 +1206,35 @@ export default function DossierExplicatifDetailPage() {
         </section>
 
         {/* Employee Info */}
-        {employeeFields.length > 0 ? (
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="flex items-center justify-end gap-2 text-base font-bold text-slate-900">
-                معلومات الموظف
-                <div className="rounded-lg bg-slate-100 p-1.5">
-                  <User className="size-4 text-slate-500" />
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {employeeFields.map((field) => {
-                  const Icon = field.icon
-                  return (
-                    <div
-                      key={field.label}
-                      className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-right transition-colors hover:border-slate-200 hover:bg-white"
-                    >
-                      <div className="mt-0.5 shrink-0 rounded-lg bg-white p-1.5 shadow-sm">
-                        <Icon className="size-3.5 text-slate-400" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-400">{field.label}</p>
-                        <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{field.value}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+        <AppCard>
+          <InfoGrid items={employeeFields} />
+        </AppCard>
 
         {/* Workflow */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="text-right text-base font-bold text-slate-900">
-              مسار معالجة الملف
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5 pt-5">
+        <AppCard title="مسار معالجة الملف">
+          <div className="space-y-5">
             <WorkflowStepper
+              steps={workflowSteps}
               currentStepIndex={currentStepIndex}
               viewedStepIndex={viewedStepIndex}
               onStepClick={setViewedStepIndex}
             />
-
-            <div className="rounded-xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-              {/* Step header */}
-              <div className="mb-5 flex flex-col gap-2 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-lg font-bold text-slate-950">
-                  {workflowSteps[viewedStepIndex]?.label || 'مسار الملف'}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {viewedStepIndex === currentStepIndex ? (
-                    <span className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                      <span className="size-1.5 rounded-full bg-blue-500" />
-                      الحالية
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                      <Eye className="size-3 text-slate-400" />
-                      عرض المرحلة
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* "Viewing past step" notice */}
-              {viewedStepIndex !== currentStepIndex ? (
-                <div className="mb-5 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-right sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-2 text-sm text-blue-700">
-                    <Eye className="mt-0.5 size-4 shrink-0 text-blue-500" />
-                    <span>
-                      أنت تعرض المرحلة:{' '}
-                      <strong className="font-bold">{workflowSteps[viewedStepIndex]?.label}</strong>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setViewedStepIndex(currentStepIndex)}
-                    className="shrink-0 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-all duration-150 hover:bg-blue-600 hover:text-white hover:border-blue-600"
-                  >
-                    العودة للمرحلة الحالية
-                  </button>
-                </div>
-              ) : null}
-
+            <StepActionPanel
+              title={workflowSteps[viewedStepIndex]?.label || 'مسار الملف'}
+              isCurrentStep={viewedStepIndex === currentStepIndex}
+              onReturnToCurrent={() => setViewedStepIndex(currentStepIndex)}
+            >
               <div key={viewedStepIndex} className="transition-opacity duration-150">
                 {renderViewedStepContent()}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </StepActionPanel>
+          </div>
+        </AppCard>
 
         {/* Documents Table */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="flex items-center justify-end gap-2 text-base font-bold text-slate-900">
-              الوثائق المرتبطة بالملف
-              <div className="rounded-lg bg-slate-100 p-1.5">
-                <FileText className="size-4 text-slate-500" />
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-5">
-            {documents.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <table className="w-full min-w-[720px] text-right text-sm">
-                  <thead className="bg-slate-50 text-xs font-semibold text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">الوثيقة</th>
-                      <th className="px-4 py-3">الفئة</th>
-                      <th className="px-4 py-3">المصدر</th>
-                      <th className="px-4 py-3">تاريخ الإنشاء</th>
-                      <th className="px-4 py-3">الحالة</th>
-                      <th className="px-4 py-3">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {[...documents]
-                      .sort((a, b) => new Date(a.cree_le) - new Date(b.cree_le))
-                      .map((document, rowIndex) => (
-                        <tr
-                          key={document.id}
-                          className={`transition-colors hover:bg-blue-50/40 ${rowIndex % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'}`}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="font-medium text-slate-800">{getDocumentName(document)}</span>
-                              <div className="shrink-0 rounded bg-slate-100 p-1">
-                                <FileText className="size-3 text-slate-400" />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{getDocumentCategoryLabel(document.categorie)}</td>
-                          <td className="px-4 py-3 text-slate-500">{getDocumentOriginLabel(document.origine)}</td>
-                          <td className="px-4 py-3 text-slate-500">{formatDate(document.cree_le) || '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                              isDocumentReady(document)
-                                ? 'bg-green-100 text-green-700'
-                                : document.chemin_fichier?.startsWith('pending://')
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              <span className={`size-1.5 rounded-full ${
-                                isDocumentReady(document)
-                                  ? 'bg-green-500'
-                                  : document.chemin_fichier?.startsWith('pending://')
-                                    ? 'bg-amber-500'
-                                    : 'bg-slate-400'
-                              }`} />
-                              {getDocumentStateLabel(document)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {isDocumentReady(document) ? (
-                              <a
-                                href={getDocumentDownloadUrl(dossier.id, document.id)}
-                                className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
-                              >
-                                <Download className="size-3" />
-                                تحميل
-                              </a>
-                            ) : (
-                              <span className="text-xs text-slate-400">غير جاهز</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center">
-                <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-slate-100">
-                  <FileText className="size-5 text-slate-400" />
-                </div>
-                <p className="font-medium text-slate-700">لا توجد وثائق مرتبطة حاليا</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-500">ستظهر الوثائق هنا بعد تنفيذ مراحل المسطرة</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <AppCard title="الوثائق المرتبطة بالملف" icon={FileText}>
+          <DocumentsTable documents={documents} dossierId={dossier.id} />
+        </AppCard>
 
         {/* Initial documents dialog */}
         <Dialog open={initialConfirmOpen} onOpenChange={setInitialConfirmOpen}>
@@ -1529,6 +1346,50 @@ export default function DossierExplicatifDetailPage() {
                   className="w-full sm:w-auto"
                 >
                   {actionLoading ? 'جاري إنشاء المسطرة...' : 'إنشاء المسطرة'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Archive confirm dialog */}
+        <Dialog open={archiveConfirmOpen} onOpenChange={(open) => { if (!open) { setArchiveConfirmOpen(false); setArchiveError('') } }}>
+          <DialogContent className="max-w-md" dir="rtl">
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right">تأكيد أرشفة الملف</DialogTitle>
+              <DialogDescription className="text-right">
+                سيتم أرشفة الملف نهائيا ولن يمكن تنفيذ أي إجراء عليه بعد ذلك
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 text-right">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">الملف</p>
+                <p className="mt-0.5 font-semibold text-slate-900" dir="ltr">{dossier?.reference}</p>
+                <p className="mt-0.5 text-sm text-slate-600">{dossier?.nom_complet}</p>
+              </div>
+              {archiveError ? (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {archiveError}
+                </div>
+              ) : null}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setArchiveConfirmOpen(false); setArchiveError('') }}
+                  disabled={archiveLoading}
+                  className="w-full sm:w-auto"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleArchive}
+                  disabled={archiveLoading}
+                  className="w-full bg-amber-600 hover:bg-amber-700 sm:w-auto"
+                >
+                  {archiveLoading ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
                 </Button>
               </div>
             </div>

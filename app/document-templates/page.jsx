@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FileText, Pencil, Search, Trash2 } from 'lucide-react'
+import { FileText, Plus, Search } from 'lucide-react'
+import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
 
 const initialFormData = {
   nom: '',
@@ -47,6 +48,13 @@ const usageLabels = {
   RETENUE: 'اقتطاع',
 }
 
+const usageBadgeStyles = {
+  LETTRE_EXPLICATIVE: 'bg-blue-50 text-blue-700 border-blue-200',
+  BORDEREAU_NOTIFICATION: 'bg-violet-50 text-violet-700 border-violet-200',
+  AVERTISSEMENT: 'bg-amber-50 text-amber-700 border-amber-200',
+  RETENUE: 'bg-rose-50 text-rose-700 border-rose-200',
+}
+
 const typeFauteArabicLabels = {
   RETARD: 'التأخر عن العمل',
   ABSENCE_NON_JUSTIFIEE: 'الغياب غير المبرر',
@@ -65,7 +73,7 @@ function PageShell({ children }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 pt-16 lg:pt-4">
+        <main className="flex-1 bg-slate-50 pt-16 lg:pt-4">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             {children}
           </div>
@@ -176,6 +184,9 @@ export default function DocumentTemplatesPage() {
         .some((v) => v && v.toLowerCase().includes(q))
     )
   }, [templates, search])
+
+  const activeCount = useMemo(() => templates.filter((t) => t.actif !== false).length, [templates])
+  const inactiveCount = useMemo(() => templates.filter((t) => t.actif === false).length, [templates])
 
   const totalFiltered = filteredTemplates.length
   const startIndex = (currentPage - 1) * pageSize
@@ -358,12 +369,38 @@ export default function DocumentTemplatesPage() {
     <PageShell>
       <div className="space-y-4" dir="rtl">
 
-        {/* Header — compact, no card */}
-        <div className="flex items-center justify-between">
-          <Button type="button" onClick={() => setDialogOpen(true)}>
-            إضافة نموذج جديد
-          </Button>
-          <h1 className="text-base font-bold text-gray-900">نماذج الوثائق</h1>
+        {/* Header card */}
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm" dir="rtl">
+          <div className="flex items-start justify-between gap-4">
+            <div className="text-right">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">نماذج الوثائق</h1>
+              <p className="mt-0.5 text-sm text-slate-500">إدارة نماذج الوثائق المرتبطة بأنواع المخالفات</p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setDialogOpen(true)}
+              className="shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Plus className="size-4" />
+              إضافة نموذج جديد
+            </Button>
+          </div>
+          <div className="mt-4 flex items-center gap-6">
+            <div>
+              <p className="text-xs text-slate-500">نشطة</p>
+              <p className="text-xl font-bold text-slate-900" dir="ltr">{activeCount}</p>
+            </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div>
+              <p className="text-xs text-slate-500">غير نشطة</p>
+              <p className="text-xl font-bold text-slate-500" dir="ltr">{inactiveCount}</p>
+            </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <div>
+              <p className="text-xs text-slate-500">الإجمالي</p>
+              <p className="text-xl font-bold text-slate-900" dir="ltr">{templates.length}</p>
+            </div>
+          </div>
         </div>
 
         {/* Feedback messages */}
@@ -379,45 +416,45 @@ export default function DocumentTemplatesPage() {
           </div>
         ) : null}
 
-        {/* Search — narrow, starts at right (RTL flex-start) */}
+        {/* Search */}
         <div className="flex">
           <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <Input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
               placeholder="ابحث عن نموذج..."
-              className="h-10 rounded-lg border-gray-300 pl-9 pr-4 text-right text-sm"
+              className="h-10 rounded-xl border-slate-300 bg-white pl-9 pr-4 text-right text-sm placeholder:text-slate-400 focus-visible:ring-blue-500"
             />
           </div>
         </div>
 
-        {/* Table card — white bg, soft shadow, rounded, contains table + footer */}
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        {/* Table card */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px]">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th scope="col" className="px-6 py-3.5 text-right text-sm font-semibold text-gray-500">اسم النموذج</th>
-                  <th scope="col" className="px-5 py-3.5 text-right text-sm font-semibold text-gray-500">الاختصار</th>
-                  <th scope="col" className="px-5 py-3.5 text-right text-sm font-semibold text-gray-500">نوع المخالفة</th>
-                  <th scope="col" className="px-5 py-3.5 text-right text-sm font-semibold text-gray-500">الاستعمال</th>
-                  <th scope="col" className="px-5 py-3.5 text-right text-sm font-semibold text-gray-500">الحالة</th>
-                  <th scope="col" className="px-5 py-3.5 text-right text-sm font-semibold text-gray-500">تاريخ الإنشاء</th>
-                  <th scope="col" className="px-5 py-3.5 text-center text-sm font-semibold text-gray-500">الإجراءات</th>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">اسم النموذج</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاختصار</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">نوع المخالفة</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاستعمال</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الحالة</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ الإنشاء</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-slate-600">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {filteredTemplates.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-14 text-center">
                       <div className="mx-auto flex max-w-xs flex-col items-center gap-3">
-                        <FileText className="size-9 text-gray-300" strokeWidth={1.5} />
+                        <FileText className="size-9 text-slate-300" strokeWidth={1.5} />
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-600">
+                          <p className="text-sm font-medium text-slate-600">
                             {search ? 'لا توجد نتائج مطابقة' : 'لا توجد نماذج حاليا'}
                           </p>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-slate-400">
                             {search ? 'جرب كلمات بحث مختلفة' : 'أضف نموذج DOCX لربطه بنوع مخالفة'}
                           </p>
                         </div>
@@ -426,48 +463,51 @@ export default function DocumentTemplatesPage() {
                   </tr>
                 ) : (
                   paginatedTemplates.map((template) => (
-                    <tr key={template.id} className="transition-colors hover:bg-gray-50/50">
-                      <td className="px-6 py-3.5 text-right text-sm font-medium text-gray-900">
+                    <tr key={template.id} className="transition-colors hover:bg-slate-50">
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                         {template.nom || '—'}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-sm text-gray-500">
-                        <span dir="ltr" className="font-mono text-xs">
+                      <td className="px-4 py-3 text-right">
+                        <span dir="ltr" className="font-mono text-xs text-slate-500">
                           {template.identifiant || '—'}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right text-sm text-gray-600">
+                      <td className="px-4 py-3 text-right text-sm text-slate-600">
                         {getTypeFauteLabel(template.type_faute)}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-sm text-gray-600">
-                        {getUsageLabel(template.usage)}
+                      <td className="px-4 py-3 text-right">
+                        {template.usage ? (
+                          <span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${usageBadgeStyles[template.usage] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                            {getUsageLabel(template.usage)}
+                          </span>
+                        ) : '—'}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-sm">
-                        <span className={template.actif ? 'text-emerald-600' : 'text-gray-400'}>
-                          {template.actif ? 'نشط' : 'غير نشط'}
-                        </span>
+                      <td className="px-4 py-3 text-right">
+                        <StatusBadge variant={template.actif !== false ? 'success' : 'neutral'}>
+                          {template.actif !== false ? 'نشط' : 'غير نشط'}
+                        </StatusBadge>
                       </td>
-                      <td className="px-5 py-3.5 text-right text-sm text-gray-500">
+                      <td className="px-4 py-3 text-right text-sm text-slate-500">
                         {formatDate(template.cree_le)}
                       </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-center gap-3.5">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-3">
                           <button
                             type="button"
                             onClick={() => openEditDialog(template)}
                             disabled={actionLoading}
-                            title="تعديل"
-                            className="text-gray-400 transition-colors hover:text-gray-600 disabled:opacity-40"
+                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            <Pencil className="size-[15px]" />
+                            تعديل
                           </button>
+                          <span className="text-slate-200">|</span>
                           <button
                             type="button"
                             onClick={() => handleDelete(template)}
                             disabled={actionLoading}
-                            title="حذف"
-                            className="text-gray-400 transition-colors hover:text-red-500 disabled:opacity-40"
+                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                           >
-                            <Trash2 className="size-[15px]" />
+                            حذف
                           </button>
                         </div>
                       </td>
@@ -478,17 +518,17 @@ export default function DocumentTemplatesPage() {
             </table>
           </div>
 
-          {/* Card footer — pagination info matching the reference */}
-          <div className="flex items-center justify-between border-t border-gray-100 px-6 py-3">
-            <span className="text-sm text-gray-500" dir="ltr">
+          {/* Card footer */}
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+            <span className="text-sm text-slate-500" dir="ltr">
               {totalFiltered > 0 ? `${startIndex + 1}-${endIndex} من ${totalFiltered}` : '0 من 0'}
             </span>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>عدد المُدخلات في كل صفحة:</span>
               <select
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
-                className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-sm text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-300"
+                className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-sm text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300"
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -504,52 +544,60 @@ export default function DocumentTemplatesPage() {
           setDialogOpen(open)
           if (!open) resetForm()
         }}>
-          <DialogContent className="max-w-2xl" dir="rtl">
-            <DialogHeader className="text-right sm:text-right">
-              <DialogTitle className="text-right">إضافة نموذج جديد</DialogTitle>
-              <DialogDescription className="text-right">
+          <DialogContent className="max-w-2xl rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+            <DialogHeader className="border-b border-slate-100 pb-4 text-right sm:text-right">
+              <DialogTitle className="text-xl font-bold text-slate-950 text-right">إضافة نموذج جديد</DialogTitle>
+              <DialogDescription className="text-sm text-slate-600 text-right">
                 ارفع ملف DOCX وحدد نوع المخالفة والاستعمال المرتبط به
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-4 overflow-y-auto pl-1">
+            <form onSubmit={handleSubmit} className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
               {errorMessage ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
                   {errorMessage}
                 </div>
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="template-name" className="block text-right">اسم النموذج</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="template-name" className="block text-sm font-semibold text-slate-700">
+                    اسم النموذج <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="template-name"
                     value={formData.nom}
                     onChange={(event) => handleChange('nom', event.target.value)}
-                    className="h-11 text-right"
+                    placeholder="مثال: رسالة توضيحية — تأخر"
+                    className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
                   />
-                  {formErrors.nom ? <p className="text-sm text-red-600">{formErrors.nom}</p> : null}
+                  {formErrors.nom ? <p className="text-xs text-red-600">{formErrors.nom}</p> : null}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="template-identifier" className="block text-right">المعرف</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="template-identifier" className="block text-sm font-semibold text-slate-700">
+                    المعرف <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="template-identifier"
                     value={formData.identifiant}
                     onChange={(event) => handleChange('identifiant', event.target.value)}
-                    className="h-11 text-right"
+                    placeholder="LETTRE_RETARD"
+                    className="h-10 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
                     dir="ltr"
                   />
-                  {formErrors.identifiant ? <p className="text-sm text-red-600">{formErrors.identifiant}</p> : null}
+                  {formErrors.identifiant ? <p className="text-xs text-red-600">{formErrors.identifiant}</p> : null}
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="block text-right">نوع المخالفة</Label>
+                <div className="space-y-1.5">
+                  <Label className="block text-sm font-semibold text-slate-700">
+                    نوع المخالفة <span className="text-red-500">*</span>
+                  </Label>
                   <p className="text-xs text-slate-500">تصنيف المخالفة المرتبطة بالنموذج</p>
                   <Select value={formData.type_faute_id} onValueChange={(value) => handleChange('type_faute_id', value)}>
-                    <SelectTrigger className="h-11 text-right">
+                    <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 focus:border-blue-500 focus:ring-blue-500/30">
                       <SelectValue placeholder="اختر نوع المخالفة" />
                     </SelectTrigger>
                     <SelectContent>
@@ -560,14 +608,16 @@ export default function DocumentTemplatesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {formErrors.type_faute_id ? <p className="text-sm text-red-600">{formErrors.type_faute_id}</p> : null}
+                  {formErrors.type_faute_id ? <p className="text-xs text-red-600">{formErrors.type_faute_id}</p> : null}
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="block text-right">نوع الاستعمال</Label>
+                <div className="space-y-1.5">
+                  <Label className="block text-sm font-semibold text-slate-700">
+                    نوع الاستعمال <span className="text-red-500">*</span>
+                  </Label>
                   <p className="text-xs text-slate-500">فئة الوثيقة أو المسطرة التي سيستعمل فيها النموذج</p>
                   <Select value={formData.usage} onValueChange={(value) => handleChange('usage', value)}>
-                    <SelectTrigger className="h-11 text-right">
+                    <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 focus:border-blue-500 focus:ring-blue-500/30">
                       <SelectValue placeholder="اختر نوع الاستعمال" />
                     </SelectTrigger>
                     <SelectContent>
@@ -578,43 +628,68 @@ export default function DocumentTemplatesPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {formErrors.usage ? <p className="text-sm text-red-600">{formErrors.usage}</p> : null}
+                  {formErrors.usage ? <p className="text-xs text-red-600">{formErrors.usage}</p> : null}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="template-file" className="block text-right">اختيار الملف (.docx)</Label>
-                <Input
-                  id="template-file"
-                  type="file"
-                  accept=".docx"
-                  onChange={(event) => handleChange('file', event.target.files?.[0] || null)}
-                  className="h-11 text-right"
-                />
-                {formErrors.file ? <p className="text-sm text-red-600">{formErrors.file}</p> : null}
+              <div className="space-y-1.5">
+                <Label className="block text-sm font-semibold text-slate-700">
+                  ملف النموذج <span className="text-red-500">*</span>
+                </Label>
+                <label
+                  htmlFor="template-file"
+                  className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-6 py-5 text-center transition-colors ${
+                    formData.file
+                      ? 'border-blue-300 bg-blue-50'
+                      : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                  }`}
+                >
+                  <FileText className={`size-7 ${formData.file ? 'text-blue-500' : 'text-slate-400'}`} strokeWidth={1.5} />
+                  {formData.file ? (
+                    <span className="text-sm font-medium text-blue-700" dir="ltr">{formData.file.name}</span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-medium text-slate-700">اسحب الملف هنا أو انقر للاختيار</span>
+                      <span className="text-xs text-slate-400">يُقبل ملف DOCX فقط</span>
+                    </>
+                  )}
+                  <input
+                    id="template-file"
+                    type="file"
+                    accept=".docx"
+                    onChange={(event) => handleChange('file', event.target.files?.[0] || null)}
+                    className="sr-only"
+                  />
+                </label>
+                {formErrors.file ? <p className="text-xs text-red-600">{formErrors.file}</p> : null}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="template-description" className="block text-right">الوصف</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="template-description" className="block text-sm font-semibold text-slate-700">الوصف</Label>
                 <textarea
                   id="template-description"
                   value={formData.description}
                   onChange={(event) => handleChange('description', event.target.value)}
-                  className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-right text-sm text-slate-700 shadow-xs outline-none transition-colors placeholder:text-slate-400 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  placeholder="وصف اختياري للنموذج..."
+                  className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
                 />
               </div>
 
-              <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-start">
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-start">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setDialogOpen(false)}
                   disabled={submitting}
-                  className="w-full sm:w-auto"
+                  className="w-full cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed sm:w-auto"
                 >
                   إلغاء
                 </Button>
-                <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full cursor-pointer bg-blue-600 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed sm:w-auto"
+                >
                   {submitting ? 'جاري الرفع...' : 'إضافة النموذج'}
                 </Button>
               </div>

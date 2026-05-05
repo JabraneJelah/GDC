@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\\\\components\\\\ui\\\\\" -File | Select-Object Name)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\\\\components\\\\dossiers-explicatifs\")",
+      "Bash(npx prisma *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\STI\\Desktop\\GDC-main\\components"
     ]
   }
 }

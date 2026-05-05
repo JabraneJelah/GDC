@@ -49,6 +49,13 @@ export async function GET() {
             actif: true,
           },
         },
+        professeur: {
+          select: {
+            hopital: {
+              select: { nom: true },
+            },
+          },
+        },
       },
       orderBy: { cree_le: 'desc' },
     })

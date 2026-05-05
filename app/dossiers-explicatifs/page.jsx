@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Footer } from '@/components/layout/footer'
 import { Sidebar } from '@/components/layout/sidebar'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Pagination } from '@/components/ui/pagination'
 import {
   Select,
@@ -26,13 +24,48 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  DOSSIER_STATUS_LABELS,
   getDossierStatusLabel,
   getStatusColor,
 } from '@/frontend/src/lib/dossierStatus'
-import { AlertTriangle, FolderOpen, Plus } from 'lucide-react'
+import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
+import {
+  AlertTriangle,
+  Archive,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  Plus,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
+
+const DEFAULT_FILTERS = {
+  search: '',
+  service: '',
+  hopital: '',
+  typeFauteId: '',
+  status: 'actifs',
+  dateFrom: '',
+  dateTo: '',
+}
+
+const STATUS_OPTIONS = [
+  { value: 'actifs', label: 'الملفات النشطة' },
+  { value: 'a_archiver', label: 'في انتظار الأرشفة' },
+  { value: 'archives', label: 'المؤرشفة' },
+  { value: 'ENREGISTRE', label: 'مسجل' },
+  { value: 'DOCUMENTS_INITIAUX_GENERES', label: 'الوثائق الأولية مولدة' },
+  { value: 'NOTIFIE', label: 'تم الإشعار' },
+  { value: 'REPONSE_RECUE', label: 'الجواب مستلم' },
+  { value: 'REPONSE_CONVAINCANTE', label: 'جواب مقنع' },
+  { value: 'REPONSE_NON_CONVAINCANTE', label: 'جواب غير مقنع' },
+  { value: 'PROCEDURE_SUIVANTE_GENEREE', label: 'المسطرة التالية مولدة' },
+  { value: 'CLOTURE', label: 'مغلق' },
+  { value: 'A_ARCHIVER', label: 'جاهز للأرشفة' },
+  { value: 'ARCHIVE', label: 'مؤرشف' },
+]
 
 const typeFauteArabicLabels = {
   RETARD: 'التأخر عن العمل',
@@ -73,17 +106,6 @@ function getFaultDisplay(typeFaute) {
   return { label, color: faultTextColor[severity] || 'text-slate-700' }
 }
 
-const statusBadgeStyles = {
-  ENREGISTRE: 'bg-slate-100 text-slate-600',
-  DOCUMENTS_INITIAUX_GENERES: 'bg-blue-50 text-blue-600',
-  NOTIFIE: 'bg-blue-50 text-blue-600',
-  REPONSE_RECUE: 'bg-violet-50 text-violet-600',
-  REPONSE_CONVAINCANTE: 'bg-green-50 text-green-600',
-  REPONSE_NON_CONVAINCANTE: 'bg-red-50 text-red-500',
-  PROCEDURE_SUIVANTE_GENEREE: 'bg-orange-50 text-orange-500',
-  CLOTURE: 'bg-green-50 text-green-600',
-}
-
 function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
@@ -96,7 +118,7 @@ function PageShell({ children }) {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 pt-16 lg:pt-4">
+        <main className="flex-1 bg-[#F8FAFC] pt-16 lg:pt-4">
           <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             {children}
           </div>
@@ -112,67 +134,114 @@ export default function DossiersExplicatifsPage() {
   const [dossiers, setDossiers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [typesFaute, setTypesFaute] = useState([])
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
 
-  const fetchDossiers = async ({ showLoading = false } = {}) => {
+  const fetchDossiers = useCallback(async ({ showLoading = false } = {}) => {
     try {
       if (showLoading) setLoading(true)
       setError(false)
       const response = await fetch('/api/dossiers-explicatifs')
-
-      if (!response.ok) {
-        throw new Error('Failed to load dossiers')
-      }
-
+      if (!response.ok) throw new Error('fetch failed')
       const data = await response.json()
       setDossiers(Array.isArray(data) ? data : [])
-    } catch (err) {
-      console.error('Erreur lors du chargement des dossiers explicatifs:', err)
+    } catch {
       setError(true)
     } finally {
       if (showLoading) setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchDossiers({ showLoading: true })
-  }, [])
+    fetch('/api/type-faute')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setTypesFaute(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [fetchDossiers])
+
+  const uniqueServices = useMemo(
+    () => [...new Set(dossiers.map((d) => d.service).filter(Boolean))].sort(),
+    [dossiers],
+  )
+
+  const uniqueHopitaux = useMemo(
+    () => [...new Set(dossiers.map((d) => d.professeur?.hopital?.nom).filter(Boolean))].sort(),
+    [dossiers],
+  )
+
+  const activeFilterCount = useMemo(
+    () => Object.entries(filters).filter(([k, v]) => v !== DEFAULT_FILTERS[k]).length,
+    [filters],
+  )
 
   const filteredDossiers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase()
-
-    return dossiers.filter((dossier) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        [dossier.reference, dossier.nom_complet, dossier.matricule]
-          .filter(Boolean)
-          .some((value) => value.toString().toLowerCase().includes(normalizedSearch))
-
-      const matchesStatus =
-        statusFilter === 'all' || dossier.statut === statusFilter
-
-      return matchesSearch && matchesStatus
+    const norm = filters.search.trim().toLowerCase()
+    return dossiers.filter((d) => {
+      if (norm && ![d.reference, d.nom_complet, d.matricule].filter(Boolean).some((v) => v.toLowerCase().includes(norm))) return false
+      if (filters.service && d.service !== filters.service) return false
+      if (filters.hopital && d.professeur?.hopital?.nom !== filters.hopital) return false
+      if (filters.typeFauteId && String(d.type_faute?.id) !== filters.typeFauteId) return false
+      const s = filters.status
+      if (s === 'actifs' && d.statut === 'ARCHIVE') return false
+      if (s === 'a_archiver' && d.statut !== 'A_ARCHIVER') return false
+      if (s === 'archives' && d.statut !== 'ARCHIVE') return false
+      if (!['actifs', 'a_archiver', 'archives'].includes(s) && d.statut !== s) return false
+      const df = d.date_faute?.slice(0, 10)
+      if (filters.dateFrom && df && df < filters.dateFrom) return false
+      if (filters.dateTo && df && df > filters.dateTo) return false
+      return true
     })
-  }, [dossiers, search, statusFilter])
+  }, [dossiers, filters])
 
   const totalPages = Math.ceil(filteredDossiers.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const paginatedDossiers = filteredDossiers.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const paginatedDossiers = filteredDossiers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  )
 
-  const activeCount = useMemo(() => dossiers.filter((d) => d.statut !== 'CLOTURE').length, [dossiers])
-  const closedCount = useMemo(() => dossiers.filter((d) => d.statut === 'CLOTURE').length, [dossiers])
+  const activeCount = useMemo(
+    () => dossiers.filter((d) => !['ARCHIVE', 'A_ARCHIVER', 'CLOTURE'].includes(d.statut)).length,
+    [dossiers],
+  )
+  const closedCount = useMemo(
+    () => dossiers.filter((d) => d.statut === 'CLOTURE').length,
+    [dossiers],
+  )
+  const aArchiverCount = useMemo(
+    () => dossiers.filter((d) => d.statut === 'A_ARCHIVER').length,
+    [dossiers],
+  )
 
-  const handleSearchChange = (event) => {
-    setSearch(event.target.value)
+  const setFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
     setCurrentPage(1)
   }
 
-  const handleStatusFilterChange = (value) => {
-    setStatusFilter(value)
+  const clearFilters = () => {
+    setFilters(DEFAULT_FILTERS)
     setCurrentPage(1)
   }
+
+  const filterChips = useMemo(() => {
+    const chips = []
+    if (filters.search) chips.push({ key: 'search', label: `البحث: ${filters.search}` })
+    if (filters.service) chips.push({ key: 'service', label: `المصلحة: ${filters.service}` })
+    if (filters.hopital) chips.push({ key: 'hopital', label: `المستشفى: ${filters.hopital}` })
+    if (filters.typeFauteId) {
+      const tf = typesFaute.find((t) => String(t.id) === filters.typeFauteId)
+      chips.push({ key: 'typeFauteId', label: `نوع المخالفة: ${tf ? (typeFauteArabicLabels[tf.code] || tf.nom) : filters.typeFauteId}` })
+    }
+    if (filters.status !== DEFAULT_FILTERS.status) {
+      const opt = STATUS_OPTIONS.find((o) => o.value === filters.status)
+      chips.push({ key: 'status', label: opt?.label || filters.status })
+    }
+    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
+    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
+    return chips
+  }, [filters, typesFaute])
 
   if (loading) {
     return (
@@ -204,33 +273,43 @@ export default function DossiersExplicatifsPage() {
 
   return (
     <PageShell>
-      <div className="space-y-6" dir="rtl">
+      <div className="space-y-5" dir="rtl">
 
         {/* Header */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2 text-right">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                الملفات التوضيحية
-              </h1>
-              <p className="text-sm leading-relaxed text-slate-500">
-                تتبع وتدبير الملفات التوضيحية وحالتها
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">الملفات التوضيحية</h1>
+              <p className="text-sm leading-relaxed text-slate-500">تتبع وتدبير الملفات التوضيحية وحالتها</p>
               {dossiers.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 pt-0.5 text-sm">
                   <span className="flex items-center gap-1.5 text-blue-600">
                     <span className="size-2 rounded-full bg-blue-500" />
                     <span className="font-semibold">{activeCount}</span>
-                    <span className="text-slate-500">ملف نشط</span>
+                    <span className="text-slate-500">نشط</span>
                   </span>
-                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-400">|</span>
                   <span className="flex items-center gap-1.5 text-green-600">
                     <span className="size-2 rounded-full bg-green-500" />
                     <span className="font-semibold">{closedCount}</span>
                     <span className="text-slate-500">مغلق</span>
                   </span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-500">المجموع: <span className="font-semibold text-slate-700">{dossiers.length}</span></span>
+                  {aArchiverCount > 0 && (
+                    <>
+                      <span className="text-slate-400">|</span>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/dossiers-explicatifs/a-archiver')}
+                        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                      >
+                        <Archive className="size-3" />
+                        في انتظار الأرشفة
+                        <span className="flex size-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                          {aArchiverCount}
+                        </span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -245,150 +324,323 @@ export default function DossiersExplicatifsPage() {
           </div>
         </section>
 
-        {/* Filters */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-5 sm:p-6">
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem] sm:items-end">
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="dossier-search" className="block text-right text-sm font-medium text-slate-700">
-                  البحث
-                </Label>
-                <Input
-                  id="dossier-search"
-                  value={search}
-                  onChange={handleSearchChange}
-                  placeholder="البحث بالاسم الكامل أو رقم التأجير أو المرجع"
-                  className="h-11 w-full text-right"
-                />
-              </div>
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor="status-filter" className="block text-right text-sm font-medium text-slate-700">
-                  الحالة
-                </Label>
-                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                  <SelectTrigger id="status-filter" className="h-11 w-full text-right">
-                    <SelectValue placeholder="الحالة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {Object.keys(DOSSIER_STATUS_LABELS).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {getDossierStatusLabel(status)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        {/* Collapsible filter bar */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Toggle header */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-5 py-4 sm:px-6"
+          >
+            <div className="flex items-center gap-2.5">
+              <SlidersHorizontal className="size-4 text-slate-500" />
+              <span className="text-sm font-semibold text-slate-800">البحث والتصفية</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </div>
+            {filtersOpen
+              ? <ChevronUp className="size-4 text-slate-400" />
+              : <ChevronDown className="size-4 text-slate-400" />
+            }
+          </button>
+
+          {/* Chips when collapsed */}
+          {!filtersOpen && filterChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 pb-4 pt-3 sm:px-6">
+              {filterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-blue-700"
+                >
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={() => setFilter(chip.key, DEFAULT_FILTERS[chip.key])}
+                    className="flex size-3.5 items-center justify-center rounded-full bg-blue-200 text-blue-700 hover:bg-blue-300"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-slate-400 underline hover:text-slate-600"
+              >
+                مسح الكل
+              </button>
+            </div>
+          )}
+
+          {/* Expanded filter form */}
+          {filtersOpen && (
+            <div className="border-t border-slate-100 px-5 pb-5 pt-4 sm:px-6">
+              <div className="space-y-4">
+                {/* Row 1 */}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">بحث عام</label>
+                    <Input
+                      value={filters.search}
+                      onChange={(e) => setFilter('search', e.target.value)}
+                      placeholder="الاسم، رقم التأجير، المرجع..."
+                      className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">المصلحة</label>
+                    <Select
+                      value={filters.service || '__all__'}
+                      onValueChange={(v) => setFilter('service', v === '__all__' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="كل المصالح" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">كل المصالح</SelectItem>
+                        {uniqueServices.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">المستشفى</label>
+                    <Select
+                      value={filters.hopital || '__all__'}
+                      onValueChange={(v) => setFilter('hopital', v === '__all__' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="كل المستشفيات" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">كل المستشفيات</SelectItem>
+                        {uniqueHopitaux.map((h) => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 2 */}
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">نوع المخالفة</label>
+                    <Select
+                      value={filters.typeFauteId || '__all__'}
+                      onValueChange={(v) => setFilter('typeFauteId', v === '__all__' ? '' : v)}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="كل الأنواع" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">كل الأنواع</SelectItem>
+                        {typesFaute.map((tf) => (
+                          <SelectItem key={tf.id} value={String(tf.id)}>
+                            {typeFauteArabicLabels[tf.code] || tf.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">الحالة</label>
+                    <Select value={filters.status} onValueChange={(v) => setFilter('status', v)}>
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="الحالة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">من تاريخ</label>
+                    <Input
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) => setFilter('dateFrom', e.target.value)}
+                      className="h-9 rounded-xl border-slate-300 bg-white text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">إلى تاريخ</label>
+                    <Input
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) => setFilter('dateTo', e.target.value)}
+                      className="h-9 rounded-xl border-slate-300 bg-white text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                  <span className="text-sm text-slate-500">
+                    عرض{' '}
+                    <span className="font-semibold text-slate-800">{filteredDossiers.length}</span>{' '}
+                    نتيجة
+                  </span>
+                  <div className="flex gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="h-8 gap-1.5 text-slate-600"
+                      >
+                        <X className="size-3.5" />
+                        مسح الفلاتر
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setFiltersOpen(false)}
+                    >
+                      عرض النتائج ({filteredDossiers.length})
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
 
-        {/* Table */}
-        <Card className="overflow-hidden border-slate-200 shadow-sm">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table className="min-w-[980px]">
-                <TableHeader className="bg-slate-50">
-                  <TableRow className="border-b border-slate-200 hover:bg-slate-50">
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">المرجع</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">الاسم الكامل</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">رقم التأجير</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">المصلحة</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">نوع المخالفة</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">الحالة</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">تاريخ المخالفة</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">تاريخ الإنشاء</TableHead>
-                    <TableHead className="px-5 py-3.5 text-right text-xs font-semibold text-slate-500">الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDossiers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="px-5 py-16 text-center">
-                        <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
-                          <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-600">لا توجد ملفات توضيحية حاليا</p>
-                            <p className="text-xs text-slate-400">قم بإنشاء ملف جديد للبدء في تتبع المسطرة</p>
-                          </div>
+        {/* Results + Table */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {activeFilterCount > 0 && (
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-2.5 sm:px-6">
+              <span className="text-xs text-slate-500">
+                تم العثور على{' '}
+                <span className="font-semibold text-slate-700">{filteredDossiers.length}</span>{' '}
+                نتيجة
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs font-medium text-blue-600 hover:underline"
+              >
+                مسح الفلاتر
+              </button>
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <Table className="min-w-[980px]">
+              <TableHeader className="bg-slate-50">
+                <TableRow className="border-b border-slate-200 hover:bg-slate-50">
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المرجع</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاسم الكامل</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">رقم التأجير</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المصلحة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">نوع المخالفة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الحالة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ المخالفة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ الإنشاء</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الإجراءات</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDossiers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="px-5 py-16 text-center">
+                      <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
+                        <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-slate-600">
+                            {activeFilterCount > 0
+                              ? 'لا توجد نتائج مطابقة للفلاتر المطبقة'
+                              : 'لا توجد ملفات توضيحية حاليا'}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {activeFilterCount > 0
+                              ? 'جرب تعديل معايير البحث'
+                              : 'قم بإنشاء ملف جديد للبدء في تتبع المسطرة'}
+                          </p>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedDossiers.map((dossier) => {
-                      const { label: faultLabel, color: faultColor } = getFaultDisplay(dossier.type_faute)
-                      const badgeClass = statusBadgeStyles[dossier.statut] || statusBadgeStyles.ENREGISTRE
-
-                      return (
-                        <TableRow key={dossier.id} className="border-b border-slate-100 hover:bg-slate-50">
-
-                          <TableCell className="px-5 py-3.5 text-right">
-                            <span dir="ltr" className="font-mono text-sm font-semibold text-slate-900">
-                              {dossier.reference || '—'}
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right text-sm font-medium text-slate-800">
-                            {dossier.nom_complet || '—'}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right text-sm text-slate-600">
-                            {dossier.matricule || '—'}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right text-sm text-slate-600">
-                            {dossier.service || '—'}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right">
-                            {faultLabel ? (
-                              <span className={`text-sm font-medium ${faultColor}`}>
-                                {faultLabel}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-slate-400">—</span>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right">
-                            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${badgeClass}`}>
-                              {getDossierStatusLabel(dossier.statut)}
-                            </span>
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right text-sm text-slate-500">
-                            {formatDate(dossier.date_faute)}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right text-sm text-slate-500">
-                            {formatDate(dossier.cree_le)}
-                          </TableCell>
-
-                          <TableCell className="px-5 py-3.5 text-right">
-                            <Link
-                              href={`/dossiers-explicatifs/${dossier.id}`}
-                              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              عرض
-                            </Link>
-                          </TableCell>
-
-                        </TableRow>
-                      )
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            {totalPages > 1 && (
+                        {activeFilterCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="mt-1 gap-1.5"
+                          >
+                            <X className="size-3.5" />
+                            مسح الفلاتر
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedDossiers.map((dossier) => {
+                    const { label: faultLabel, color: faultColor } = getFaultDisplay(dossier.type_faute)
+                    return (
+                      <TableRow key={dossier.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <TableCell className="px-4 py-3 text-right">
+                          <span dir="ltr" className="font-mono text-sm font-bold text-slate-900">
+                            {dossier.reference || '—'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                          {dossier.nom_complet || '—'}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                          {dossier.matricule || '—'}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                          {dossier.service || '—'}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          {faultLabel
+                            ? <span className={`text-sm font-medium ${faultColor}`}>{faultLabel}</span>
+                            : <span className="text-sm text-slate-400">—</span>
+                          }
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <StatusBadge variant={getStatusColor(dossier.statut)}>
+                            {getDossierStatusLabel(dossier.statut)}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
+                          {formatDate(dossier.date_faute)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
+                          {formatDate(dossier.cree_le)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-right">
+                          <Link
+                            href={`/dossiers-explicatifs/${dossier.id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            عرض
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          {totalPages > 1 && (
+            <div className="border-t border-slate-100">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
               />
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
 
       </div>
     </PageShell>
