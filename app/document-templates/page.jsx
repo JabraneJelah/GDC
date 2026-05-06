@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Footer } from '@/components/layout/footer'
-import { Sidebar } from '@/components/layout/sidebar'
+import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -68,21 +67,6 @@ const typeFauteArabicLabels = {
   ABANDON_POSTE: 'التخلي عن الوظيفة',
 }
 
-function PageShell({ children }) {
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 bg-slate-50 pt-16 lg:pt-4">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </div>
-  )
-}
 
 function formatDate(value) {
   if (!value) return '—'
@@ -431,17 +415,17 @@ export default function DocumentTemplatesPage() {
 
         {/* Table card */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px]">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[1200px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">اسم النموذج</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاختصار</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">نوع المخالفة</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاستعمال</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">الحالة</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ الإنشاء</th>
-                  <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-slate-600">الإجراءات</th>
+                <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">اسم النموذج</th>
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الاختصار</th>
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">نوع المخالفة</th>
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الاستعمال</th>
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الحالة</th>
+                  <th scope="col" className="px-4 py-3 text-right text-sm font-semibold text-slate-700">تاريخ الإنشاء</th>
+                  <th scope="col" className="px-4 py-3 text-center text-sm font-semibold text-slate-700">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -463,34 +447,34 @@ export default function DocumentTemplatesPage() {
                   </tr>
                 ) : (
                   paginatedTemplates.map((template) => (
-                    <tr key={template.id} className="transition-colors hover:bg-slate-50">
+                    <tr key={template.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
                       <td className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
                         {template.nom || '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span dir="ltr" className="font-mono text-xs text-slate-500">
+                      <td className="px-4 py-3 text-right text-sm">
+                        <span dir="ltr" className="font-mono text-sm text-slate-700">
                           {template.identifiant || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-600">
                         {getTypeFauteLabel(template.type_faute)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right text-sm">
                         {template.usage ? (
                           <span className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${usageBadgeStyles[template.usage] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                             {getUsageLabel(template.usage)}
                           </span>
                         ) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right text-sm">
                         <StatusBadge variant={template.actif !== false ? 'success' : 'neutral'}>
                           {template.actif !== false ? 'نشط' : 'غير نشط'}
                         </StatusBadge>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm text-slate-500">
+                      <td className="px-4 py-3 text-right text-sm text-slate-700">
                         {formatDate(template.cree_le)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-sm">
                         <div className="flex items-center justify-center gap-3">
                           <button
                             type="button"

@@ -9,20 +9,31 @@ import {
   Users,
   Calendar,
   Settings,
-  Menu,
   X,
   ChevronDown,
   ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
   User,
   LogOut,
   GraduationCap,
-  FileText
+  FileText,
 } from 'lucide-react'
 
-export function Sidebar() {
+function NavTooltip({ label, children }) {
+  return (
+    <div className="group/tip relative">
+      {children}
+      <span className="pointer-events-none absolute right-full top-1/2 z-50 mr-3 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover/tip:opacity-100">
+        {label}
+      </span>
+    </div>
+  )
+}
+
+export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMobile }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isReferentielOpen, setIsReferentielOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -32,47 +43,26 @@ export function Sidebar() {
   }
 
   useEffect(() => {
-    setIsMobileOpen(false)
-  }, [pathname])
-
-  useEffect(() => {
-    const referentielPaths = ['/services', '/specialites', '/types-conge', '/categories-personnel', '/titres', '/hopitaux', '/grades', '/jours-feries', '/types-fautes']
-    if (referentielPaths.some(path => pathname.startsWith(path))) {
+    const referentielPaths = [
+      '/services', '/specialites', '/types-conge', '/categories-personnel',
+      '/titres', '/hopitaux', '/grades', '/jours-feries', '/types-fautes',
+    ]
+    if (referentielPaths.some((p) => pathname.startsWith(p))) {
       setIsReferentielOpen(true)
     }
   }, [pathname])
 
+  useEffect(() => {
+    if (isCollapsed) setIsReferentielOpen(false)
+  }, [isCollapsed])
+
   const menuItems = [
-    {
-      href: '/dashboard',
-      label: 'لوحة القيادة',
-      icon: LayoutDashboard,
-    },
-    {
-      href: '/professeurs',
-      label: 'الأساتذة',
-      icon: GraduationCap,
-    },
-    {
-      href: '/utilisateurs',
-      label: 'إدارة المستخدمين',
-      icon: Users,
-    },
-    {
-      href: '/conges',
-      label: 'إدارة العطل',
-      icon: Calendar,
-    },
-    {
-      href: '/dossiers-explicatifs',
-      label: 'الملفات التوضيحية',
-      icon: FileText,
-    },
-    {
-      href: '/document-templates',
-      label: 'نماذج الوثائق',
-      icon: FileText,
-    },
+    { href: '/dashboard', label: 'لوحة القيادة', icon: LayoutDashboard },
+    { href: '/professeurs', label: 'الأساتذة', icon: GraduationCap },
+    { href: '/utilisateurs', label: 'إدارة المستخدمين', icon: Users },
+    { href: '/conges', label: 'إدارة العطل', icon: Calendar },
+    { href: '/dossiers-explicatifs', label: 'الملفات التوضيحية', icon: FileText },
+    { href: '/document-templates', label: 'نماذج الوثائق', icon: FileText },
     {
       label: 'المرجعيات',
       icon: Settings,
@@ -91,147 +81,228 @@ export function Sidebar() {
   ]
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full" dir="rtl">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0]">
-        <Link href="/dashboard" className="text-base font-semibold text-[#334155]">
-          إدارة الموارد البشرية
-        </Link>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsMobileOpen(false)}
-          className="lg:hidden h-8 w-8 p-0"
-        >
-          <X className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-        {menuItems.map((item) => {
-          if (item.children) {
-            return (
-              <div key={item.label}>
-                <button
-                  onClick={() => setIsReferentielOpen(!isReferentielOpen)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isReferentielOpen
-                      ? 'bg-[#F8FAFC] text-[#334155]'
-                      : 'text-[#334155] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </div>
-                  {isReferentielOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronLeft className="h-4 w-4" />
-                  )}
-                </button>
-                {isReferentielOpen && (
-                  <div className="mr-4 mt-1 space-y-1">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${
-                          isActive(child.href)
-                            ? 'bg-[#F8FAFC] text-[#334155] font-medium'
-                            : 'text-[#334155] hover:bg-[#F8FAFC]'
-                        }`}
-                      >
-                        {child.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive(item.href)
-                  ? 'bg-[#F8FAFC] text-[#334155]'
-                  : 'text-[#334155] hover:bg-[#F8FAFC]'
-              }`}
-            >
-              <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Footer */}
-      <div className="border-t border-[#E2E8F0] p-4 space-y-2">
-        <Link href="/profile">
-          <Button
-            variant="ghost"
-            className={`w-full justify-end gap-3 ${
-              pathname === '/profile' ? 'bg-[#F8FAFC]' : ''
-            }`}
-          >
-            <span>الملف الشخصي</span>
-            <User className="h-5 w-5" />
-          </Button>
-        </Link>
-        <Button
-          variant="ghost"
-          onClick={handleLogout}
-          className="w-full justify-end gap-3 text-[#334155] hover:bg-[#F8FAFC]"
-        >
-          <span>تسجيل الخروج</span>
-          <LogOut className="h-5 w-5" />
-        </Button>
-      </div>
-    </div>
-  )
+  const isReferentielActive = menuItems
+    .find((i) => i.children)
+    ?.children.some((c) => isActive(c.href))
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 right-4 z-50">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsMobileOpen(true)}
-          className="h-9 w-9 p-0 bg-white shadow-md"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-      </div>
-
-      {/* Mobile padding spacer */}
-      <div className="lg:hidden h-16" />
-
-      {/* Mobile sidebar overlay */}
+      {/* Mobile overlay */}
       {isMobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMobileOpen(false)}
+          className="fixed inset-x-0 bottom-0 top-14 z-40 bg-black/50 lg:hidden"
+          onClick={onCloseMobile}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar panel */}
       <aside
-        className={`fixed top-0 right-0 h-full w-64 bg-white border-l border-[#E2E8F0] z-50 transform transition-transform duration-300 ease-in-out ${
-          isMobileOpen ? 'translate-x-0' : 'translate-x-full'
-        } lg:translate-x-0`}
+        className={`fixed right-0 top-14 z-50 flex h-[calc(100vh-3.5rem)] flex-col border-l border-[#E2E8F0] bg-white transition-all duration-300 ease-in-out
+          ${isMobileOpen ? 'translate-x-0' : 'translate-x-full'}
+          lg:translate-x-0
+          ${isCollapsed ? 'w-16' : 'w-64'}
+        `}
       >
-        <SidebarContent />
-      </aside>
+        <div className="flex h-full flex-col" dir="rtl">
+          {/* Sidebar header */}
+          <div
+            className={`flex shrink-0 items-center border-b border-slate-200 ${
+              isCollapsed ? 'justify-center p-3' : 'justify-between p-4'
+            }`}
+          >
+            {!isCollapsed && (
+              <Link
+                href="/dashboard"
+                className="truncate text-base font-semibold text-slate-950"
+              >
+                إدارة الموارد البشرية
+              </Link>
+            )}
+            {/* Collapse toggle — desktop only */}
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="hidden size-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC] lg:flex"
+            >
+              {isCollapsed ? (
+                <ChevronsLeft className="h-4 w-4" />
+              ) : (
+                <ChevronsRight className="h-4 w-4" />
+              )}
+            </button>
+            {/* Mobile close */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCloseMobile}
+              className="h-8 w-8 p-0 lg:hidden"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
 
-      {/* Desktop spacer - hidden on mobile, ordered last so sidebar sits on the right */}
-      <div className="hidden lg:block lg:order-last w-64 flex-shrink-0" />
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+            {menuItems.map((item) => {
+              if (item.children) {
+                const toggleActive = isReferentielActive || isReferentielOpen
+
+                if (isCollapsed) {
+                  return (
+                    <NavTooltip key={item.label} label={item.label}>
+                      <button
+                        type="button"
+                        className={`flex w-full items-center justify-center rounded-lg p-2.5 transition-colors ${
+                          toggleActive
+                            ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                            : 'text-slate-600 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                        }`}
+                      >
+                        <item.icon className="h-5 w-5" />
+                      </button>
+                    </NavTooltip>
+                  )
+                }
+
+                return (
+                  <div key={item.label}>
+                    <button
+                      type="button"
+                      onClick={() => setIsReferentielOpen(!isReferentielOpen)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                        toggleActive
+                          ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                          : 'text-slate-800 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon
+                          className={`h-5 w-5 ${toggleActive ? 'text-[#1174BC]' : 'text-current'}`}
+                        />
+                        <span>{item.label}</span>
+                      </div>
+                      {isReferentielOpen ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronLeft className="h-4 w-4 shrink-0" />
+                      )}
+                    </button>
+                    {isReferentielOpen && (
+                      <div className="mr-4 mt-0.5 space-y-0.5 border-r border-slate-200 pr-2">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`block rounded-lg px-3 py-2 text-base font-medium transition-colors ${
+                              isActive(child.href)
+                                ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                                : 'text-slate-700 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              const active = isActive(item.href)
+
+              if (isCollapsed) {
+                return (
+                  <NavTooltip key={item.href} label={item.label}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
+                        active
+                          ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                          : 'text-slate-600 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                      }`}
+                    >
+                      <item.icon className="h-5 w-5 shrink-0" />
+                    </Link>
+                  </NavTooltip>
+                )
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                    active
+                      ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                      : 'text-slate-800 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                  }`}
+                >
+                  <item.icon
+                    className={`h-5 w-5 shrink-0 ${active ? 'text-[#1174BC]' : 'text-current'}`}
+                  />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* Footer actions */}
+          <div className="shrink-0 border-t border-slate-200 p-3 space-y-0.5">
+            {isCollapsed ? (
+              <>
+                <NavTooltip label="الملف الشخصي">
+                  <Link
+                    href="/profile"
+                    className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
+                      pathname === '/profile'
+                        ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                        : 'text-slate-600 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                    }`}
+                  >
+                    <User className="h-5 w-5 shrink-0" />
+                  </Link>
+                </NavTooltip>
+                <NavTooltip label="تسجيل الخروج">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center justify-center rounded-lg p-2.5 text-slate-600 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0" />
+                  </button>
+                </NavTooltip>
+              </>
+            ) : (
+              <>
+                <Link href="/profile" className="block">
+                  <div
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                      pathname === '/profile'
+                        ? 'bg-[#1174BC]/10 text-[#1174BC]'
+                        : 'text-slate-800 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
+                    }`}
+                  >
+                    <User
+                      className={`h-5 w-5 shrink-0 ${
+                        pathname === '/profile' ? 'text-[#1174BC]' : 'text-current'
+                      }`}
+                    />
+                    <span>الملف الشخصي</span>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
+                >
+                  <LogOut className="h-5 w-5 shrink-0 text-current" />
+                  <span>تسجيل الخروج</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </aside>
     </>
   )
 }

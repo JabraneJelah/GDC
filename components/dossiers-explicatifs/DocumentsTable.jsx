@@ -74,25 +74,25 @@ export function DocumentsTable({ documents = [], dossierId }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-right text-sm">
-          <thead className="bg-slate-50">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[1200px] text-right text-sm">
+          <thead className="bg-[#F1F5F9]">
             <tr className="border-b border-slate-200">
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">الوثيقة</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">الفئة</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">المصدر</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">تاريخ الإنشاء</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">الحالة</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-600">الإجراءات</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">الوثيقة</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">الفئة</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">المصدر</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">تاريخ الإنشاء</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">الحالة</th>
+              <th className="px-4 py-3 text-sm font-semibold text-slate-700">الإجراءات</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
-            {sorted.map((doc, i) => (
+          <tbody className="divide-y divide-slate-100">
+            {sorted.map((doc) => (
               <tr
                 key={doc.id}
-                className={`transition-colors hover:bg-slate-50 ${i % 2 === 1 ? 'bg-slate-50/50' : ''}`}
+                className="bg-white transition-colors hover:bg-[#F8FAFC]"
               >
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-sm">
                   <div className="flex items-center justify-end gap-2">
                     <span className="max-w-[200px] truncate font-medium text-slate-800">
                       {getDocumentName(doc)}
@@ -102,17 +102,17 @@ export function DocumentsTable({ documents = [], dossierId }) {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-600">
+                <td className="px-4 py-3 text-sm text-slate-600">
                   {categoryLabels[doc.categorie] || doc.categorie || '—'}
                 </td>
-                <td className="px-4 py-3 text-slate-500">
+                <td className="px-4 py-3 text-sm text-slate-700">
                   {originLabels[doc.origine] || doc.origine || '—'}
                 </td>
-                <td className="px-4 py-3 text-slate-500">{formatDate(doc.cree_le)}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-sm text-slate-700">{formatDate(doc.cree_le)}</td>
+                <td className="px-4 py-3 text-sm">
                   <StatusChip doc={doc} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-sm">
                   {isReady(doc) ? (
                     <a
                       href={downloadUrl(dossierId, doc.id)}

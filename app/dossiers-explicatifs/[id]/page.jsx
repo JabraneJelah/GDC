@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Footer } from '@/components/layout/footer'
-import { Sidebar } from '@/components/layout/sidebar'
+import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -119,21 +118,6 @@ const actionConfirmations = {
 }
 
 
-function PageShell({ children }) {
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 bg-[#FBFCFD] pt-16 lg:pt-4">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </div>
-  )
-}
 
 function formatDate(value) {
   if (!value) return null
@@ -866,36 +850,36 @@ export default function DossierExplicatifDetailPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               {dossier.nom_complet ? (
                 <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-right">
-                  <User className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <User className="mt-0.5 size-4 shrink-0 text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400">الاسم الكامل</p>
+                    <p className="text-xs text-slate-500">الاسم الكامل</p>
                     <p className="mt-0.5 text-sm font-semibold text-slate-800">{dossier.nom_complet}</p>
                   </div>
                 </div>
               ) : null}
               {dossier.matricule ? (
                 <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-right">
-                  <Hash className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <Hash className="mt-0.5 size-4 shrink-0 text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400">رقم التأجير</p>
+                    <p className="text-xs text-slate-500">رقم التأجير</p>
                     <p className="mt-0.5 text-sm font-semibold text-slate-800">{dossier.matricule}</p>
                   </div>
                 </div>
               ) : null}
               {getTypeFauteLabel(dossier.type_faute) ? (
                 <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-right">
-                  <FileText className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <FileText className="mt-0.5 size-4 shrink-0 text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400">نوع المخالفة</p>
+                    <p className="text-xs text-slate-500">نوع المخالفة</p>
                     <p className="mt-0.5 text-sm font-semibold text-slate-800">{getTypeFauteLabel(dossier.type_faute)}</p>
                   </div>
                 </div>
               ) : null}
               {formatDate(dossier.date_faute) ? (
                 <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-right">
-                  <Calendar className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                  <Calendar className="mt-0.5 size-4 shrink-0 text-slate-500" />
                   <div>
-                    <p className="text-xs text-slate-400">تاريخ المخالفة</p>
+                    <p className="text-xs text-slate-500">تاريخ المخالفة</p>
                     <p className="mt-0.5 text-sm font-semibold text-slate-800">{formatDate(dossier.date_faute)}</p>
                   </div>
                 </div>
@@ -912,7 +896,7 @@ export default function DossierExplicatifDetailPage() {
               <div className="space-y-2">
                 {initialDocuments.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <FileText className="size-4 shrink-0 text-slate-400" />
+                    <FileText className="size-4 shrink-0 text-slate-500" />
                     <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(doc)}</span>
                     {isDocumentReady(doc) ? (
                       <a href={getDocumentDownloadUrl(dossier.id, doc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
@@ -924,7 +908,7 @@ export default function DossierExplicatifDetailPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">لم يتم إنشاء وثائق أولية</p>
+              <p className="text-sm text-slate-600">لم يتم إنشاء وثائق أولية</p>
             )}
           </div>
         )
@@ -938,14 +922,14 @@ export default function DossierExplicatifDetailPage() {
                   <Calendar className="size-4 text-slate-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">تاريخ التبليغ</p>
+                  <p className="text-xs text-slate-500">تاريخ التبليغ</p>
                   <p className="mt-0.5 text-sm font-semibold text-slate-800">{formatDate(dossier.date_notification)}</p>
                 </div>
               </div>
             ) : null}
             {notificationProofDocument ? (
               <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                <FileText className="size-4 shrink-0 text-slate-400" />
+                <FileText className="size-4 shrink-0 text-slate-500" />
                 <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(notificationProofDocument)}</span>
                 {isDocumentReady(notificationProofDocument) ? (
                   <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
@@ -955,7 +939,7 @@ export default function DossierExplicatifDetailPage() {
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">لا يوجد وصل استلام مرفوع</p>
+              <p className="text-sm text-slate-600">لا يوجد وصل استلام مرفوع</p>
             )}
           </div>
         )
@@ -969,14 +953,14 @@ export default function DossierExplicatifDetailPage() {
                   <Calendar className="size-4 text-slate-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">تاريخ التوصل بالجواب</p>
+                  <p className="text-xs text-slate-500">تاريخ التوصل بالجواب</p>
                   <p className="mt-0.5 text-sm font-semibold text-slate-800">{formatDate(dossier.date_reponse)}</p>
                 </div>
               </div>
             ) : null}
             {responseProofDocument ? (
               <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                <FileText className="size-4 shrink-0 text-slate-400" />
+                <FileText className="size-4 shrink-0 text-slate-500" />
                 <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(responseProofDocument)}</span>
                 {isDocumentReady(responseProofDocument) ? (
                   <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
@@ -986,7 +970,7 @@ export default function DossierExplicatifDetailPage() {
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">لا توجد وثيقة جواب مرفوعة</p>
+              <p className="text-sm text-slate-600">لا توجد وثيقة جواب مرفوعة</p>
             )}
           </div>
         )
@@ -1009,7 +993,7 @@ export default function DossierExplicatifDetailPage() {
                   }
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">قرار التقييم</p>
+                  <p className="text-xs text-slate-500">قرار التقييم</p>
                   <p className={`mt-0.5 text-sm font-bold ${
                     dossier.decision_reponse === 'CONVAINCANTE' ? 'text-green-800' : 'text-amber-800'
                   }`}>
@@ -1020,7 +1004,7 @@ export default function DossierExplicatifDetailPage() {
             ) : null}
             {dossier.commentaire_evaluation ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-                <p className="text-xs text-slate-400">ملاحظة</p>
+                <p className="text-xs text-slate-500">ملاحظة</p>
                 <p className="mt-1 leading-relaxed text-sm text-slate-700">{dossier.commentaire_evaluation}</p>
               </div>
             ) : null}
@@ -1035,7 +1019,7 @@ export default function DossierExplicatifDetailPage() {
               <div className="space-y-2">
                 {procedureDocuments.map((doc) => (
                   <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <FileText className="size-4 shrink-0 text-slate-400" />
+                    <FileText className="size-4 shrink-0 text-slate-500" />
                     <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(doc)}</span>
                     {isDocumentReady(doc) ? (
                       <a href={getDocumentDownloadUrl(dossier.id, doc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
@@ -1047,7 +1031,7 @@ export default function DossierExplicatifDetailPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">لم يتم إنشاء وثائق مسطرة</p>
+              <p className="text-sm text-slate-600">لم يتم إنشاء وثائق مسطرة</p>
             )}
           </div>
         )

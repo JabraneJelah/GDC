@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Footer } from '@/components/layout/footer'
-import { Sidebar } from '@/components/layout/sidebar'
+import { PageShell } from '@/components/layout/PageShell'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,21 +30,6 @@ function formatDate(value) {
   return d.toLocaleDateString('ar-MA')
 }
 
-function PageShell({ children }) {
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 bg-[#FBFCFD] pt-16 lg:pt-4">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </div>
-  )
-}
 
 export default function AArchiverPage() {
   const router = useRouter()
@@ -159,16 +143,16 @@ export default function AArchiverPage() {
         ) : (
           <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table className="min-w-[700px]">
+              <div className="w-full overflow-x-auto">
+                <Table className="w-full min-w-[1200px]">
                   <TableHeader className="bg-slate-50">
                     <TableRow className="border-b border-slate-200 hover:bg-slate-50">
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المرجع</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاسم الكامل</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">رقم التأجير</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المصلحة</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ الإغلاق</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الإجراءات</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المرجع</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الاسم الكامل</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">رقم التأجير</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المصلحة</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">تاريخ الإغلاق</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

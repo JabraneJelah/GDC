@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Footer } from '@/components/layout/footer'
-import { Sidebar } from '@/components/layout/sidebar'
+import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
@@ -33,6 +32,7 @@ import {
   Archive,
   ChevronDown,
   ChevronUp,
+  Eye,
   FolderOpen,
   Plus,
   SlidersHorizontal,
@@ -94,9 +94,9 @@ const typeFauteSeverity = {
 }
 
 const faultTextColor = {
-  red: 'text-rose-400',
-  amber: 'text-amber-400',
-  blue: 'text-slate-500',
+  red: 'text-rose-600',
+  amber: 'text-amber-600',
+  blue: 'text-slate-700',
 }
 
 function getFaultDisplay(typeFaute) {
@@ -113,21 +113,6 @@ function formatDate(value) {
   return date.toLocaleDateString('ar-MA')
 }
 
-function PageShell({ children }) {
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 bg-[#F8FAFC] pt-16 lg:pt-4">
-          <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </div>
-  )
-}
 
 export default function DossiersExplicatifsPage() {
   const router = useRouter()
@@ -518,10 +503,10 @@ export default function DossiersExplicatifsPage() {
         {/* Results + Table */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           {activeFilterCount > 0 && (
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-2.5 sm:px-6">
-              <span className="text-xs text-slate-500">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-2.5 sm:px-6">
+              <span className="text-xs text-slate-600">
                 تم العثور على{' '}
-                <span className="font-semibold text-slate-700">{filteredDossiers.length}</span>{' '}
+                <span className="font-semibold text-slate-900">{filteredDossiers.length}</span>{' '}
                 نتيجة
               </span>
               <button
@@ -533,19 +518,19 @@ export default function DossiersExplicatifsPage() {
               </button>
             </div>
           )}
-          <div className="overflow-x-auto">
-            <Table className="min-w-[980px]">
-              <TableHeader className="bg-slate-50">
-                <TableRow className="border-b border-slate-200 hover:bg-slate-50">
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المرجع</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الاسم الكامل</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">رقم التأجير</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">المصلحة</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">نوع المخالفة</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الحالة</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ المخالفة</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">تاريخ الإنشاء</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-xs font-bold text-slate-600">الإجراءات</TableHead>
+          <div className="w-full overflow-x-auto">
+            <Table className="w-full min-w-[1200px]">
+              <TableHeader className="bg-[#F1F5F9]">
+                <TableRow className="border-b border-slate-200 hover:bg-[#F1F5F9]">
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">المرجع</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الاسم الكامل</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">رقم التأجير</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">المصلحة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">نوع المخالفة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الحالة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">تاريخ المخالفة</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">تاريخ الإنشاء</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -560,7 +545,7 @@ export default function DossiersExplicatifsPage() {
                               ? 'لا توجد نتائج مطابقة للفلاتر المطبقة'
                               : 'لا توجد ملفات توضيحية حاليا'}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-600">
                             {activeFilterCount > 0
                               ? 'جرب تعديل معايير البحث'
                               : 'قم بإنشاء ملف جديد للبدء في تتبع المسطرة'}
@@ -584,13 +569,13 @@ export default function DossiersExplicatifsPage() {
                   paginatedDossiers.map((dossier) => {
                     const { label: faultLabel, color: faultColor } = getFaultDisplay(dossier.type_faute)
                     return (
-                      <TableRow key={dossier.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <TableRow key={dossier.id} className="border-b border-slate-100 bg-white hover:bg-[#F8FAFC]">
                         <TableCell className="px-4 py-3 text-right">
-                          <span dir="ltr" className="font-mono text-sm font-bold text-slate-900">
+                          <span dir="ltr" className="font-mono text-sm text-slate-600">
                             {dossier.reference || '—'}
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                           {dossier.nom_complet || '—'}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
@@ -610,18 +595,20 @@ export default function DossiersExplicatifsPage() {
                             {getDossierStatusLabel(dossier.statut)}
                           </StatusBadge>
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-700">
                           {formatDate(dossier.date_faute)}
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
+                        <TableCell className="px-4 py-3 text-right text-sm text-slate-700">
                           {formatDate(dossier.cree_le)}
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right">
                           <Link
                             href={`/dossiers-explicatifs/${dossier.id}`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                            aria-label="عرض الملف"
+                            title="عرض الملف"
+                            className="inline-flex size-8 items-center justify-center rounded-lg text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                           >
-                            عرض
+                            <Eye className="size-4" aria-hidden="true" />
                           </Link>
                         </TableCell>
                       </TableRow>

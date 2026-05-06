@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Footer } from '@/components/layout/footer'
-import { Sidebar } from '@/components/layout/sidebar'
+import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,21 +23,6 @@ import { AlertTriangle, Plus, ShieldAlert } from 'lucide-react'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function PageShell({ children }) {
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col lg:ml-0">
-        <main className="flex-1 bg-[#F8FAFC] pt-16 lg:pt-4">
-          <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {children}
-          </div>
-        </main>
-        <Footer />
-      </div>
-    </div>
-  )
-}
 
 function ActiveBadge({ actif }) {
   return actif
@@ -382,7 +366,7 @@ export default function TypesFautesPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
+                <tr className="border-b border-slate-200 bg-[#F1F5F9]">
                   <th scope="col" className="px-5 py-3 text-right text-xs font-semibold text-slate-700">الرمز</th>
                   <th scope="col" className="px-5 py-3 text-right text-xs font-semibold text-slate-700">نوع المخالفة</th>
                   <th scope="col" className="px-5 py-3 text-right text-xs font-semibold text-slate-700">الوصف</th>
@@ -415,7 +399,7 @@ export default function TypesFautesPage() {
                   </tr>
                 ) : (
                   filtered.map((tf) => (
-                    <tr key={tf.id} className={`transition-colors hover:bg-slate-50 ${!tf.actif ? 'opacity-70' : ''}`}>
+                    <tr key={tf.id} className={`bg-white transition-colors hover:bg-[#F8FAFC] ${!tf.actif ? 'opacity-70' : ''}`}>
                       <td className="px-5 py-3.5">
                         <span dir="ltr" className="font-mono text-sm font-semibold text-slate-800">
                           {tf.code}
