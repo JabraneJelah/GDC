@@ -456,62 +456,62 @@ export default function TypesFautesPage() {
         {/* ── Create dialog ── */}
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setCreateForm(EMPTY_FORM); setCreateErrors({}); setCreateApiError('') } }}>
           <DialogContent className="max-w-lg rounded-2xl border-slate-200 shadow-xl" dir="rtl">
-            <DialogHeader className="border-b border-slate-100 pb-4 text-right">
-              <DialogTitle className="text-lg font-bold text-slate-950">إضافة نوع مخالفة</DialogTitle>
-              <DialogDescription className="text-sm text-slate-600">
+            <DialogHeader className="border-b border-slate-100 pb-4 text-right sm:text-right">
+              <DialogTitle className="text-right text-xl font-bold text-slate-950">إضافة نوع مخالفة</DialogTitle>
+              <DialogDescription className="text-right text-sm text-slate-600">
                 أدخل معطيات نوع المخالفة الجديد. سيكون نشطًا تلقائيًا.
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleCreate} className="space-y-4 pt-1">
+            <form onSubmit={handleCreate} className="space-y-5">
               {createApiError && (
-                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  <AlertTriangle className="size-4 shrink-0" />
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
                   {createApiError}
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="create-code" className="block text-right text-sm font-medium text-slate-700">
-                  الرمز <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="create-code"
-                  value={createForm.code}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, code: e.target.value.toUpperCase() })); setCreateErrors((p) => ({ ...p, code: '' })) }}
-                  placeholder="مثال: RETARD"
-                  dir="ltr"
-                  className="h-10 rounded-xl border-slate-300 bg-white font-mono text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-blue-500"
-                />
-                <p className="text-xs text-slate-500">أحرف لاتينية كبيرة وأرقام وشرطة سفلية فقط</p>
-                {createErrors.code && <p className="text-xs font-medium text-red-600">{createErrors.code}</p>}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-code" className="block text-sm font-semibold text-slate-700">
+                    الرمز <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="create-code"
+                    value={createForm.code}
+                    onChange={(e) => { setCreateForm((p) => ({ ...p, code: e.target.value.toUpperCase() })); setCreateErrors((p) => ({ ...p, code: '' })) }}
+                    placeholder="مثال: RETARD"
+                    dir="ltr"
+                    className="h-10 rounded-xl border-slate-300 bg-white font-mono text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
+                  />
+                  <p className="text-xs text-slate-500">أحرف لاتينية كبيرة وأرقام وشرطة سفلية فقط</p>
+                  {createErrors.code ? <p className="text-xs text-red-600">{createErrors.code}</p> : null}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-nom" className="block text-sm font-semibold text-slate-700">
+                    نوع المخالفة <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="create-nom"
+                    value={createForm.nom}
+                    onChange={(e) => { setCreateForm((p) => ({ ...p, nom: e.target.value })); setCreateErrors((p) => ({ ...p, nom: '' })) }}
+                    placeholder="مثال: التأخر عن العمل"
+                    className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
+                  />
+                  {createErrors.nom ? <p className="text-xs text-red-600">{createErrors.nom}</p> : null}
+                </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="create-nom" className="block text-right text-sm font-medium text-slate-700">
-                  نوع المخالفة <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="create-nom"
-                  value={createForm.nom}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, nom: e.target.value })); setCreateErrors((p) => ({ ...p, nom: '' })) }}
-                  placeholder="مثال: التأخر عن العمل"
-                  className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-blue-500"
-                />
-                {createErrors.nom && <p className="text-xs font-medium text-red-600">{createErrors.nom}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="create-description" className="block text-right text-sm font-medium text-slate-700">
+                <Label htmlFor="create-description" className="block text-sm font-semibold text-slate-700">
                   الوصف
                 </Label>
                 <textarea
                   id="create-description"
                   value={createForm.description}
                   onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="وصف اختياري..."
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="وصف اختياري لنوع المخالفة..."
+                  className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
                 />
               </div>
 
@@ -521,14 +521,14 @@ export default function TypesFautesPage() {
                   variant="outline"
                   onClick={() => setCreateOpen(false)}
                   disabled={createSubmitting}
-                  className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 sm:w-auto"
+                  className="w-full cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed sm:w-auto"
                 >
                   إلغاء
                 </Button>
                 <Button
                   type="submit"
                   disabled={createSubmitting}
-                  className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+                  className="w-full cursor-pointer bg-blue-600 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed sm:w-auto"
                 >
                   {createSubmitting ? 'جاري الحفظ...' : 'إضافة نوع المخالفة'}
                 </Button>
@@ -540,58 +540,61 @@ export default function TypesFautesPage() {
         {/* ── Edit dialog ── */}
         <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) { setEditingId(null); setEditErrors({}); setEditApiError('') } }}>
           <DialogContent className="max-w-lg rounded-2xl border-slate-200 shadow-xl" dir="rtl">
-            <DialogHeader className="border-b border-slate-100 pb-4 text-right">
-              <DialogTitle className="text-lg font-bold text-slate-950">تعديل نوع المخالفة</DialogTitle>
-              <DialogDescription className="text-sm text-slate-600">
-                تعديل معطيات نوع المخالفة لن يؤثر على الملفات المرتبطة به.
+            <DialogHeader className="border-b border-slate-100 pb-4 text-right sm:text-right">
+              <DialogTitle className="text-right text-xl font-bold text-slate-950">تعديل نوع المخالفة</DialogTitle>
+              <DialogDescription className="text-right text-sm text-slate-600">
+                التعديل لن يؤثر على الملفات المرتبطة بهذا النوع.
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleEdit} className="space-y-4 pt-1">
+            <form onSubmit={handleEdit} className="space-y-5">
               {editApiError && (
-                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  <AlertTriangle className="size-4 shrink-0" />
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
                   {editApiError}
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-code" className="block text-right text-sm font-medium text-slate-700">
-                  الرمز <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-code"
-                  value={editForm.code}
-                  onChange={(e) => { setEditForm((p) => ({ ...p, code: e.target.value.toUpperCase() })); setEditErrors((p) => ({ ...p, code: '' })) }}
-                  dir="ltr"
-                  className="h-10 rounded-xl border-slate-300 bg-white font-mono text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-blue-500"
-                />
-                {editErrors.code && <p className="text-xs font-medium text-red-600">{editErrors.code}</p>}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-code" className="block text-sm font-semibold text-slate-700">
+                    الرمز <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-code"
+                    value={editForm.code}
+                    onChange={(e) => { setEditForm((p) => ({ ...p, code: e.target.value.toUpperCase() })); setEditErrors((p) => ({ ...p, code: '' })) }}
+                    dir="ltr"
+                    className="h-10 rounded-xl border-slate-300 bg-white font-mono text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
+                  />
+                  <p className="text-xs text-slate-500">أحرف لاتينية كبيرة وأرقام وشرطة سفلية فقط</p>
+                  {editErrors.code ? <p className="text-xs text-red-600">{editErrors.code}</p> : null}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-nom" className="block text-sm font-semibold text-slate-700">
+                    نوع المخالفة <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-nom"
+                    value={editForm.nom}
+                    onChange={(e) => { setEditForm((p) => ({ ...p, nom: e.target.value })); setEditErrors((p) => ({ ...p, nom: '' })) }}
+                    placeholder="مثال: التأخر عن العمل"
+                    className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
+                  />
+                  {editErrors.nom ? <p className="text-xs text-red-600">{editErrors.nom}</p> : null}
+                </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="edit-nom" className="block text-right text-sm font-medium text-slate-700">
-                  نوع المخالفة <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-nom"
-                  value={editForm.nom}
-                  onChange={(e) => { setEditForm((p) => ({ ...p, nom: e.target.value })); setEditErrors((p) => ({ ...p, nom: '' })) }}
-                  className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-blue-500"
-                />
-                {editErrors.nom && <p className="text-xs font-medium text-red-600">{editErrors.nom}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-description" className="block text-right text-sm font-medium text-slate-700">
+                <Label htmlFor="edit-description" className="block text-sm font-semibold text-slate-700">
                   الوصف
                 </Label>
                 <textarea
                   id="edit-description"
                   value={editForm.description}
                   onChange={(e) => setEditForm((p) => ({ ...p, description: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="وصف اختياري لنوع المخالفة..."
+                  className="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30"
                 />
               </div>
 
@@ -601,14 +604,14 @@ export default function TypesFautesPage() {
                   variant="outline"
                   onClick={() => setEditOpen(false)}
                   disabled={editSubmitting}
-                  className="w-full border-slate-300 text-slate-700 hover:bg-slate-50 sm:w-auto"
+                  className="w-full cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed sm:w-auto"
                 >
                   إلغاء
                 </Button>
                 <Button
                   type="submit"
                   disabled={editSubmitting}
-                  className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+                  className="w-full cursor-pointer bg-blue-600 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed sm:w-auto"
                 >
                   {editSubmitting ? 'جاري التحديث...' : 'حفظ التعديلات'}
                 </Button>
@@ -623,17 +626,17 @@ export default function TypesFautesPage() {
           onOpenChange={(open) => { if (!open) { setDeactivateId(null); setDeactivateApiError('') } }}
         >
           <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
-            <DialogHeader className="text-right">
-              <DialogTitle className="text-right text-lg font-bold text-slate-950">تأكيد التعطيل</DialogTitle>
+            <DialogHeader className="border-b border-slate-100 pb-4 text-right sm:text-right">
+              <DialogTitle className="text-right text-xl font-bold text-slate-950">تأكيد التعطيل</DialogTitle>
               <DialogDescription className="text-right text-sm text-slate-600">
-                هل تريد تعطيل هذا النوع من المخالفة؟
+                هل تريد تعطيل هذا النوع من المخالفات؟
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
               {deactivatingRecord && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-xs text-slate-500">نوع المخالفة</p>
+                  <p className="text-xs font-medium text-slate-500">نوع المخالفة</p>
                   <p className="mt-0.5 font-mono text-sm font-semibold text-slate-800" dir="ltr">
                     {deactivatingRecord.code}
                   </p>
@@ -646,31 +649,30 @@ export default function TypesFautesPage() {
               </div>
 
               {deactivateApiError && (
-                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  <AlertTriangle className="size-4 shrink-0" />
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
                   {deactivateApiError}
                 </div>
               )}
+            </div>
 
-              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => { setDeactivateId(null); setDeactivateApiError('') }}
-                  disabled={deactivateLoading}
-                  className="w-full border-slate-300 text-slate-700 sm:w-auto"
-                >
-                  إلغاء
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleDeactivate}
-                  disabled={deactivateLoading}
-                  className="w-full bg-amber-600 text-white hover:bg-amber-700 sm:w-auto"
-                >
-                  {deactivateLoading ? 'جاري التعطيل...' : 'تعطيل'}
-                </Button>
-              </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setDeactivateId(null); setDeactivateApiError('') }}
+                disabled={deactivateLoading}
+                className="w-full cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed sm:w-auto"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDeactivate}
+                disabled={deactivateLoading}
+                className="w-full cursor-pointer bg-amber-600 font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed sm:w-auto"
+              >
+                {deactivateLoading ? 'جاري التعطيل...' : 'تعطيل'}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
