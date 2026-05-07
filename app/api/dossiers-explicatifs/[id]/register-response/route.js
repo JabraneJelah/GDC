@@ -12,9 +12,16 @@ const ALLOWED_RESPONSE_TYPES = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
 }
 const RESPONSE_DOCUMENT_TITLE_PREFIX = '\u062c\u0648\u0627\u0628 \u0627\u0644\u0645\u0639\u0646\u064a \u0628\u0627\u0644\u0623\u0645\u0631'
+const FIRST_REGISTRATION_STATUS = 'NOTIFIE'
+const CORRECTION_STATUSES = [
+  'REPONSE_RECUE',
+  'REPONSE_CONVAINCANTE',
+  'REPONSE_NON_CONVAINCANTE',
+]
+const ALL_ALLOWED_STATUSES = [FIRST_REGISTRATION_STATUS, ...CORRECTION_STATUSES]
 
-function buildResponseDocumentIdentifiant(dossierId) {
-  return `REP-${dossierId}`
+function buildResponseDocumentIdentifiant(dossierId, isFirstRegistration) {
+  return isFirstRegistration ? `REP-${dossierId}` : `REP-${dossierId}-UPD-${Date.now()}`
 }
 
 function sanitizeFileNamePart(value) {
@@ -68,20 +75,6 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (!(responseFile instanceof File) || responseFile.size === 0) {
-      return NextResponse.json(
-        { error: 'Le document de reponse est obligatoire' },
-        { status: 400 }
-      )
-    }
-
-    if (!Object.keys(ALLOWED_RESPONSE_TYPES).includes(responseFile.type)) {
-      return NextResponse.json(
-        { error: 'Format du document de reponse invalide. Les formats acceptes sont PDF, JPG, PNG et DOCX' },
-        { status: 400 }
-      )
-    }
-
     const dossier = await prisma.dossierExplicatif.findUnique({
       where: { id },
       select: {
@@ -98,76 +91,130 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (dossier.statut !== 'NOTIFIE') {
+    if (!ALL_ALLOWED_STATUSES.includes(dossier.statut)) {
       return NextResponse.json(
-        { error: 'La reponse ne peut etre enregistree que pour un dossier notifie' },
+        { error: 'La reponse ne peut etre enregistree ou modifiee dans le statut actuel du dossier' },
         { status: 400 }
       )
     }
 
-    const existingResponseDocument = await prisma.dossierDocument.findFirst({
+    const isFirstRegistration = dossier.statut === FIRST_REGISTRATION_STATUS
+
+    const existingResponseDocuments = await prisma.dossierDocument.findMany({
       where: {
         dossier_id: dossier.id,
         origine: 'TELEVERSE',
         categorie: 'reponse_agent',
       },
-      select: {
-        id: true,
-        titre: true,
-      },
+      orderBy: { cree_le: 'desc' },
+      select: { id: true },
     })
+    const existingResponseDocument = existingResponseDocuments[0] || null
+    const duplicateResponseDocumentIds = existingResponseDocuments.slice(1).map((document) => document.id)
 
-    if (dossier.date_reponse_recue || existingResponseDocument) {
-      return NextResponse.json(
-        {
-          error: 'La reponse a deja ete enregistree pour ce dossier',
-          has_response_date: Boolean(dossier.date_reponse_recue),
-          has_response_document: Boolean(existingResponseDocument),
-        },
-        { status: 400 }
-      )
+    if (isFirstRegistration) {
+      if (!(responseFile instanceof File) || responseFile.size === 0) {
+        return NextResponse.json(
+          { error: 'Le document de reponse est obligatoire' },
+          { status: 400 }
+        )
+      }
+
+      if (!Object.keys(ALLOWED_RESPONSE_TYPES).includes(responseFile.type)) {
+        return NextResponse.json(
+          { error: 'Format du document de reponse invalide. Les formats acceptes sont PDF, JPG, PNG et DOCX' },
+          { status: 400 }
+        )
+      }
+
+      if (dossier.date_reponse_recue || existingResponseDocument) {
+        return NextResponse.json(
+          {
+            error: 'La reponse a deja ete enregistree pour ce dossier',
+            has_response_date: Boolean(dossier.date_reponse_recue),
+            has_response_document: Boolean(existingResponseDocument),
+          },
+          { status: 400 }
+        )
+      }
+    } else if (responseFile instanceof File && responseFile.size > 0) {
+      if (!Object.keys(ALLOWED_RESPONSE_TYPES).includes(responseFile.type)) {
+        return NextResponse.json(
+          { error: 'Format du document de reponse invalide. Les formats acceptes sont PDF, JPG, PNG et DOCX' },
+          { status: 400 }
+        )
+      }
     }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'responses')
-    const fileName = buildResponseFileName({
-      dossierId: dossier.id,
-      originalName: responseFile.name,
-      mimeType: responseFile.type,
-    })
-    const diskPath = path.join(uploadDir, fileName)
-    const publicPath = `/uploads/responses/${fileName}`
+    let publicPath = null
+    const hasNewFile = responseFile instanceof File && responseFile.size > 0
 
-    await mkdir(uploadDir, { recursive: true })
-    const bytes = Buffer.from(await responseFile.arrayBuffer())
-    await writeFile(diskPath, bytes, { flag: 'wx' })
+    if (hasNewFile) {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'responses')
+      const fileName = buildResponseFileName({
+        dossierId: dossier.id,
+        originalName: responseFile.name,
+        mimeType: responseFile.type,
+      })
+      const diskPath = path.join(uploadDir, fileName)
+      publicPath = `/uploads/responses/${fileName}`
+
+      await mkdir(uploadDir, { recursive: true })
+      const bytes = Buffer.from(await responseFile.arrayBuffer())
+      await writeFile(diskPath, bytes, { flag: 'wx' })
+    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.dossierDocument.create({
-        data: {
-          identifiant: buildResponseDocumentIdentifiant(dossier.id),
-          titre: `${RESPONSE_DOCUMENT_TITLE_PREFIX} - ${responseFile.name || 'reponse_agent'}`,
-          chemin_fichier: publicPath,
-          origine: 'TELEVERSE',
-          categorie: 'reponse_agent',
-          dossier_id: dossier.id,
-          template_id: null,
-          cree_par_rh_id: currentUser.userId,
-        },
-      })
+      if (publicPath) {
+        if (existingResponseDocument) {
+          await tx.dossierDocument.update({
+            where: { id: existingResponseDocument.id },
+            data: {
+              titre: `${RESPONSE_DOCUMENT_TITLE_PREFIX} - ${responseFile.name || 'reponse_agent'}`,
+              chemin_fichier: publicPath,
+              cree_par_rh_id: currentUser.userId,
+            },
+          })
+        } else {
+          await tx.dossierDocument.create({
+            data: {
+              identifiant: buildResponseDocumentIdentifiant(dossier.id, isFirstRegistration),
+              titre: `${RESPONSE_DOCUMENT_TITLE_PREFIX} - ${responseFile.name || 'reponse_agent'}`,
+              chemin_fichier: publicPath,
+              origine: 'TELEVERSE',
+              categorie: 'reponse_agent',
+              dossier_id: dossier.id,
+              template_id: null,
+              cree_par_rh_id: currentUser.userId,
+            },
+          })
+        }
+      }
+
+      if (duplicateResponseDocumentIds.length > 0) {
+        await tx.dossierDocument.deleteMany({
+          where: {
+            id: { in: duplicateResponseDocumentIds },
+            dossier_id: dossier.id,
+            categorie: 'reponse_agent',
+            origine: 'TELEVERSE',
+          },
+        })
+      }
 
       await tx.dossierExplicatif.update({
         where: { id: dossier.id },
         data: {
           date_reponse_recue: parsedResponseDate,
-          statut: 'REPONSE_RECUE',
+          ...(isFirstRegistration ? { statut: 'REPONSE_RECUE' } : {}),
         },
       })
     })
 
     return NextResponse.json({
-      message: 'Reponse enregistree avec succes',
+      message: isFirstRegistration ? 'Reponse enregistree avec succes' : 'Reponse mise a jour avec succes',
       dossier_id: dossier.id,
-      statut: 'REPONSE_RECUE',
+      statut: isFirstRegistration ? 'REPONSE_RECUE' : dossier.statut,
     })
   } catch (error) {
     console.error("Erreur lors de l'enregistrement de la reponse:", error)

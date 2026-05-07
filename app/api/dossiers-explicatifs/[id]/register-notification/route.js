@@ -10,10 +10,21 @@ const ALLOWED_PROOF_TYPES = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
 }
+const NOTIFICATION_PROOF_TITLE_PREFIX = '\u0648\u0635\u0644 \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645'
 
-function buildNotificationDocumentIdentifiant(dossierId) {
-  return `NOTIF-${dossierId}`
-}
+// First registration only when documents are ready
+const FIRST_REGISTRATION_STATUS = 'DOCUMENTS_INITIAUX_GENERES'
+
+// Correction allowed before any closure/finalization
+const CORRECTION_STATUSES = [
+  'NOTIFIE',
+  'REPONSE_RECUE',
+  'REPONSE_CONVAINCANTE',
+  'REPONSE_NON_CONVAINCANTE',
+  'PROCEDURE_SUIVANTE_GENEREE',
+]
+
+const ALL_ALLOWED_STATUSES = [FIRST_REGISTRATION_STATUS, ...CORRECTION_STATUSES]
 
 function sanitizeFileNamePart(value) {
   return String(value || '')
@@ -41,10 +52,7 @@ export async function POST(request, { params }) {
     const id = resolvedParams?.id
 
     if (!id || !UUID_PATTERN.test(id)) {
-      return NextResponse.json(
-        { error: 'ID invalide' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'ID invalide' }, { status: 400 })
     }
 
     const formData = await request.formData()
@@ -66,20 +74,6 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (!(proofFile instanceof File) || proofFile.size === 0) {
-      return NextResponse.json(
-        { error: 'Le justificatif de notification est obligatoire' },
-        { status: 400 }
-      )
-    }
-
-    if (!Object.keys(ALLOWED_PROOF_TYPES).includes(proofFile.type)) {
-      return NextResponse.json(
-        { error: 'Format du justificatif invalide. Les formats acceptes sont PDF, JPG et PNG' },
-        { status: 400 }
-      )
-    }
-
     const dossier = await prisma.dossierExplicatif.findUnique({
       where: { id },
       select: {
@@ -96,75 +90,134 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (dossier.statut !== 'DOCUMENTS_INITIAUX_GENERES') {
+    if (!ALL_ALLOWED_STATUSES.includes(dossier.statut)) {
       return NextResponse.json(
-        { error: 'La notification ne peut etre enregistree que pour un dossier avec documents initiaux generes' },
+        { error: 'La notification ne peut etre enregistree ou modifiee dans le statut actuel du dossier' },
         { status: 400 }
       )
     }
 
-    const existingNotificationDocument = await prisma.dossierDocument.findFirst({
+    const isFirstRegistration = dossier.statut === FIRST_REGISTRATION_STATUS
+    const existingNotificationDocuments = await prisma.dossierDocument.findMany({
       where: {
         dossier_id: dossier.id,
         categorie: 'preuve_notification',
+        origine: 'TELEVERSE',
       },
-      select: {
-        id: true,
-        titre: true,
-      },
+      orderBy: { cree_le: 'desc' },
+      select: { id: true },
     })
+    const existingNotificationDocument = existingNotificationDocuments[0] || null
+    const duplicateNotificationDocumentIds = existingNotificationDocuments.slice(1).map((document) => document.id)
 
-    if (dossier.date_notification || existingNotificationDocument) {
-      return NextResponse.json(
-        {
-          error: 'La notification a deja ete enregistree pour ce dossier',
-          has_notification_date: Boolean(dossier.date_notification),
-          has_notification_proof_document: Boolean(existingNotificationDocument),
-        },
-        { status: 400 }
-      )
+    if (isFirstRegistration) {
+      // File is required for first registration
+      if (!(proofFile instanceof File) || proofFile.size === 0) {
+        return NextResponse.json(
+          { error: 'Le justificatif de notification est obligatoire' },
+          { status: 400 }
+        )
+      }
+
+      if (!Object.keys(ALLOWED_PROOF_TYPES).includes(proofFile.type)) {
+        return NextResponse.json(
+          { error: 'Format du justificatif invalide. Les formats acceptes sont PDF, JPG et PNG' },
+          { status: 400 }
+        )
+      }
+
+      if (dossier.date_notification || existingNotificationDocument) {
+        return NextResponse.json(
+          {
+            error: 'La notification a deja ete enregistree pour ce dossier',
+            has_notification_date: Boolean(dossier.date_notification),
+            has_notification_proof_document: Boolean(existingNotificationDocument),
+          },
+          { status: 400 }
+        )
+      }
+    } else {
+      // Correction mode: file is optional, but validate type if provided
+      if (proofFile instanceof File && proofFile.size > 0) {
+        if (!Object.keys(ALLOWED_PROOF_TYPES).includes(proofFile.type)) {
+          return NextResponse.json(
+            { error: 'Format du justificatif invalide. Les formats acceptes sont PDF, JPG et PNG' },
+            { status: 400 }
+          )
+        }
+      }
     }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'proofs')
-    const fileName = buildProofFileName({
-      dossierId: dossier.id,
-      originalName: proofFile.name,
-      mimeType: proofFile.type,
-    })
-    const diskPath = path.join(uploadDir, fileName)
-    const publicPath = `/uploads/proofs/${fileName}`
+    // Save file to disk only if provided
+    let publicPath = null
+    const hasNewFile = proofFile instanceof File && proofFile.size > 0
 
-    await mkdir(uploadDir, { recursive: true })
-    const bytes = Buffer.from(await proofFile.arrayBuffer())
-    await writeFile(diskPath, bytes, { flag: 'wx' })
+    if (hasNewFile) {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'proofs')
+      const fileName = buildProofFileName({
+        dossierId: dossier.id,
+        originalName: proofFile.name,
+        mimeType: proofFile.type,
+      })
+      const diskPath = path.join(uploadDir, fileName)
+      publicPath = `/uploads/proofs/${fileName}`
+
+      await mkdir(uploadDir, { recursive: true })
+      const bytes = Buffer.from(await proofFile.arrayBuffer())
+      await writeFile(diskPath, bytes, { flag: 'wx' })
+    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.dossierDocument.create({
-        data: {
-          identifiant: buildNotificationDocumentIdentifiant(dossier.id),
-          titre: `وصل الاستلام - ${proofFile.name || 'preuve_notification'}`,
-          chemin_fichier: publicPath,
-          origine: 'TELEVERSE',
-          categorie: 'preuve_notification',
-          dossier_id: dossier.id,
-          template_id: null,
-          cree_par_rh_id: currentUser.userId,
-        },
-      })
+      if (publicPath) {
+        if (existingNotificationDocument) {
+          await tx.dossierDocument.update({
+            where: { id: existingNotificationDocument.id },
+            data: {
+              titre: `${NOTIFICATION_PROOF_TITLE_PREFIX} - ${proofFile.name || 'preuve_notification'}`,
+              chemin_fichier: publicPath,
+              cree_par_rh_id: currentUser.userId,
+            },
+          })
+        } else {
+          await tx.dossierDocument.create({
+            data: {
+              identifiant: `NOTIF-${dossier.id}`,
+              titre: `${NOTIFICATION_PROOF_TITLE_PREFIX} - ${proofFile.name || 'preuve_notification'}`,
+              chemin_fichier: publicPath,
+              origine: 'TELEVERSE',
+              categorie: 'preuve_notification',
+              dossier_id: dossier.id,
+              template_id: null,
+              cree_par_rh_id: currentUser.userId,
+            },
+          })
+        }
+      }
+
+      if (duplicateNotificationDocumentIds.length > 0) {
+        await tx.dossierDocument.deleteMany({
+          where: {
+            id: { in: duplicateNotificationDocumentIds },
+            dossier_id: dossier.id,
+            categorie: 'preuve_notification',
+            origine: 'TELEVERSE',
+          },
+        })
+      }
 
       await tx.dossierExplicatif.update({
         where: { id: dossier.id },
         data: {
           date_notification: parsedNotificationDate,
-          statut: 'NOTIFIE',
+          ...(isFirstRegistration ? { statut: 'NOTIFIE' } : {}),
         },
       })
     })
 
     return NextResponse.json({
-      message: 'Notification enregistree avec succes',
+      message: isFirstRegistration ? 'Notification enregistree avec succes' : 'Notification mise a jour avec succes',
       dossier_id: dossier.id,
-      statut: 'NOTIFIE',
+      statut: isFirstRegistration ? 'NOTIFIE' : dossier.statut,
     })
   } catch (error) {
     console.error("Erreur lors de l'enregistrement de la notification:", error)

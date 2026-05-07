@@ -10,6 +10,13 @@ const STATUS_BY_DECISION = {
   NON_CONVAINCANTE: 'REPONSE_NON_CONVAINCANTE',
 }
 
+// First evaluation from REPONSE_RECUE, plus correction before procedure/closure
+const ALLOWED_EVALUATION_STATUSES = [
+  'REPONSE_RECUE',
+  'REPONSE_CONVAINCANTE',
+  'REPONSE_NON_CONVAINCANTE',
+]
+
 export async function POST(request, { params }) {
   try {
     const currentUser = await getCurrentUser()
@@ -21,10 +28,7 @@ export async function POST(request, { params }) {
     const id = resolvedParams?.id
 
     if (!id || !UUID_PATTERN.test(id)) {
-      return NextResponse.json(
-        { error: 'ID invalide' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'ID invalide' }, { status: 400 })
     }
 
     const body = await request.json()
@@ -60,16 +64,9 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (dossier.statut !== 'REPONSE_RECUE') {
+    if (!ALLOWED_EVALUATION_STATUSES.includes(dossier.statut)) {
       return NextResponse.json(
-        { error: 'La reponse ne peut etre evaluee que pour un dossier avec reponse recue' },
-        { status: 400 }
-      )
-    }
-
-    if (dossier.decision_reponse) {
-      return NextResponse.json(
-        { error: 'La reponse a deja ete evaluee pour ce dossier' },
+        { error: 'La reponse ne peut etre evaluee ou corrigee dans le statut actuel du dossier' },
         { status: 400 }
       )
     }
@@ -82,6 +79,7 @@ export async function POST(request, { params }) {
         decision_reponse,
         statut,
         decision_par_rh_id: currentUser.userId,
+        commentaire_evaluation: commentaire ?? null,
       },
       select: {
         id: true,
@@ -90,10 +88,10 @@ export async function POST(request, { params }) {
       },
     })
 
+    const isCorrection = dossier.statut !== 'REPONSE_RECUE'
+
     return NextResponse.json({
-      message: commentaire
-        ? `Reponse evaluee avec succes. Commentaire: ${commentaire}`
-        : 'Reponse evaluee avec succes',
+      message: isCorrection ? 'Evaluation mise a jour avec succes' : 'Reponse evaluee avec succes',
       dossier_id: updatedDossier.id,
       statut: updatedDossier.statut,
       decision_reponse: updatedDossier.decision_reponse,
