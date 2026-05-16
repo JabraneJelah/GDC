@@ -2,69 +2,92 @@
 
 import { Check } from 'lucide-react'
 
+// Horizontal depth (px) of each chevron arrow/notch
+const A = 13
+
+function chevronClip(isFirst, isLast) {
+  if (isFirst && isLast) return undefined
+  if (isFirst)
+    // rightmost: flat right edge, left-pointing arrow
+    return `polygon(100% 0%, ${A}px 0%, 0% 50%, ${A}px 100%, 100% 100%)`
+  if (isLast)
+    // leftmost: right-side notch, flat left edge
+    return `polygon(calc(100% - ${A}px) 0%, 0% 0%, 0% 100%, calc(100% - ${A}px) 100%, 100% 50%)`
+  // middle: right-side notch + left-pointing arrow
+  return `polygon(calc(100% - ${A}px) 0%, ${A}px 0%, 0% 50%, ${A}px 100%, calc(100% - ${A}px) 100%, 100% 50%)`
+}
+
 export function WorkflowStepper({ steps, currentStepIndex, viewedStepIndex, onStepClick }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white px-2 py-2.5 shadow-sm">
       <div className="overflow-x-auto">
-        <div className="flex min-w-[620px] items-start" dir="rtl">
+        <div className="flex min-w-[560px] gap-0.5" dir="rtl">
           {steps.map((step, index) => {
+            const isFirst     = index === 0
+            const isLast      = index === steps.length - 1
             const isCompleted = index < currentStepIndex
             const isCurrent   = index === currentStepIndex
             const isViewed    = index === viewedStepIndex
             const isClickable = isCompleted || isCurrent
 
+            const clip = chevronClip(isFirst, isLast)
+
+            // Padding accounts for the clipped area on each side
+            const pl = isFirst ? 10 : A + 7
+            const pr = isLast  ? 10 : A + 7
+
+            const bg = isCompleted ? '#ecfdf5'   // emerald-50
+                     : isCurrent   ? '#eff6ff'   // blue-50
+                     :               '#f1f5f9'   // slate-100
+
+            const labelColor = isCompleted ? '#065f46'   // emerald-900
+                             : isCurrent   ? '#1e40af'   // blue-800
+                             :               '#94a3b8'   // slate-400
+
+            const numColor = isCurrent ? '#3b82f6' : '#cbd5e1' // blue-500 / slate-300
+
             return (
-              <div key={step.label} className="flex flex-1 items-start">
-                <button
-                  type="button"
-                  onClick={() => isClickable && onStepClick(index)}
-                  disabled={!isClickable}
-                  className={`group flex min-w-[80px] flex-col items-center text-center ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
+              <button
+                key={step.label}
+                type="button"
+                onClick={() => isClickable && onStepClick(index)}
+                disabled={!isClickable}
+                style={{
+                  clipPath: clip,
+                  paddingLeft: `${pl}px`,
+                  paddingRight: `${pr}px`,
+                  backgroundColor: bg,
+                }}
+                className={[
+                  'group relative flex flex-1 items-center justify-center gap-1.5 py-2.5 transition-[filter]',
+                  isClickable ? 'cursor-pointer hover:brightness-[0.96]' : 'cursor-default',
+                ].join(' ')}
+              >
+                {/* Step icon / number */}
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  {isCompleted ? (
+                    <Check className="size-3.5 stroke-[2.5] text-emerald-500" />
+                  ) : (
+                    <span
+                      style={{ color: numColor }}
+                      className="text-[11px] font-bold tabular-nums leading-none"
+                    >
+                      {index + 1}
+                    </span>
+                  )}
+                </span>
+
+                {/* Step label */}
+                <span
+                  style={{ color: labelColor }}
+                  className={[
+                    'whitespace-nowrap text-[12px] font-semibold leading-none',
+                    isViewed && !isCurrent ? 'underline decoration-dotted underline-offset-2' : '',
+                  ].join(' ')}
                 >
-                  {/* Circle */}
-                  <span
-                    className={`flex size-8 items-center justify-center rounded-full border transition-colors ${
-                      isCompleted
-                        ? 'border-emerald-500 bg-emerald-500 text-white group-hover:border-emerald-600 group-hover:bg-emerald-600'
-                        : isCurrent
-                          ? 'border-blue-600 bg-blue-600 text-white'
-                          : 'border-slate-200 bg-white text-slate-400'
-                    } ${isViewed && !isCurrent ? 'ring-1 ring-blue-300 ring-offset-1' : ''}`}
-                  >
-                    {isCompleted
-                      ? <Check className="size-4 stroke-2" />
-                      : <span className="text-xs font-semibold">{index + 1}</span>
-                    }
-                  </span>
-
-                  {/* Step label */}
-                  <p
-                    className={`mt-2 whitespace-nowrap text-xs font-semibold leading-tight transition-colors ${
-                      isCompleted
-                        ? 'text-slate-600 group-hover:text-emerald-700'
-                        : isCurrent
-                          ? 'text-blue-700'
-                          : 'text-slate-400'
-                    } ${isViewed ? 'underline decoration-dotted underline-offset-2' : ''}`}
-                  >
-                    {step.label}
-                  </p>
-
-                  {/* Step state label */}
-                  <p className={`mt-0.5 text-[11px] leading-tight ${
-                    isCompleted ? 'text-slate-400' : isCurrent ? 'text-blue-400' : 'text-slate-300'
-                  }`}>
-                    {isCompleted ? 'مكتملة' : isCurrent ? 'الحالية' : 'قادمة'}
-                  </p>
-                </button>
-
-                {/* Connector */}
-                {index < steps.length - 1 && (
-                  <div className={`mx-1 mt-4 h-px flex-1 ${
-                    index < currentStepIndex ? 'bg-emerald-300' : 'bg-slate-200'
-                  }`} />
-                )}
-              </div>
+                  {step.label}
+                </span>
+              </button>
             )
           })}
         </div>

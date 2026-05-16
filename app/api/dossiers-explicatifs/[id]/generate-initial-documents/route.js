@@ -243,12 +243,17 @@ export async function POST(_request, { params }) {
 
       for (const generatedDocument of generatedDocuments) {
         const { template, chemin_fichier } = generatedDocument
+        const categorieByUsage = {
+          LETTRE_EXPLICATIVE: 'lettre_explicative',
+          BORDEREAU_NOTIFICATION: 'bordereau_notification',
+        }
         const document = await tx.dossierDocument.create({
           data: {
             identifiant: buildDocumentIdentifiant(template.id, dossier.id),
             titre: template.nom,
             chemin_fichier,
             origine: 'GENERE',
+            categorie: categorieByUsage[template.usage] || null,
             dossier_id: dossier.id,
             template_id: template.id,
             cree_par_rh_id: currentUser.userId,

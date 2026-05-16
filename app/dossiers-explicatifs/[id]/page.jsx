@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -40,6 +41,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Lock,
+  Pencil,
 } from 'lucide-react'
 
 const statusBadgeStyles = {
@@ -58,7 +60,7 @@ const fieldLabelClassName = 'block text-right text-sm font-semibold text-slate-8
 const workflowSteps = [
   { label: 'تسجيل الملف' },
   { label: 'التبليغ' },
-  { label: 'التقييم' },
+  { label: 'الجواب والتقييم' },
   { label: 'المسطرة' },
   { label: 'الإغلاق' },
 ]
@@ -66,7 +68,7 @@ const workflowSteps = [
 const statusStepIndex = {
   ENREGISTRE: 0,
   DOCUMENTS_INITIAUX_GENERES: 1,
-  NOTIFIE: 1,
+  NOTIFIE: 2,
   REPONSE_RECUE: 2,
   REPONSE_CONVAINCANTE: 4,
   REPONSE_NON_CONVAINCANTE: 3,
@@ -159,15 +161,15 @@ function RegistrationSummary({ dossier }) {
   ]
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm font-medium text-slate-700">تم تسجيل الملف بالمعطيات التالية:</p>
-      <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="space-y-4 text-right" dir="rtl">
+      <p className="text-sm font-semibold text-slate-800">تم تسجيل الملف بالمعطيات التالية:</p>
+      <dl className="grid grid-cols-1 gap-x-8 gap-y-0 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
-          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-right">
-            <dt className="text-xs font-medium text-slate-500">{item.label}</dt>
+          <div key={item.label} className="border-b border-slate-100 py-3 text-right last:border-b-0">
+            <dt className="text-sm font-medium text-slate-700">{item.label}</dt>
             <dd
               dir={item.dir}
-              className="mt-1 truncate text-sm font-semibold text-slate-800"
+              className={`mt-1 truncate text-sm text-slate-900 ${item.dir === 'ltr' ? 'text-right font-medium' : ''}`}
             >
               {item.value || '-'}
             </dd>
@@ -262,7 +264,7 @@ export default function DossierExplicatifDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
-  const [actionSuccess, setActionSuccess] = useState('')
+  const [successModal, setSuccessModal] = useState(null)
   const [notificationDate, setNotificationDate] = useState(getTodayInputValue())
   const [notificationProofFile, setNotificationProofFile] = useState(null)
   const [responseDate, setResponseDate] = useState(getTodayInputValue())
@@ -270,13 +272,17 @@ export default function DossierExplicatifDetailPage() {
   const [responseDecision, setResponseDecision] = useState('CONVAINCANTE')
   const [evaluationComment, setEvaluationComment] = useState('')
   const [procedureType, setProcedureType] = useState('AVERTISSEMENT')
-  const [procedureTemplateId, setProcedureTemplateId] = useState('')
   const [initialConfirmOpen, setInitialConfirmOpen] = useState(false)
   const [procedureConfirmOpen, setProcedureConfirmOpen] = useState(false)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [viewedStepIndex, setViewedStepIndex] = useState(0)
+  const [notifEditMode, setNotifEditMode] = useState(false)
+  const [responseEditMode, setResponseEditMode] = useState(false)
+  const [evalEditMode, setEvalEditMode] = useState(false)
+  const [procedureLoading, setProcedureLoading] = useState(false)
+  const [errorModal, setErrorModal] = useState(null)
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
     if (!dossierId) return null
@@ -330,16 +336,6 @@ export default function DossierExplicatifDetailPage() {
     fetchTemplates()
   }, [])
 
-  const activeProcedureTemplates = useMemo(() => {
-    if (!dossier?.type_faute_id || !procedureType) return []
-
-    return templates.filter((template) => (
-      template.actif !== false &&
-      Number(template.type_faute_id) === Number(dossier.type_faute_id) &&
-      template.usage === procedureType
-    ))
-  }, [dossier?.type_faute_id, procedureType, templates])
-
   const activeInitialTemplates = useMemo(() => {
     if (!dossier?.type_faute_id) return []
 
@@ -350,23 +346,6 @@ export default function DossierExplicatifDetailPage() {
     ))
   }, [dossier?.type_faute_id, templates])
 
-  useEffect(() => {
-    const selectedTemplateStillAvailable = activeProcedureTemplates.some((template) => template.id === procedureTemplateId)
-
-    if (selectedTemplateStillAvailable) return
-
-    if (activeProcedureTemplates.length > 0) {
-      setProcedureTemplateId(activeProcedureTemplates[0].id)
-    } else {
-      setProcedureTemplateId('')
-    }
-  }, [activeProcedureTemplates, procedureTemplateId])
-
-  const selectedProcedureTemplate = useMemo(
-    () => activeProcedureTemplates.find((template) => template.id === procedureTemplateId) || null,
-    [activeProcedureTemplates, procedureTemplateId]
-  )
-
   const currentStepIndex = statusStepIndex[dossier?.statut] ?? 0
   const statusColor = getStatusColor(dossier?.statut)
   const statusClassName = statusBadgeStyles[statusColor] || statusBadgeStyles.neutral
@@ -374,7 +353,7 @@ export default function DossierExplicatifDetailPage() {
   const notificationProofDocument = documents.find((document) => document.categorie === 'preuve_notification')
   const responseProofDocument = [...documents].reverse().find((document) => document.categorie === 'reponse_agent')
   const procedureDocuments = documents.filter((document) => document.categorie === 'procedure_suivante')
-  const canGenerateProcedure = dossier?.statut !== 'REPONSE_NON_CONVAINCANTE' || Boolean(selectedProcedureTemplate)
+  const canGenerateProcedure = true
   const canRegisterNotification =
     dossier?.statut !== 'DOCUMENTS_INITIAUX_GENERES' ||
     Boolean(notificationProofDocument) ||
@@ -390,13 +369,6 @@ export default function DossierExplicatifDetailPage() {
     setViewedStepIndex(currentStepIndex)
   }, [currentStepIndex])
 
-  // Auto-dismiss success messages after 2.5 s
-  useEffect(() => {
-    if (!actionSuccess) return
-    const id = setTimeout(() => setActionSuccess(''), 2500)
-    return () => clearTimeout(id)
-  }, [actionSuccess])
-
   // Pre-fill notification date when navigating back to التبليغ step in correction mode
   useEffect(() => {
     if (!dossier) return
@@ -410,32 +382,20 @@ export default function DossierExplicatifDetailPage() {
     setResponseDate(new Date(dossier.date_reponse_recue).toISOString().slice(0, 10))
   }, [dossier?.date_reponse_recue])
 
-  // Pre-fill evaluation decision when navigating back to التقييم step in correction mode
+  // Pre-fill evaluation decision when navigating to الجواب والتقييم step
   useEffect(() => {
     if (!dossier) return
     if (viewedStepIndex === 2 && dossier.decision_reponse) {
       setResponseDecision(dossier.decision_reponse)
-      if (dossier.commentaire_evaluation) setEvaluationComment(dossier.commentaire_evaluation)
     }
   }, [viewedStepIndex, dossier?.id])
 
-  const actionFeedback = (
-    <>
-      {actionError ? (
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
-          <span>{actionError}</span>
-        </div>
-      ) : null}
-
-      {actionSuccess ? (
-        <div className="flex items-start gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-right text-sm text-green-700">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
-          <span>{actionSuccess}</span>
-        </div>
-      ) : null}
-    </>
-  )
+  const actionFeedback = actionError ? (
+    <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
+      <span>{actionError}</span>
+    </div>
+  ) : null
 
   const handleAction = async ({ skipConfirmation = false } = {}) => {
     if (!dossier || actionLoading) return
@@ -446,7 +406,7 @@ export default function DossierExplicatifDetailPage() {
     }
 
     setActionError('')
-    setActionSuccess('')
+    setSuccessModal(null)
 
     try {
       let endpoint = ''
@@ -480,12 +440,8 @@ export default function DossierExplicatifDetailPage() {
         if (evaluationComment.trim()) payload.commentaire = evaluationComment.trim()
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
         if (!procedureType) throw new Error('procedure_type_required')
-        if (!procedureTemplateId) throw new Error('template_required')
         endpoint = 'generate-procedure'
-        payload = {
-          type_procedure: procedureType,
-          template_id: procedureTemplateId,
-        }
+        payload = { type_procedure: procedureType }
       } else if (dossier.statut === 'REPONSE_CONVAINCANTE' || dossier.statut === 'PROCEDURE_SUIVANTE_GENEREE') {
         endpoint = 'close-dossier'
       }
@@ -512,10 +468,7 @@ export default function DossierExplicatifDetailPage() {
         throw new Error(responseBody?.error || (dossier.statut === 'REPONSE_NON_CONVAINCANTE' ? 'procedure_generation_failed' : 'Action failed'))
       }
 
-      setActionSuccess(dossier.statut === 'REPONSE_NON_CONVAINCANTE'
-        ? 'تم إنشاء المسطرة اللاحقة بنجاح'
-        : 'تم تنفيذ العملية بنجاح')
-
+      const prevStatut = dossier.statut
       await fetchDossier({ showLoading: false })
       setInitialConfirmOpen(false)
       setProcedureConfirmOpen(false)
@@ -524,6 +477,23 @@ export default function DossierExplicatifDetailPage() {
       setResponseDate(getTodayInputValue())
       setResponseProofFile(null)
       setEvaluationComment('')
+
+      if (prevStatut === 'ENREGISTRE') {
+        setSuccessModal({ title: 'تم إنشاء الوثائق الأولية', description: 'تم إنشاء وثائق التبليغ بنجاح.', hasNextStep: true })
+      } else if (prevStatut === 'DOCUMENTS_INITIAUX_GENERES') {
+        setSuccessModal({ title: 'تم تسجيل التبليغ بنجاح', description: 'تم حفظ تاريخ التبليغ ووصل الاستلام.', hasNextStep: true })
+      } else if (prevStatut === 'NOTIFIE') {
+        setSuccessModal({ title: 'تم تسجيل الجواب بنجاح', description: 'تم حفظ تاريخ التوصل بالجواب والوثيقة المرفقة. يمكنك الآن تقييم الجواب.', hasNextStep: false })
+      } else if (prevStatut === 'REPONSE_RECUE') {
+        const descr = responseDecision === 'CONVAINCANTE'
+          ? 'الجواب مقنع — يمكنك الانتقال إلى مرحلة الإغلاق المباشر.'
+          : 'الجواب غير مقنع — يمكنك الانتقال إلى مرحلة المسطرة التأديبية.'
+        setSuccessModal({ title: 'تم اعتماد التقييم بنجاح', description: descr, hasNextStep: true })
+      } else if (prevStatut === 'REPONSE_NON_CONVAINCANTE') {
+        setSuccessModal({ title: 'تم إنشاء المسطرة بنجاح', description: 'تم إنشاء وثائق المسطرة اللاحقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
+      } else if (prevStatut === 'REPONSE_CONVAINCANTE' || prevStatut === 'PROCEDURE_SUIVANTE_GENEREE') {
+        setSuccessModal({ title: 'تم إغلاق الملف بنجاح', description: 'تم إغلاق الملف التأديبي.', hasNextStep: true })
+      }
     } catch (actionErrorValue) {
       console.error('Erreur lors de l action du dossier explicatif:', actionErrorValue)
       if (actionErrorValue.message === 'notification_date_required') {
@@ -540,8 +510,6 @@ export default function DossierExplicatifDetailPage() {
         setActionError('صيغة وثيقة الجواب غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX')
       } else if (actionErrorValue.message === 'procedure_type_required') {
         setActionError('المرجو اختيار نوع المسطرة')
-      } else if (actionErrorValue.message === 'template_required') {
-        setActionError('المرجو اختيار نموذج المسطرة')
       } else if (actionErrorValue.message === 'procedure_generation_failed') {
         setActionError('تعذر إنشاء المسطرة اللاحقة')
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
@@ -557,14 +525,12 @@ export default function DossierExplicatifDetailPage() {
   const handlePrimaryActionClick = () => {
     if (dossier?.statut === 'ENREGISTRE') {
       setActionError('')
-      setActionSuccess('')
       setInitialConfirmOpen(true)
       return
     }
 
     if (dossier?.statut === 'REPONSE_NON_CONVAINCANTE') {
       setActionError('')
-      setActionSuccess('')
       setProcedureConfirmOpen(true)
       return
     }
@@ -575,7 +541,7 @@ export default function DossierExplicatifDetailPage() {
   const handleNotificationUpdate = async () => {
     if (!dossier || actionLoading) return
     setActionError('')
-    setActionSuccess('')
+    setSuccessModal(null)
 
     if (!notificationDate) {
       setActionError('المرجو إدخال تاريخ التبليغ')
@@ -603,9 +569,10 @@ export default function DossierExplicatifDetailPage() {
         throw new Error(responseBody?.error || 'update failed')
       }
 
-      setActionSuccess('تم تحديث التبليغ بنجاح')
       setNotificationProofFile(null)
+      setNotifEditMode(false)
       await fetchDossier({ showLoading: false })
+      setSuccessModal({ title: 'تم تحديث التبليغ بنجاح', description: 'تم حفظ التعديلات على بيانات التبليغ.', hasNextStep: false })
     } catch (err) {
       setActionError(translateApiError(err.message, dossier.statut))
     } finally {
@@ -616,7 +583,7 @@ export default function DossierExplicatifDetailPage() {
   const handleResponseUpdate = async () => {
     if (!dossier || actionLoading) return
     setActionError('')
-    setActionSuccess('')
+    setSuccessModal(null)
 
     if (!responseDate) {
       setActionError('المرجو إدخال تاريخ التوصل بالجواب')
@@ -649,9 +616,10 @@ export default function DossierExplicatifDetailPage() {
         throw new Error(responseBody?.error || 'update failed')
       }
 
-      setActionSuccess(dossier.statut === 'NOTIFIE' ? 'تم تسجيل الجواب بنجاح' : 'تم تحديث الجواب بنجاح')
       setResponseProofFile(null)
+      setResponseEditMode(false)
       await fetchDossier({ showLoading: false })
+      setSuccessModal({ title: 'تم تحديث الجواب بنجاح', description: 'تم حفظ التعديلات على بيانات الجواب.', hasNextStep: false })
     } catch (err) {
       setActionError(translateApiError(err.message, dossier.statut))
     } finally {
@@ -662,7 +630,7 @@ export default function DossierExplicatifDetailPage() {
   const handleEvaluationUpdate = async () => {
     if (!dossier || actionLoading) return
     setActionError('')
-    setActionSuccess('')
+    setSuccessModal(null)
     setActionLoading(true)
 
     try {
@@ -680,12 +648,60 @@ export default function DossierExplicatifDetailPage() {
         throw new Error(responseBody?.error || 'update failed')
       }
 
-      setActionSuccess('تم تحديث التقييم بنجاح')
+      setEvalEditMode(false)
       await fetchDossier({ showLoading: false })
+      setSuccessModal({ title: 'تم تحديث التقييم بنجاح', description: 'تم حفظ قرار التقييم الجديد.', hasNextStep: false })
     } catch (err) {
       setActionError(translateApiError(err.message, dossier.statut))
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleGenerateProcedureFromEval = async () => {
+    if (!dossier || procedureLoading) return
+    setProcedureLoading(true)
+    setSuccessModal(null)
+    setErrorModal(null)
+
+    try {
+      const response = await fetch(`/api/dossiers-explicatifs/${dossierId}/generate-procedure`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type_procedure: procedureType }),
+      })
+
+      const responseBody = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const errorMsg = responseBody?.error || ''
+        if (errorMsg.includes('لا يوجد نموذج')) {
+          setErrorModal({
+            title: 'النموذج غير متوفر',
+            description: 'لا يوجد نموذج خاص باستكمال المسطرة التأديبية لهذا النوع من المخالفة. يرجى إضافته من صفحة نماذج الوثائق.',
+          })
+        } else {
+          setErrorModal({
+            title: 'تعذر إنشاء الطلب',
+            description: errorMsg || 'حدث خطأ أثناء إنشاء طلب المسطرة التأديبية.',
+          })
+        }
+        return
+      }
+
+      await fetchDossier({ showLoading: false })
+      setSuccessModal({
+        title: 'تم إنشاء طلب استكمال المسطرة التأديبية',
+        description: 'تم توليد الوثيقة وإضافتها إلى الوثائق المرتبطة بالملف.',
+        hasNextStep: true,
+      })
+    } catch {
+      setErrorModal({
+        title: 'تعذر إنشاء الطلب',
+        description: 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+      })
+    } finally {
+      setProcedureLoading(false)
     }
   }
 
@@ -698,8 +714,8 @@ export default function DossierExplicatifDetailPage() {
       const body = await res.json().catch(() => null)
       if (!res.ok) throw new Error(body?.error || 'archive failed')
       setArchiveConfirmOpen(false)
-      setActionSuccess('تم أرشفة الملف بنجاح')
       await fetchDossier({ showLoading: false })
+      setSuccessModal({ title: 'تم أرشفة الملف بنجاح', description: 'تم أرشفة الملف التأديبي نهائياً.', hasNextStep: false })
     } catch (err) {
       setArchiveError(
         err.message?.includes('deja archive') ? 'هذا الملف مؤرشف مسبقا' : 'تعذر أرشفة الملف، حاول مرة أخرى'
@@ -797,107 +813,15 @@ export default function DossierExplicatifDetailPage() {
       )
     }
 
-    if (dossier.statut === 'DOCUMENTS_INITIAUX_GENERES') {
+    if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
       return (
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="date_notification" className={fieldLabelClassName}>تاريخ التبليغ</Label>
-              <Input
-                id="date_notification"
-                type="date"
-                value={notificationDate}
-                onChange={(event) => {
-                  setNotificationDate(event.target.value)
-                  setActionError('')
-                }}
-                className={editableInputClassName}
-                disabled={actionLoading}
-              />
-            </div>
-            <div>
-              <UploadField
-                id="notification_proof"
-                label="وصل الاستلام"
-                accept="application/pdf,image/jpeg,image/png"
-                selectedFile={notificationProofFile}
-                onChange={(event) => {
-                  setNotificationProofFile(event.target.files?.[0] || null)
-                  setActionError('')
-                }}
-                helperText="PDF أو JPG أو PNG"
-                disabled={actionLoading}
-              />
-            </div>
-          </div>
-          {actionFeedback}
-          <Button
-            type="button"
-            onClick={handlePrimaryActionClick}
-            disabled={actionLoading || !canRunCurrentAction}
-            className="w-full sm:w-auto"
-          >
-            {actionLoading ? 'جاري التنفيذ...' : 'تسجيل التبليغ'}
-          </Button>
-        </div>
-      )
-    }
-
-    if (dossier.statut === 'NOTIFIE') {
-      return (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="date_reponse" className={fieldLabelClassName}>تاريخ التوصل بالجواب</Label>
-              <Input
-                id="date_reponse"
-                type="date"
-                value={responseDate}
-                onChange={(event) => {
-                  setResponseDate(event.target.value)
-                  setActionError('')
-                }}
-                className={editableInputClassName}
-                disabled={actionLoading}
-              />
-            </div>
-            <div>
-              <UploadField
-                id="response_document"
-                label="وثيقة الجواب"
-                accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
-                selectedFile={responseProofFile}
-                onChange={(event) => {
-                  setResponseProofFile(event.target.files?.[0] || null)
-                  setActionError('')
-                }}
-                helperText="PDF أو JPG أو PNG أو DOCX"
-                disabled={actionLoading}
-              />
-            </div>
-          </div>
-          {actionFeedback}
-          <Button
-            type="button"
-            onClick={handlePrimaryActionClick}
-            disabled={actionLoading || !canRunCurrentAction}
-            className="w-full sm:w-auto"
-          >
-            {actionLoading ? 'جاري التنفيذ...' : 'تسجيل الجواب'}
-          </Button>
-        </div>
-      )
-    }
-
-    if (dossier.statut === 'REPONSE_RECUE') {
-      return (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className={fieldLabelClassName}>تقييم الجواب</Label>
+          <div className="max-w-xs space-y-2">
+            <Label className={fieldLabelClassName}>نوع المسطرة</Label>
             <Select
-              value={responseDecision}
+              value={procedureType}
               onValueChange={(value) => {
-                setResponseDecision(value)
+                setProcedureType(value)
                 setActionError('')
               }}
               disabled={actionLoading}
@@ -906,111 +830,19 @@ export default function DossierExplicatifDetailPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CONVAINCANTE">الجواب مقنع</SelectItem>
-                <SelectItem value="NON_CONVAINCANTE">غير مقنع</SelectItem>
+                <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
+                <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="commentaire_evaluation" className={fieldLabelClassName}>ملاحظة اختيارية</Label>
-            <textarea
-              id="commentaire_evaluation"
-              value={evaluationComment}
-              onChange={(event) => {
-                setEvaluationComment(event.target.value)
-                setActionError('')
-              }}
-              className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-500 focus-visible:border-blue-500 focus-visible:ring-[3px] focus-visible:ring-blue-500/20"
-              disabled={actionLoading}
-            />
-          </div>
           {actionFeedback}
           <Button
             type="button"
             onClick={handlePrimaryActionClick}
-            disabled={actionLoading || !canRunCurrentAction}
+            disabled={actionLoading}
             className="w-full sm:w-auto"
           >
-            {actionLoading ? 'جاري التنفيذ...' : 'اعتماد التقييم'}
-          </Button>
-        </div>
-      )
-    }
-
-    if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
-      return (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label className={fieldLabelClassName}>نوع المسطرة</Label>
-              <Select
-                value={procedureType}
-                onValueChange={(value) => {
-                  setProcedureType(value)
-                  setActionError('')
-                }}
-                disabled={actionLoading}
-              >
-                <SelectTrigger className={selectTriggerClassName}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
-                  <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className={fieldLabelClassName}>نموذج المسطرة</Label>
-              {activeProcedureTemplates.length === 1 ? (
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-right text-sm font-medium text-slate-800">
-                  {activeProcedureTemplates[0].nom}
-                </div>
-              ) : null}
-              {activeProcedureTemplates.length > 1 ? (
-                <Select
-                  value={procedureTemplateId}
-                  onValueChange={(value) => {
-                    setProcedureTemplateId(value)
-                    setActionError('')
-                  }}
-                  disabled={actionLoading}
-                >
-                  <SelectTrigger className={selectTriggerClassName}>
-                    <SelectValue placeholder="اختر النموذج" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeProcedureTemplates.map((template) => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
-              {activeProcedureTemplates.length === 0 ? (
-                <p className="text-sm text-amber-700">لا يوجد نموذج نشط مرتبط بنفس نوع المخالفة ونوع المسطرة المختارة</p>
-              ) : (
-                <p className="text-xs font-medium text-slate-500">
-                  يتم عرض النماذج النشطة المرتبطة بنفس نوع المخالفة ونوع المسطرة المختارة
-                </p>
-              )}
-            </div>
-          </div>
-          {selectedProcedureTemplate ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-right">
-              <p className="text-sm font-semibold text-slate-800">النموذج الذي سيتم إنشاؤه: {selectedProcedureTemplate.nom}</p>
-              <p className="mt-1 text-xs text-slate-500">نوع المخالفة: {getTypeFauteLabel(dossier.type_faute) || '-'}</p>
-            </div>
-          ) : null}
-          {actionFeedback}
-          <Button
-            type="button"
-            onClick={handlePrimaryActionClick}
-            disabled={actionLoading || !canRunCurrentAction}
-            className="w-full sm:w-auto"
-          >
-            {actionLoading ? 'جاري إنشاء المسطرة...' : 'إنشاء المسطرة'}
+            {actionLoading ? 'جاري الإنشاء...' : 'إنشاء طلب استكمال المسطرة التأديبية'}
           </Button>
         </div>
       )
@@ -1082,20 +914,43 @@ export default function DossierExplicatifDetailPage() {
       case 2:
         return (
           <div className="space-y-4">
+            <div className="space-y-3">
+              {dossier.date_reponse_recue ? (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                  <div className="shrink-0 rounded-lg bg-white p-2 shadow-sm">
+                    <Calendar className="size-4 text-slate-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">تاريخ التوصل بالجواب</p>
+                    <p className="mt-0.5 text-sm font-semibold text-slate-800">{formatDate(dossier.date_reponse_recue)}</p>
+                  </div>
+                </div>
+              ) : null}
+              {responseProofDocument ? (
+                <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <FileText className="size-4 shrink-0 text-slate-500" />
+                  <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(responseProofDocument)}</span>
+                  {isDocumentReady(responseProofDocument) ? (
+                    <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                      <Download className="size-3" />
+                      تحميل
+                    </a>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600">لا يوجد وثيقة جواب مرفوعة</p>
+              )}
+            </div>
             {dossier.decision_reponse ? (
-              <div className={`flex items-center gap-3 rounded-xl border px-5 py-4 text-right ${
+              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-right ${
                 dossier.decision_reponse === 'CONVAINCANTE'
                   ? 'border-green-200 bg-green-50'
                   : 'border-amber-200 bg-amber-50'
               }`}>
-                <div className={`shrink-0 rounded-full p-1.5 ${
-                  dossier.decision_reponse === 'CONVAINCANTE' ? 'bg-green-100' : 'bg-amber-100'
-                }`}>
-                  {dossier.decision_reponse === 'CONVAINCANTE'
-                    ? <CheckCircle2 className="size-5 text-green-600" />
-                    : <AlertTriangle className="size-5 text-amber-600" />
-                  }
-                </div>
+                {dossier.decision_reponse === 'CONVAINCANTE'
+                  ? <CheckCircle2 className="size-5 shrink-0 text-green-600" />
+                  : <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+                }
                 <div>
                   <p className="text-xs text-slate-500">قرار التقييم</p>
                   <p className={`mt-0.5 text-sm font-bold ${
@@ -1104,12 +959,6 @@ export default function DossierExplicatifDetailPage() {
                     {dossier.decision_reponse === 'CONVAINCANTE' ? 'الجواب مقنع' : 'الجواب غير مقنع'}
                   </p>
                 </div>
-              </div>
-            ) : null}
-            {dossier.commentaire_evaluation ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-                <p className="text-xs text-slate-500">ملاحظة</p>
-                <p className="mt-1 leading-relaxed text-sm text-slate-700">{dossier.commentaire_evaluation}</p>
               </div>
             ) : null}
           </div>
@@ -1185,7 +1034,7 @@ export default function DossierExplicatifDetailPage() {
     }
   }
 
-  // Secondary context panel for each viewed step
+  // Secondary context panel for each viewed step (steps 3-5 only)
   const renderStepContext = (stepIndex) => {
     if (!dossier) return null
 
@@ -1207,136 +1056,11 @@ export default function DossierExplicatifDetailPage() {
 
     switch (stepIndex) {
       case 0:
+      case 1:
+      case 2:
         return null
 
-      case 1: {
-        const hasNotif = Boolean(dossier.date_notification)
-        const notifIsCurrent = !hasNotif && currentStepIndex === 1
-        return (
-          <ContextPanel
-            title="التبليغ"
-            statusColor={hasNotif ? 'green' : notifIsCurrent ? 'blue' : 'slate'}
-            statusLabel={hasNotif ? 'مكتملة' : notifIsCurrent ? 'الحالية' : 'مقبل'}
-          >
-            {hasNotif ? (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <Calendar className="size-3.5 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-xs text-slate-500">تاريخ التبليغ</p>
-                    <p className="text-sm font-semibold text-slate-800">{formatDate(dossier.date_notification)}</p>
-                  </div>
-                </div>
-                {notificationProofDocument ? docRow(notificationProofDocument) : null}
-              </div>
-            ) : notifIsCurrent ? (
-              <p className="text-sm text-slate-500">في انتظار تسجيل التبليغ وتحميل وصل الاستلام</p>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Lock className="size-4 shrink-0" />
-                <span>تُكمل بعد إنشاء الوثائق الأولية</span>
-              </div>
-            )}
-          </ContextPanel>
-        )
-      }
-
-      case 2: {
-        const hasResponse = Boolean(dossier.date_reponse_recue)
-        const responseIsCurrent = !hasResponse && currentStepIndex === 2
-        return (
-          <ContextPanel
-            title="الجواب"
-            statusColor={hasResponse ? 'green' : responseIsCurrent ? 'amber' : 'slate'}
-            statusLabel={hasResponse ? 'مكتملة' : responseIsCurrent ? 'في الانتظار' : 'مقبل'}
-          >
-            {hasResponse ? (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <Calendar className="size-3.5 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-xs text-slate-500">تاريخ التوصل بالجواب</p>
-                    <p className="text-sm font-semibold text-slate-800">{formatDate(dossier.date_reponse_recue)}</p>
-                  </div>
-                </div>
-                {responseProofDocument ? docRow(responseProofDocument) : null}
-              </div>
-            ) : responseIsCurrent ? (
-              <p className="text-sm text-slate-500">في انتظار تسجيل جواب المعني بالأمر</p>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Lock className="size-4 shrink-0" />
-                <span>تُكمل بعد تسجيل التبليغ</span>
-              </div>
-            )}
-          </ContextPanel>
-        )
-      }
-
       case 3: {
-        const hasDecision = Boolean(dossier.decision_reponse)
-        const isConvincing = dossier.decision_reponse === 'CONVAINCANTE'
-        const hasProcedure = procedureDocuments.length > 0
-        const isClosed = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
-
-        if (!hasDecision) {
-          return (
-            <ContextPanel title="الخطوة التالية" statusColor="slate" statusLabel="مقبل">
-              <p className="mb-2 text-xs text-slate-500">تتحدد الخطوة التالية بناءً على قرار التقييم:</p>
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 rounded-lg border border-green-100 bg-green-50/60 px-3 py-2">
-                  <CheckCircle2 className="size-3.5 shrink-0 text-green-600" />
-                  <span className="text-xs text-green-700">جواب مقنع ← إغلاق مباشر</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2">
-                  <AlertTriangle className="size-3.5 shrink-0 text-amber-600" />
-                  <span className="text-xs text-amber-700">غير مقنع ← مسطرة تأديبية</span>
-                </div>
-              </div>
-            </ContextPanel>
-          )
-        }
-
-        if (isConvincing) {
-          return (
-            <ContextPanel
-              title="الإغلاق المباشر"
-              statusColor={isClosed ? 'green' : 'amber'}
-              statusLabel={isClosed ? 'مكتملة' : 'جاهز'}
-            >
-              {isClosed ? (
-                <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-green-600" />
-                  <div>
-                    <p className="text-xs text-slate-500">تاريخ الإغلاق</p>
-                    <p className="text-sm font-semibold text-green-800">{formatDate(dossier.date_cloture) || '-'}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">الجواب مقنع — يمكن إغلاق الملف مباشرة دون مسطرة</p>
-              )}
-            </ContextPanel>
-          )
-        }
-
-        return (
-          <ContextPanel
-            title="المسطرة اللاحقة"
-            statusColor={hasProcedure ? 'green' : currentStepIndex === 3 ? 'blue' : 'amber'}
-            statusLabel={hasProcedure ? 'مكتملة' : currentStepIndex === 3 ? 'الحالية' : 'في الانتظار'}
-          >
-            {hasProcedure ? (
-              <div className="space-y-1.5">{procedureDocuments.map(docRow)}</div>
-            ) : (
-              <p className="text-sm text-slate-500">
-                {currentStepIndex === 3 ? 'في انتظار إنشاء وثيقة المسطرة اللاحقة' : 'الجواب غير مقنع — يتطلب مسطرة تأديبية'}
-              </p>
-            )}
-          </ContextPanel>
-        )
-      }
-
-      case 4: {
         const isClosed = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
         const closureIsCurrent = !isClosed && currentStepIndex === 4
         return (
@@ -1365,7 +1089,7 @@ export default function DossierExplicatifDetailPage() {
         )
       }
 
-      case 5: {
+      case 4: {
         if (dossier.statut === 'CLOTURE') {
           return (
             <ContextPanel title="الأرشفة" statusColor="slate" statusLabel="في الانتظار">
@@ -1401,222 +1125,401 @@ export default function DossierExplicatifDetailPage() {
     }
   }
 
-  // Two-card paired layout for التبليغ + الجواب when step 2 is selected
-  const renderNotifResponseLayout = () => {
+  // التبليغ step: display mode by default, switches to edit mode via pencil icon
+  const renderNotificationStep = () => {
     if (!dossier) return null
 
-    const NOTIF_FINAL_STATUSES = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE']
-    const notifIsFinal = NOTIF_FINAL_STATUSES.includes(dossier.statut)
-    const notifIsActive = dossier.statut === 'DOCUMENTS_INITIAUX_GENERES'
-    const notifIsCompleted = !['ENREGISTRE', 'DOCUMENTS_INITIAUX_GENERES'].includes(dossier.statut)
-    const notifIsEditable = notifIsCompleted && !notifIsFinal
-    const responseIsActive = dossier.statut === 'NOTIFIE'
-    const responseCanEdit = ['NOTIFIE', 'REPONSE_RECUE', 'REPONSE_CONVAINCANTE', 'REPONSE_NON_CONVAINCANTE'].includes(dossier.statut)
-    const responseDisabled = !responseCanEdit
+    const isFinal = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
+    const hasData = Boolean(dossier.date_notification)
+    const isFirstReg = dossier.statut === 'DOCUMENTS_INITIAUX_GENERES'
+    const canEdit = hasData && !isFinal
+    const showForm = isFirstReg || notifEditMode
 
-    let notifCardContent
-
-    if (notifIsFinal) {
-      notifCardContent = renderCompletedStepContent(2)
-    } else if (notifIsEditable) {
-      notifCardContent = (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="notif_date_paired" className={fieldLabelClassName}>تاريخ التبليغ</Label>
-            <Input
-              id="notif_date_paired"
-              type="date"
-              value={notificationDate}
-              onChange={(event) => { setNotificationDate(event.target.value); setActionError('') }}
-              className={editableInputClassName}
-              disabled={actionLoading}
-            />
+    if (!showForm && hasData) {
+      return (
+        <div dir="rtl">
+          <div className="flex items-start justify-between gap-4">
+            <dl className="flex-1 text-right">
+              <div className="border-b border-slate-100 py-3">
+                <dt className="text-sm font-medium text-slate-700">تاريخ التبليغ</dt>
+                <dd className="mt-1 text-sm text-slate-900">{formatDate(dossier.date_notification) || '-'}</dd>
+              </div>
+              <div className="py-3">
+                <dt className="text-sm font-medium text-slate-700">وصل الاستلام</dt>
+                <dd className="mt-1 text-sm text-slate-900">
+                  {notificationProofDocument ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="truncate">{getDocumentName(notificationProofDocument)}</span>
+                      {isDocumentReady(notificationProofDocument) ? (
+                        <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800">
+                          تحميل
+                        </a>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">لا يوجد وصل مرفوع</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setNotifEditMode(true)}
+                title="تعديل التبليغ"
+                className="mt-3 flex cursor-pointer shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900"
+              >
+                <Pencil className="size-3.5" />
+                تعديل
+              </button>
+            ) : null}
           </div>
-          <UploadField
-            id="notif_proof_paired"
-            label="وصل الاستلام (اختياري للتحديث)"
-            accept="application/pdf,image/jpeg,image/png"
-            selectedFile={notificationProofFile}
-            onChange={(event) => { setNotificationProofFile(event.target.files?.[0] || null); setActionError('') }}
-            helperText="اترك فارغا للإبقاء على الملف الحالي"
-            disabled={actionLoading}
-          />
-          {notificationProofDocument ? (
-            <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <FileText className="size-4 shrink-0 text-slate-400" />
-              <span className="flex-1 truncate text-sm text-slate-600">{getDocumentName(notificationProofDocument)}</span>
-              {isDocumentReady(notificationProofDocument) ? (
-                <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
-                  <Download className="size-3" />
-                  تحميل
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-          <Button
-            type="button"
-            onClick={handleNotificationUpdate}
-            disabled={actionLoading}
-            className="w-full"
-          >
-            {actionLoading ? 'جاري الحفظ...' : 'تحديث التبليغ'}
-          </Button>
-        </div>
-      )
-    } else {
-      notifCardContent = (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="notif_date_paired" className={fieldLabelClassName}>تاريخ التبليغ</Label>
-            <Input
-              id="notif_date_paired"
-              type="date"
-              value={notificationDate}
-              onChange={(event) => { setNotificationDate(event.target.value); setActionError('') }}
-              className={editableInputClassName}
-              disabled={actionLoading || !notifIsActive}
-            />
-          </div>
-          <UploadField
-            id="notif_proof_paired"
-            label="وصل الاستلام"
-            accept="application/pdf,image/jpeg,image/png"
-            selectedFile={notificationProofFile}
-            onChange={(event) => { setNotificationProofFile(event.target.files?.[0] || null); setActionError('') }}
-            helperText="PDF أو JPG أو PNG"
-            disabled={actionLoading || !notifIsActive}
-          />
-          {notifIsActive ? (
-            <Button
-              type="button"
-              onClick={handlePrimaryActionClick}
-              disabled={actionLoading || !canRunCurrentAction}
-              className="w-full"
-            >
-              {actionLoading ? 'جاري التنفيذ...' : 'تسجيل التبليغ'}
-            </Button>
-          ) : null}
+          {actionFeedback}
         </div>
       )
     }
 
-    const responseCardContent = (
-      <div className="space-y-4">
+    return (
+      <div className="max-w-xl space-y-5" dir="rtl">
         <div className="space-y-2">
-          <Label htmlFor="resp_date_paired" className={fieldLabelClassName}>تاريخ التوصل بالجواب</Label>
+          <Label htmlFor="notif_date" className={fieldLabelClassName}>تاريخ التبليغ</Label>
           <Input
-            id="resp_date_paired"
+            id="notif_date"
             type="date"
-            value={responseDate}
-            onChange={(event) => { setResponseDate(event.target.value); setActionError('') }}
+            value={notificationDate}
+            onChange={(event) => { setNotificationDate(event.target.value); setActionError('') }}
             className={editableInputClassName}
-            disabled={actionLoading || responseDisabled}
+            disabled={actionLoading}
           />
         </div>
         <UploadField
-          id="resp_doc_paired"
-          label={responseProofDocument ? 'وثيقة الجواب (اختيارية للتحديث)' : 'وثيقة الجواب'}
-          accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
-          selectedFile={responseProofFile}
-          onChange={(event) => { setResponseProofFile(event.target.files?.[0] || null); setActionError('') }}
-          helperText={responseProofDocument ? 'اترك فارغا للإبقاء على الملف الحالي' : 'PDF أو JPG أو PNG أو DOCX'}
-          disabled={actionLoading || responseDisabled}
+          id="notif_proof"
+          label={notifEditMode ? 'وصل الاستلام (اختياري للتحديث)' : 'وصل الاستلام'}
+          accept="application/pdf,image/jpeg,image/png"
+          selectedFile={notificationProofFile}
+          onChange={(event) => { setNotificationProofFile(event.target.files?.[0] || null); setActionError('') }}
+          helperText={notifEditMode ? 'اترك فارغاً للإبقاء على الملف الحالي' : 'PDF أو JPG أو PNG'}
+          disabled={actionLoading}
         />
-        {responseProofDocument ? (
-          <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-            <FileText className="size-4 shrink-0 text-slate-500" />
-            <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(responseProofDocument)}</span>
-            {isDocumentReady(responseProofDocument) ? (
-              <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+        {notifEditMode && notificationProofDocument ? (
+          <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+            <FileText className="size-4 shrink-0 text-slate-400" />
+            <span className="flex-1 truncate text-sm text-slate-600">{getDocumentName(notificationProofDocument)}</span>
+            {isDocumentReady(notificationProofDocument) ? (
+              <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
                 <Download className="size-3" />
                 تحميل
               </a>
             ) : null}
           </div>
         ) : null}
-        <Button
-          type="button"
-          onClick={handleResponseUpdate}
-          disabled={actionLoading || responseDisabled || !canRunCurrentAction}
-          className="w-full"
-        >
-          {actionLoading && responseCanEdit
-            ? 'جاري التنفيذ...'
-            : responseProofDocument || dossier.date_reponse_recue ? 'تحديث الجواب' : 'تسجيل الجواب'}
-        </Button>
-      </div>
-    )
-
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 border-b border-slate-100 pb-3 text-right">
-              <h3 className="text-sm font-bold text-slate-800">التبليغ</h3>
-            </div>
-            {notifCardContent}
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 border-b border-slate-100 pb-3 text-right">
-              <h3 className="text-sm font-bold text-slate-800">الجواب</h3>
-            </div>
-            {responseCardContent}
-          </div>
-        </div>
         {actionFeedback}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            onClick={notifEditMode ? handleNotificationUpdate : handlePrimaryActionClick}
+            disabled={actionLoading || (!notifEditMode && !canRunCurrentAction)}
+            className="sm:w-auto"
+          >
+            {actionLoading ? 'جاري الحفظ...' : notifEditMode ? 'تحديث التبليغ' : 'تسجيل التبليغ'}
+          </Button>
+          {notifEditMode ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setNotifEditMode(false); setActionError(''); setSuccessModal(null) }}
+              disabled={actionLoading}
+              className="sm:w-auto"
+            >
+              إلغاء
+            </Button>
+          ) : null}
+        </div>
       </div>
     )
   }
 
-  // Editable correction layout for التقييم step when evaluation can be corrected
-  const renderEvaluationCorrectionLayout = () => {
+  // الجواب والتقييم combined step
+  const renderResponseAndEvaluationStep = () => {
     if (!dossier) return null
 
+    const isFinal = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
+    const hasResponseData = Boolean(dossier.date_reponse_recue)
+    const isFirstResponseReg = dossier.statut === 'NOTIFIE'
+    const responseEditableStatuses = ['NOTIFIE', 'REPONSE_RECUE', 'REPONSE_CONVAINCANTE', 'REPONSE_NON_CONVAINCANTE', 'PROCEDURE_SUIVANTE_GENEREE']
+    const canEditResponse = hasResponseData && !isFinal && responseEditableStatuses.includes(dossier.statut)
+    const isResponseLocked = !hasResponseData && !isFirstResponseReg
+    const showResponseForm = isFirstResponseReg || responseEditMode
+
+    const evalAllowedStatuses = ['REPONSE_RECUE', 'REPONSE_CONVAINCANTE', 'REPONSE_NON_CONVAINCANTE', 'PROCEDURE_SUIVANTE_GENEREE']
+    const hasEvalData = Boolean(dossier.decision_reponse)
+    const evalReady = hasResponseData && Boolean(responseProofDocument)
+    const canEval = evalReady && evalAllowedStatuses.includes(dossier.statut) && !isFinal
+    const canEditEval = hasEvalData && !isFinal && evalAllowedStatuses.includes(dossier.statut)
+    const showEvalForm = canEval && (!hasEvalData || evalEditMode)
+
+    const block = 'overflow-hidden rounded-xl border border-slate-200 bg-white'
+    const blockHeader = 'flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/60 px-5 py-3.5'
+    const blockBody = 'px-5 py-4'
+    const editBtn = 'flex cursor-pointer shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900'
+
     return (
-      <div className="grid gap-5 xl:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 border-b border-slate-100 pb-3 text-right">
-            <h3 className="text-sm font-bold text-slate-800">تحديث التقييم</h3>
+      <div className="space-y-3" dir="rtl">
+
+        {/* ═══ Block 1: الجواب ═══ */}
+        <div className={block}>
+          <div className={blockHeader}>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">الجواب</p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {isResponseLocked
+                  ? 'في انتظار تسجيل التبليغ'
+                  : showResponseForm
+                    ? (responseEditMode ? 'تعديل بيانات الجواب المسجل' : 'سجّل تاريخ التوصل والوثيقة المرفقة')
+                    : 'معلومات الجواب المرفوع من طرف المعني بالأمر'}
+              </p>
+            </div>
+            {canEditResponse && !showResponseForm ? (
+              <button type="button" onClick={() => setResponseEditMode(true)} className={editBtn}>
+                <Pencil className="size-3.5" />
+                تعديل
+              </button>
+            ) : null}
           </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className={fieldLabelClassName}>تقييم الجواب</Label>
-              <Select
-                value={responseDecision}
-                onValueChange={(value) => { setResponseDecision(value); setActionError('') }}
-                disabled={actionLoading}
-              >
-                <SelectTrigger className={selectTriggerClassName}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CONVAINCANTE">الجواب مقنع</SelectItem>
-                  <SelectItem value="NON_CONVAINCANTE">غير مقنع</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="commentaire_correction" className={fieldLabelClassName}>ملاحظة اختيارية</Label>
-              <textarea
-                id="commentaire_correction"
-                value={evaluationComment}
-                onChange={(event) => { setEvaluationComment(event.target.value); setActionError('') }}
-                className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 shadow-sm outline-none transition-colors placeholder:text-slate-500 focus-visible:border-blue-500 focus-visible:ring-[3px] focus-visible:ring-blue-500/20"
-                disabled={actionLoading}
-              />
-            </div>
-            {actionFeedback}
-            <Button
-              type="button"
-              onClick={handleEvaluationUpdate}
-              disabled={actionLoading}
-              className="w-full sm:w-auto"
-            >
-              {actionLoading ? 'جاري الحفظ...' : 'حفظ التعديلات'}
-            </Button>
+          <div className={blockBody}>
+            {isResponseLocked ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Lock className="size-4 shrink-0" />
+                <span>تُكمل بعد تسجيل التبليغ</span>
+              </div>
+            ) : !showResponseForm && hasResponseData ? (
+              <div>
+                <dl className="divide-y divide-slate-50 text-sm">
+                  <div className="flex items-center justify-between gap-6 py-2.5">
+                    <dt className="shrink-0 text-xs font-medium text-slate-400">تاريخ التوصل بالجواب</dt>
+                    <dd className="font-semibold text-slate-900">{formatDate(dossier.date_reponse_recue) || '—'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-6 py-2.5">
+                    <dt className="shrink-0 text-xs font-medium text-slate-400">وثيقة الجواب</dt>
+                    <dd className="flex min-w-0 items-center gap-2">
+                      {responseProofDocument ? (
+                        <>
+                          <FileText className="size-3.5 shrink-0 text-slate-400" />
+                          <span className="max-w-[180px] truncate font-semibold text-slate-900">{getDocumentName(responseProofDocument)}</span>
+                          {isDocumentReady(responseProofDocument) ? (
+                            <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800">
+                              <Download className="size-3.5" />
+                            </a>
+                          ) : null}
+                        </>
+                      ) : (
+                        <span className="text-slate-400">لا يوجد وثيقة مرفوعة</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                {!evalEditMode && actionFeedback}
+              </div>
+            ) : (
+              <div className="max-w-lg space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="resp_date" className={fieldLabelClassName}>تاريخ التوصل بالجواب</Label>
+                  <Input
+                    id="resp_date"
+                    type="date"
+                    value={responseDate}
+                    onChange={(event) => { setResponseDate(event.target.value); setActionError('') }}
+                    className={editableInputClassName}
+                    disabled={actionLoading}
+                  />
+                </div>
+                <UploadField
+                  id="resp_doc"
+                  label={responseEditMode ? 'وثيقة الجواب (اختيارية للتحديث)' : 'وثيقة الجواب'}
+                  accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+                  selectedFile={responseProofFile}
+                  onChange={(event) => { setResponseProofFile(event.target.files?.[0] || null); setActionError('') }}
+                  helperText={responseEditMode ? 'اترك فارغاً للإبقاء على الملف الحالي' : 'PDF أو JPG أو PNG أو DOCX'}
+                  disabled={actionLoading}
+                />
+                {responseEditMode && responseProofDocument ? (
+                  <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+                    <FileText className="size-4 shrink-0 text-slate-400" />
+                    <span className="flex-1 truncate text-sm text-slate-600">{getDocumentName(responseProofDocument)}</span>
+                    {isDocumentReady(responseProofDocument) ? (
+                      <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                        <Download className="size-3" />
+                        تحميل
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+                {actionFeedback}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    onClick={responseEditMode ? handleResponseUpdate : handlePrimaryActionClick}
+                    disabled={actionLoading || (!responseEditMode && !canRunCurrentAction)}
+                    className="sm:w-auto"
+                  >
+                    {actionLoading ? 'جاري الحفظ...' : responseEditMode ? 'تحديث الجواب' : 'تسجيل الجواب'}
+                  </Button>
+                  {responseEditMode ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { setResponseEditMode(false); setActionError(''); setSuccessModal(null) }}
+                      disabled={actionLoading}
+                      className="sm:w-auto"
+                    >
+                      إلغاء
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        {renderStepContext(3)}
+
+        {/* ═══ Block 2: التقييم ═══ */}
+        <div className={block}>
+          <div className={blockHeader}>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">التقييم</p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {!evalReady
+                  ? 'يتوفر بعد تسجيل الجواب ورفع الوثيقة'
+                  : showEvalForm
+                    ? (evalEditMode ? 'تعديل قرار التقييم المسجل' : 'حدد نتيجة فحص جواب المعني بالأمر')
+                    : 'نتيجة فحص جواب المعني بالأمر'}
+              </p>
+            </div>
+            {canEditEval && !showEvalForm ? (
+              <button type="button" onClick={() => setEvalEditMode(true)} className={editBtn}>
+                <Pencil className="size-3.5" />
+                تعديل
+              </button>
+            ) : null}
+          </div>
+          <div className={blockBody}>
+            {!evalReady ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Lock className="size-4 shrink-0" />
+                <span>يتوفر بعد تسجيل الجواب ورفع الوثيقة</span>
+              </div>
+            ) : !showEvalForm && hasEvalData ? (
+              <div className="space-y-3">
+                <div className={`inline-flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-sm font-semibold ${
+                  dossier.decision_reponse === 'CONVAINCANTE'
+                    ? 'border-green-200 bg-green-50 text-green-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
+                  {dossier.decision_reponse === 'CONVAINCANTE'
+                    ? <CheckCircle2 className="size-4 shrink-0 text-green-600" />
+                    : <AlertTriangle className="size-4 shrink-0 text-amber-600" />
+                  }
+                  {dossier.decision_reponse === 'CONVAINCANTE' ? 'الجواب مقنع' : 'الجواب غير مقنع'}
+                </div>
+                {actionFeedback}
+              </div>
+            ) : showEvalForm ? (
+              <div className="max-w-lg space-y-4">
+                <div className="space-y-1.5">
+                  <Label className={fieldLabelClassName}>نتيجة التقييم</Label>
+                  <Select
+                    value={responseDecision}
+                    onValueChange={(value) => { setResponseDecision(value); setActionError('') }}
+                    disabled={actionLoading}
+                  >
+                    <SelectTrigger className={selectTriggerClassName}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CONVAINCANTE">الجواب مقنع</SelectItem>
+                      <SelectItem value="NON_CONVAINCANTE">الجواب غير مقنع</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {actionFeedback}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    onClick={evalEditMode ? handleEvaluationUpdate : handlePrimaryActionClick}
+                    disabled={actionLoading}
+                    className="sm:w-auto"
+                  >
+                    {actionLoading ? 'جاري الحفظ...' : evalEditMode ? 'تحديث التقييم' : 'اعتماد التقييم'}
+                  </Button>
+                  {evalEditMode ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => { setEvalEditMode(false); setActionError(''); setSuccessModal(null) }}
+                      disabled={actionLoading}
+                      className="sm:w-auto"
+                    >
+                      إلغاء
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* ═══ Block 3: الإجراء التالي ═══ */}
+        {!showEvalForm && hasEvalData && dossier.decision_reponse === 'NON_CONVAINCANTE' && !isFinal ? (
+          <div className={block}>
+            <div className={blockHeader}>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">الإجراء التالي</p>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  {procedureDocuments.length > 0
+                    ? 'طلب استكمال المسطرة التأديبية قابل للتحديث بعد كل تعديل'
+                    : 'إنشاء طلب استكمال المسطرة التأديبية حسب نوع المخالفة'}
+                </p>
+              </div>
+              {procedureDocuments.length > 0 ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                  <CheckCircle2 className="size-3" />
+                  تم الإنشاء
+                </span>
+              ) : null}
+            </div>
+            <div className={blockBody}>
+              <div className="max-w-sm space-y-4">
+                <div className="space-y-1.5">
+                  <Label className={fieldLabelClassName}>نوع المسطرة</Label>
+                  <Select
+                    value={procedureType}
+                    onValueChange={setProcedureType}
+                    disabled={procedureLoading}
+                  >
+                    <SelectTrigger className={selectTriggerClassName}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
+                      <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant={procedureDocuments.length > 0 ? 'outline' : 'default'}
+                  onClick={handleGenerateProcedureFromEval}
+                  disabled={procedureLoading}
+                  className="w-full transition-colors sm:w-auto"
+                >
+                  {procedureLoading
+                    ? (procedureDocuments.length > 0 ? 'جاري الإعادة...' : 'جاري الإنشاء...')
+                    : (procedureDocuments.length > 0 ? 'إعادة توليد الطلب' : 'إنشاء طلب استكمال المسطرة التأديبية')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
       </div>
     )
   }
@@ -1625,20 +1528,12 @@ export default function DossierExplicatifDetailPage() {
   const renderViewedStepContent = () => {
     if (!dossier) return null
 
-    if (viewedStepIndex === 1) return renderNotifResponseLayout()
-
-    // التقييم step: show editable correction form when evaluation can still be corrected
-    if (viewedStepIndex === 2 && (
-      dossier.statut === 'REPONSE_CONVAINCANTE' ||
-      dossier.statut === 'REPONSE_NON_CONVAINCANTE'
-    )) {
-      return renderEvaluationCorrectionLayout()
-    }
+    if (viewedStepIndex === 1) return renderNotificationStep()
+    if (viewedStepIndex === 2) return renderResponseAndEvaluationStep()
 
     const isCurrentStep = viewedStepIndex === currentStepIndex
     const primary = isCurrentStep ? renderCurrentStepContent() : renderCompletedStepContent(viewedStepIndex)
-    const contextStepIndex = viewedStepIndex >= 2 ? viewedStepIndex + 1 : viewedStepIndex
-    const secondary = renderStepContext(contextStepIndex)
+    const secondary = renderStepContext(viewedStepIndex)
 
     if (!secondary) return primary
 
@@ -1844,35 +1739,25 @@ export default function DossierExplicatifDetailPage() {
         <Dialog open={procedureConfirmOpen} onOpenChange={setProcedureConfirmOpen}>
           <DialogContent className="max-w-xl" dir="rtl">
             <DialogHeader className="text-right sm:text-right">
-              <DialogTitle className="text-right">تأكيد إنشاء المسطرة</DialogTitle>
+              <DialogTitle className="text-right">تأكيد إنشاء طلب المسطرة التأديبية</DialogTitle>
               <DialogDescription className="text-right">
-                راجع النموذج المختار قبل إنشاء المسطرة اللاحقة
+                سيتم إنشاء طلب استكمال المسطرة التأديبية اعتمادًا على نموذج نوع المخالفة
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 text-right">
-              {selectedProcedureTemplate ? (
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                  <dl className="space-y-3 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="font-medium text-slate-500">نوع المسطرة</dt>
-                      <dd className="font-semibold text-slate-800">{procedureLabels[procedureType] || '-'}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="font-medium text-slate-500">النموذج الذي سيتم إنشاؤه</dt>
-                      <dd className="max-w-[220px] text-left font-semibold text-slate-800">{selectedProcedureTemplate.nom}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="font-medium text-slate-500">نوع المخالفة</dt>
-                      <dd className="max-w-[220px] text-left font-semibold text-slate-800">{getTypeFauteLabel(dossier.type_faute) || '-'}</dd>
-                    </div>
-                  </dl>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  لا يوجد نموذج نشط مرتبط بنفس نوع المخالفة ونوع المسطرة المختارة
-                </div>
-              )}
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                <dl className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="font-medium text-slate-500">نوع المسطرة</dt>
+                    <dd className="font-semibold text-slate-800">{procedureLabels[procedureType] || '-'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="font-medium text-slate-500">نوع المخالفة</dt>
+                    <dd className="max-w-[220px] text-left font-semibold text-slate-800">{getTypeFauteLabel(dossier.type_faute) || '-'}</dd>
+                  </div>
+                </dl>
+              </div>
 
               <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-start">
                 <Button
@@ -1887,13 +1772,59 @@ export default function DossierExplicatifDetailPage() {
                 <Button
                   type="button"
                   onClick={() => handleAction({ skipConfirmation: true })}
-                  disabled={actionLoading || !selectedProcedureTemplate}
+                  disabled={actionLoading}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'جاري إنشاء المسطرة...' : 'إنشاء المسطرة'}
+                  {actionLoading ? 'جاري الإنشاء...' : 'إنشاء طلب المسطرة'}
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success feedback modal */}
+        <Dialog open={Boolean(successModal)} onOpenChange={(open) => { if (!open) setSuccessModal(null) }}>
+          <DialogContent className="max-w-md" dir="rtl" showCloseButton={false}>
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right text-slate-900">{successModal?.title}</DialogTitle>
+              {successModal?.description ? (
+                <DialogDescription className="text-right">{successModal.description}</DialogDescription>
+              ) : null}
+            </DialogHeader>
+            <DialogFooter className="sm:justify-start">
+              <Button
+                type="button"
+                onClick={() => {
+                  if (successModal?.hasNextStep) setViewedStepIndex(currentStepIndex)
+                  setSuccessModal(null)
+                }}
+                className="w-full sm:w-auto"
+              >
+                {successModal?.hasNextStep ? 'الانتقال للمرحلة التالية' : 'حسنًا'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Error modal — missing template or procedure generation failure */}
+        <Dialog open={Boolean(errorModal)} onOpenChange={(open) => { if (!open) setErrorModal(null) }}>
+          <DialogContent className="max-w-md" dir="rtl">
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right text-slate-900">{errorModal?.title}</DialogTitle>
+              {errorModal?.description ? (
+                <DialogDescription className="text-right">{errorModal.description}</DialogDescription>
+              ) : null}
+            </DialogHeader>
+            <DialogFooter className="sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setErrorModal(null)}
+                className="w-full sm:w-auto"
+              >
+                حسنًا
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

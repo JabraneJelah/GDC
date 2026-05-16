@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-const VALID_USAGES = ['LETTRE_EXPLICATIVE', 'BORDEREAU_NOTIFICATION', 'AVERTISSEMENT', 'RETENUE']
+const VALID_USAGES = ['LETTRE_EXPLICATIVE', 'BORDEREAU_NOTIFICATION', 'AVERTISSEMENT', 'RETENUE', 'PROCEDURE_DISCIPLINAIRE']
 
 function parseTypeFauteId(value) {
   if (value == null || value === '') return null
@@ -81,6 +81,22 @@ export async function PUT(request, { params }) {
       if (identifiantExists) {
         return NextResponse.json(
           { error: 'Cet identifiant de template existe déjà' },
+          { status: 400 }
+        )
+      }
+    }
+
+    const usagePairChanged =
+      Number(nextTypeFauteId) !== Number(existing.type_faute_id) || usage !== existing.usage
+
+    if (usagePairChanged) {
+      const usagePairExists = await prisma.documentTemplate.findFirst({
+        where: { type_faute_id: nextTypeFauteId, usage, NOT: { id } },
+      })
+
+      if (usagePairExists) {
+        return NextResponse.json(
+          { error: 'Un template avec ce type de faute et cet usage existe déjà' },
           { status: 400 }
         )
       }

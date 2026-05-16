@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { mkdir, readFile, writeFile } from 'fs/promises'
+import path from 'path'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ALLOWED_TYPES_PROCEDURE = ['AVERTISSEMENT', 'RETENUE']
@@ -9,12 +11,80 @@ function buildDocumentIdentifiant(templateId, dossierId) {
   return `PROC-${templateId}-${dossierId}`
 }
 
-function buildPlaceholderPath(templateId, dossierId) {
-  return `pending://procedure/template/${templateId}/dossier/${dossierId}`
+function formatDate(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('fr-MA').format(value)
 }
 
-function buildDocumentTitle(templateName) {
-  return `Procedure suivante - ${templateName}`
+function buildTemplateData(dossier) {
+  return {
+    nom_complet: dossier.nom_complet || '',
+    matricule: dossier.matricule || '',
+    profil: dossier.profil || '',
+    service: dossier.service || '',
+    date_faute: formatDate(dossier.date_faute),
+    type_faute: dossier.type_faute?.nom || '',
+    details: dossier.details || '',
+  }
+}
+
+function resolvePublicFilePath(publicPath) {
+  const relativePath = publicPath.replace(/^\/+/, '')
+  const normalizedPath = path.normalize(relativePath)
+  const publicDir = path.join(process.cwd(), 'public')
+  const filePath = path.join(publicDir, normalizedPath)
+  const relativeToPublic = path.relative(publicDir, filePath)
+
+  if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic)) {
+    throw new Error('Chemin de fichier invalide')
+  }
+
+  return filePath
+}
+
+function buildGeneratedFileName(dossierReference, templateIdentifiant) {
+  const safeReference = dossierReference.replace(/[^a-zA-Z0-9_-]/g, '-')
+  const safeIdentifiant = templateIdentifiant.replace(/[^a-zA-Z0-9_-]/g, '-')
+  return `${safeReference}_${safeIdentifiant}.docx`
+}
+
+async function loadDocxLibraries() {
+  const pizzipPackage = 'pizzip'
+  const docxtemplaterPackage = 'docxtemplater'
+  const [{ default: PizZip }, { default: Docxtemplater }] = await Promise.all([
+    import(pizzipPackage),
+    import(docxtemplaterPackage),
+  ])
+  return { PizZip, Docxtemplater }
+}
+
+async function generateDocumentFromTemplate({ dossier, template, templateData, PizZip, Docxtemplater }) {
+  const templateFilePath = resolvePublicFilePath(template.chemin_fichier)
+  const generatedDir = path.join(process.cwd(), 'public', 'uploads', 'generated')
+  const fileName = buildGeneratedFileName(dossier.reference, template.identifiant)
+  const generatedFilePath = path.join(generatedDir, fileName)
+  const publicPath = `/uploads/generated/${fileName}`
+
+  await mkdir(generatedDir, { recursive: true })
+
+  const content = await readFile(templateFilePath)
+  const zip = new PizZip(content)
+  const doc = new Docxtemplater(zip, {
+    paragraphLoop: true,
+    linebreaks: true,
+    nullGetter: () => '',
+  })
+
+  doc.render(templateData)
+
+  const buffer = doc.getZip().generate({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+  })
+
+  await writeFile(generatedFilePath, buffer, { flag: 'w' })
+
+  return publicPath
 }
 
 export async function POST(request, { params }) {
@@ -35,7 +105,7 @@ export async function POST(request, { params }) {
     }
 
     const body = await request.json()
-    const { type_procedure, template_id } = body
+    const { type_procedure } = body
 
     if (!type_procedure) {
       return NextResponse.json(
@@ -51,21 +121,22 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (!template_id || !UUID_PATTERN.test(template_id)) {
-      return NextResponse.json(
-        { error: 'Template de procedure invalide' },
-        { status: 400 }
-      )
-    }
-
     const dossier = await prisma.dossierExplicatif.findUnique({
       where: { id },
       select: {
         id: true,
+        reference: true,
+        nom_complet: true,
+        matricule: true,
+        profil: true,
+        service: true,
+        date_faute: true,
+        details: true,
         statut: true,
         type_faute_id: true,
-        type_procedure_selectionne: true,
-        template_procedure_id: true,
+        type_faute: {
+          select: { nom: true },
+        },
       },
     })
 
@@ -76,55 +147,11 @@ export async function POST(request, { params }) {
       )
     }
 
-    if (dossier.statut !== 'REPONSE_NON_CONVAINCANTE') {
+    const GENERATABLE_STATUSES = ['REPONSE_NON_CONVAINCANTE', 'PROCEDURE_SUIVANTE_GENEREE']
+
+    if (!GENERATABLE_STATUSES.includes(dossier.statut)) {
       return NextResponse.json(
         { error: 'La procedure suivante ne peut etre generee que pour un dossier avec reponse non convaincante' },
-        { status: 400 }
-      )
-    }
-
-    if (dossier.type_procedure_selectionne || dossier.template_procedure_id) {
-      return NextResponse.json(
-        { error: 'La procedure suivante a deja ete generee pour ce dossier' },
-        { status: 400 }
-      )
-    }
-
-    const template = await prisma.documentTemplate.findUnique({
-      where: { id: template_id },
-      select: {
-        id: true,
-        nom: true,
-        actif: true,
-        type_faute_id: true,
-        usage: true,
-      },
-    })
-
-    if (!template) {
-      return NextResponse.json(
-        { error: 'Template de procedure non trouve' },
-        { status: 404 }
-      )
-    }
-
-    if (!template.actif) {
-      return NextResponse.json(
-        { error: 'Le template de procedure selectionne est inactif' },
-        { status: 400 }
-      )
-    }
-
-    if (template.type_faute_id !== dossier.type_faute_id) {
-      return NextResponse.json(
-        { error: 'Le template de procedure selectionne ne correspond pas au type de faute du dossier' },
-        { status: 400 }
-      )
-    }
-
-    if (template.usage !== type_procedure) {
-      return NextResponse.json(
-        { error: 'Le template de procedure selectionne ne correspond pas au type de procedure choisi' },
         { status: 400 }
       )
     }
@@ -138,42 +165,100 @@ export async function POST(request, { params }) {
       select: {
         id: true,
         titre: true,
+        chemin_fichier: true,
       },
     })
 
-    if (existingProcedureDocument) {
+    const template = await prisma.documentTemplate.findFirst({
+      where: {
+        type_faute_id: dossier.type_faute_id,
+        usage: 'PROCEDURE_DISCIPLINAIRE',
+        actif: true,
+      },
+      select: {
+        id: true,
+        nom: true,
+        identifiant: true,
+        chemin_fichier: true,
+        actif: true,
+        type_faute_id: true,
+        usage: true,
+      },
+    })
+
+    if (!template) {
       return NextResponse.json(
-        {
-          error: 'La procedure suivante a deja ete generee pour ce dossier',
-          existing_document: existingProcedureDocument,
-        },
+        { error: 'لا يوجد نموذج خاص باستكمال المسطرة التأديبية لهذا النوع من المخالفة' },
         { status: 400 }
       )
     }
 
+    let docxLibraries
+    try {
+      docxLibraries = await loadDocxLibraries()
+    } catch (error) {
+      console.error('Bibliotheques DOCX manquantes:', error)
+      return NextResponse.json(
+        { error: 'Generation DOCX indisponible' },
+        { status: 500 }
+      )
+    }
+
+    const templateData = buildTemplateData(dossier)
+    const generatedPath = await generateDocumentFromTemplate({
+      dossier,
+      template,
+      templateData,
+      ...docxLibraries,
+    })
+
+    const documentIdentifiant = buildDocumentIdentifiant(template.id, dossier.id)
+
     const result = await prisma.$transaction(async (tx) => {
-      const createdDocument = await tx.dossierDocument.create({
-        data: {
-          identifiant: buildDocumentIdentifiant(template.id, dossier.id),
-          titre: buildDocumentTitle(template.nom),
-          chemin_fichier: buildPlaceholderPath(template.id, dossier.id),
-          origine: 'GENERE',
-          categorie: 'procedure_suivante',
-          dossier_id: dossier.id,
-          template_id: template.id,
-          cree_par_rh_id: currentUser.userId,
-        },
-        select: {
-          id: true,
-          identifiant: true,
-          titre: true,
-          template_id: true,
-          chemin_fichier: true,
-          origine: true,
-          categorie: true,
-          cree_le: true,
-        },
-      })
+      let createdDocument
+
+      if (existingProcedureDocument) {
+        createdDocument = await tx.dossierDocument.update({
+          where: { id: existingProcedureDocument.id },
+          data: {
+            chemin_fichier: generatedPath,
+            titre: template.nom,
+          },
+          select: {
+            id: true,
+            identifiant: true,
+            titre: true,
+            template_id: true,
+            chemin_fichier: true,
+            origine: true,
+            categorie: true,
+            cree_le: true,
+          },
+        })
+      } else {
+        createdDocument = await tx.dossierDocument.create({
+          data: {
+            identifiant: documentIdentifiant,
+            titre: template.nom,
+            chemin_fichier: generatedPath,
+            origine: 'GENERE',
+            categorie: 'procedure_suivante',
+            dossier_id: dossier.id,
+            template_id: template.id,
+            cree_par_rh_id: currentUser.userId,
+          },
+          select: {
+            id: true,
+            identifiant: true,
+            titre: true,
+            template_id: true,
+            chemin_fichier: true,
+            origine: true,
+            categorie: true,
+            cree_le: true,
+          },
+        })
+      }
 
       const updatedDossier = await tx.dossierExplicatif.update({
         where: { id: dossier.id },
@@ -190,10 +275,7 @@ export async function POST(request, { params }) {
         },
       })
 
-      return {
-        createdDocument,
-        updatedDossier,
-      }
+      return { createdDocument, updatedDossier }
     })
 
     return NextResponse.json({

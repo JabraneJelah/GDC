@@ -3,7 +3,7 @@
 import { FileText, Download, CheckCircle2, Clock } from 'lucide-react'
 
 const categoryLabels = {
-  procedure_suivante:   'المسطرة اللاحقة',
+  procedure_suivante:   'طلب استكمال المسطرة التأديبية',
   lettre_explicative:   'رسالة توضيحية',
   bordereau_notification: 'إشعار / جدول إرسال',
   preuve_notification:  'وصل الاستلام',
@@ -73,7 +73,7 @@ export function DocumentsTable({ documents = [], dossierId }) {
   const sorted = [...documents].sort((a, b) => new Date(a.cree_le) - new Date(b.cree_le))
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200">
+    <div className="overflow-hidden rounded-xl border border-slate-200" dir="rtl">
       <div className="w-full overflow-x-auto">
         <table className="w-full min-w-[1200px] text-right text-sm">
           <thead className="bg-[#F1F5F9]">
@@ -93,13 +93,13 @@ export function DocumentsTable({ documents = [], dossierId }) {
                 className="bg-white transition-colors hover:bg-[#F8FAFC]"
               >
                 <td className="px-4 py-3 text-sm">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="max-w-[200px] truncate font-medium text-slate-800">
-                      {getDocumentName(doc)}
-                    </span>
+                  <div className="flex items-center gap-2">
                     <div className="shrink-0 rounded bg-slate-100 p-1">
                       <FileText className="size-3 text-slate-400" />
                     </div>
+                    <span className="max-w-[200px] truncate font-medium text-slate-800">
+                      {getDocumentName(doc)}
+                    </span>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-slate-600">

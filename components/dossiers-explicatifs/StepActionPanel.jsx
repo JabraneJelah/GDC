@@ -4,8 +4,9 @@ export function StepActionPanel({ title, isCurrentStep, onReturnToCurrent, child
   return (
     <div className="mt-5 rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
       {/* Panel header */}
-      <div className="mb-5 flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
-        <div className="flex items-center gap-2">
+      <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between" dir="rtl">
+        <h2 className="flex-1 text-right text-lg font-bold text-slate-950">{title}</h2>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <span
             className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
               isCurrentStep
@@ -26,7 +27,6 @@ export function StepActionPanel({ title, isCurrentStep, onReturnToCurrent, child
             </button>
           )}
         </div>
-        <h2 className="text-lg font-bold text-slate-950">{title}</h2>
       </div>
 
       {children}

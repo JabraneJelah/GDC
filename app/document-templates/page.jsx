@@ -41,10 +41,11 @@ const initialEditFormData = {
 }
 
 const usageLabels = {
-  LETTRE_EXPLICATIVE: 'رسالة توضيحية',
-  BORDEREAU_NOTIFICATION: 'إشعار / جدول إرسال',
+  LETTRE_EXPLICATIVE: 'طلب التوضيح / الاستفسار',
+  BORDEREAU_NOTIFICATION: 'وثيقة التبليغ',
   AVERTISSEMENT: 'تنبيه',
   RETENUE: 'اقتطاع',
+  PROCEDURE_DISCIPLINAIRE: 'طلب استكمال المسطرة التأديبية',
 }
 
 const usageBadgeStyles = {
@@ -52,6 +53,7 @@ const usageBadgeStyles = {
   BORDEREAU_NOTIFICATION: 'bg-violet-50 text-violet-700 border-violet-200',
   AVERTISSEMENT: 'bg-amber-50 text-amber-700 border-amber-200',
   RETENUE: 'bg-rose-50 text-rose-700 border-rose-200',
+  PROCEDURE_DISCIPLINAIRE: 'bg-indigo-50 text-indigo-700 border-indigo-200',
 }
 
 const typeFauteArabicLabels = {

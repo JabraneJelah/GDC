@@ -10,11 +10,12 @@ const STATUS_BY_DECISION = {
   NON_CONVAINCANTE: 'REPONSE_NON_CONVAINCANTE',
 }
 
-// First evaluation from REPONSE_RECUE, plus correction before procedure/closure
+// First evaluation from REPONSE_RECUE, plus correction before final states
 const ALLOWED_EVALUATION_STATUSES = [
   'REPONSE_RECUE',
   'REPONSE_CONVAINCANTE',
   'REPONSE_NON_CONVAINCANTE',
+  'PROCEDURE_SUIVANTE_GENEREE',
 ]
 
 export async function POST(request, { params }) {
@@ -32,7 +33,7 @@ export async function POST(request, { params }) {
     }
 
     const body = await request.json()
-    const { decision_reponse, commentaire } = body
+    const { decision_reponse } = body
 
     if (!decision_reponse) {
       return NextResponse.json(
@@ -78,8 +79,9 @@ export async function POST(request, { params }) {
       data: {
         decision_reponse,
         statut,
-        decision_par_rh_id: currentUser.userId,
-        commentaire_evaluation: commentaire ?? null,
+        decision_par_rh: {
+          connect: { id: currentUser.userId },
+        },
       },
       select: {
         id: true,

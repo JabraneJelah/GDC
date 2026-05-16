@@ -59,6 +59,7 @@ enum TemplateUsage {
   BORDEREAU_NOTIFICATION
   AVERTISSEMENT
   RETENUE
+  PROCEDURE_DISCIPLINAIRE
 }
 
 // Utilisateurs RH - Personnel RH qui utilise l'application

@@ -9,6 +9,7 @@ const VALID_USAGES = [
   'BORDEREAU_NOTIFICATION',
   'AVERTISSEMENT',
   'RETENUE',
+  'PROCEDURE_DISCIPLINAIRE',
 ]
 
 export const runtime = 'nodejs'
@@ -68,7 +69,7 @@ export async function POST(request) {
       return jsonError('يجب اختيار ملف بصيغة DOCX فقط', 400)
     }
 
-    const [typeFaute, existingIdentifiant] = await Promise.all([
+    const [typeFaute, existingIdentifiant, existingUsagePair] = await Promise.all([
       prisma.typeFaute.findUnique({
         where: { id: type_faute_id },
       }),
@@ -76,6 +77,9 @@ export async function POST(request) {
         where: {
           identifiant: { equals: identifiant, mode: 'insensitive' },
         },
+      }),
+      prisma.documentTemplate.findFirst({
+        where: { type_faute_id, usage },
       }),
     ])
 
@@ -85,6 +89,10 @@ export async function POST(request) {
 
     if (existingIdentifiant) {
       return jsonError('هذا المعرف مستعمل مسبقا', 409)
+    }
+
+    if (existingUsagePair) {
+      return jsonError('يوجد بالفعل نموذج بنفس نوع المخالفة ونوع الاستعمال', 409)
     }
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'templates')
