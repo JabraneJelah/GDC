@@ -26,8 +26,11 @@ import {
   getDossierStatusLabel,
   getStatusColor,
 } from '@/frontend/src/lib/dossierStatus'
+import {
+  getExtraFieldsForCode,
+  getMissingRequiredFields,
+} from '@/lib/dossiers-explicatifs/extraFields'
 import { AppCard } from '@/components/dossiers-explicatifs/AppCard'
-import { InfoGrid } from '@/components/dossiers-explicatifs/InfoGrid'
 import { WorkflowStepper } from '@/components/dossiers-explicatifs/WorkflowStepper'
 import { StepActionPanel } from '@/components/dossiers-explicatifs/StepActionPanel'
 import { DocumentsTable } from '@/components/dossiers-explicatifs/DocumentsTable'
@@ -55,13 +58,13 @@ const statusBadgeStyles = {
 const editableInputClassName = 'h-11 border-slate-300 bg-white text-right text-slate-900 shadow-sm placeholder:text-slate-500 focus-visible:border-blue-500 focus-visible:ring-blue-500/20'
 const selectTriggerClassName = 'h-11 border-slate-300 bg-white text-right text-slate-900 shadow-sm focus-visible:border-blue-500 focus-visible:ring-blue-500/20'
 const fileInputClassName = 'h-11 cursor-pointer border-slate-300 bg-white text-right text-slate-900 shadow-sm file:ml-3 file:rounded-md file:bg-blue-50 file:px-3 file:text-blue-700 hover:border-blue-300 focus-visible:border-blue-500 focus-visible:ring-blue-500/20'
-const fieldLabelClassName = 'block text-right text-sm font-semibold text-slate-800'
+const fieldLabelClassName = 'block text-right text-sm font-medium text-slate-700'
 
 const workflowSteps = [
   { label: 'تسجيل الملف' },
   { label: 'التبليغ' },
   { label: 'الجواب والتقييم' },
-  { label: 'المسطرة' },
+  { label: 'المسطرة التأديبية' },
   { label: 'الإغلاق' },
 ]
 
@@ -120,11 +123,21 @@ const actionConfirmations = {
 
 function formatDate(value) {
   if (!value) return null
-
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
-
   return date.toLocaleDateString('ar-MA')
+}
+
+function formatDateTime(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const datePart = date.toLocaleDateString('ar-MA')
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  const timePart = `${h}:${m}`
+  if (timePart === '00:00') return datePart
+  return `${datePart} على الساعة ${timePart}`
 }
 
 function getTodayInputValue() {
@@ -157,7 +170,7 @@ function RegistrationSummary({ dossier }) {
     { label: 'المصلحة', value: dossier.professeur?.service?.nom || dossier.service },
     { label: 'الدرجة', value: dossier.professeur?.grade?.nom || dossier.profil },
     { label: 'نوع المخالفة', value: getTypeFauteLabel(dossier.type_faute) },
-    { label: 'تاريخ المخالفة', value: formatDate(dossier.date_faute) },
+    { label: 'تاريخ المخالفة', value: formatDateTime(dossier.date_faute) },
   ]
 
   return (
@@ -194,7 +207,7 @@ function translateApiError(message, status) {
   if (normalizedMessage.includes('deja cloture')) return 'هذا الملف مغلق مسبقا'
   if (normalizedMessage.includes('deja ete')) return 'تم تنفيذ هذا الإجراء سابقا'
   if (normalizedMessage.includes('ne peut etre cloture')) {
-    return 'لا يمكن إغلاق الملف إلا بعد جواب مقنع أو بعد إنشاء المسطرة اللاحقة'
+    return 'لا يمكن إغلاق الملف إلا بعد جواب مقنع أو بعد إنشاء طلب استكمال المسطرة التأديبية'
   }
   if (normalizedMessage.includes('ne peut etre')) return 'لا يمكن تنفيذ هذا الإجراء في الحالة الحالية للملف'
   if (normalizedMessage.includes('template') && normalizedMessage.includes('actif')) return 'النموذج المحدد غير نشط'
@@ -215,7 +228,7 @@ function getContextualActionError(status) {
   }
 
   if (status === 'REPONSE_NON_CONVAINCANTE') {
-    return 'تعذر إنشاء المسطرة اللاحقة، المرجو التحقق من المعطيات والمحاولة مرة أخرى'
+    return 'تعذر إنشاء طلب استكمال المسطرة التأديبية، المرجو التحقق من المعطيات والمحاولة مرة أخرى'
   }
 
   if (status === 'REPONSE_CONVAINCANTE' || status === 'PROCEDURE_SUIVANTE_GENEREE') {
@@ -227,13 +240,13 @@ function getContextualActionError(status) {
 
 const ctxBadge = {
   green: 'border-green-200 bg-green-50 text-green-700',
-  blue:  'border-blue-200 bg-blue-50 text-blue-700',
+  blue: 'border-blue-200 bg-blue-50 text-blue-700',
   amber: 'border-amber-200 bg-amber-50 text-amber-700',
   slate: 'border-slate-200 bg-slate-100 text-slate-500',
 }
 const ctxDot = {
   green: 'bg-green-500',
-  blue:  'bg-blue-500',
+  blue: 'bg-blue-500',
   amber: 'bg-amber-500',
   slate: 'bg-slate-300',
 }
@@ -283,6 +296,10 @@ export default function DossierExplicatifDetailPage() {
   const [evalEditMode, setEvalEditMode] = useState(false)
   const [procedureLoading, setProcedureLoading] = useState(false)
   const [errorModal, setErrorModal] = useState(null)
+  const [extraFieldsData, setExtraFieldsData] = useState({})
+  const [extraFieldsSaving, setExtraFieldsSaving] = useState(false)
+  const [extraFieldsError, setExtraFieldsError] = useState('')
+  const [extraFieldsSuccess, setExtraFieldsSuccess] = useState(false)
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
     if (!dossierId) return null
@@ -390,6 +407,22 @@ export default function DossierExplicatifDetailPage() {
     }
   }, [viewedStepIndex, dossier?.id])
 
+  // Pre-fill procedure type from saved value so regeneration uses the same type
+  useEffect(() => {
+    if (dossier?.type_procedure_selectionne) {
+      setProcedureType(dossier.type_procedure_selectionne)
+    }
+  }, [dossier?.type_procedure_selectionne])
+
+  // Sync extra fields form from saved donnees_supplementaires
+  useEffect(() => {
+    if (!dossier) return
+    const saved = dossier.donnees_supplementaires
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+      setExtraFieldsData(saved)
+    }
+  }, [dossier?.id])
+
   const actionFeedback = actionError ? (
     <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
@@ -490,7 +523,7 @@ export default function DossierExplicatifDetailPage() {
           : 'الجواب غير مقنع — يمكنك الانتقال إلى مرحلة المسطرة التأديبية.'
         setSuccessModal({ title: 'تم اعتماد التقييم بنجاح', description: descr, hasNextStep: true })
       } else if (prevStatut === 'REPONSE_NON_CONVAINCANTE') {
-        setSuccessModal({ title: 'تم إنشاء المسطرة بنجاح', description: 'تم إنشاء وثائق المسطرة اللاحقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
+        setSuccessModal({ title: 'تم إنشاء طلب استكمال المسطرة التأديبية', description: 'تم توليد الوثيقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
       } else if (prevStatut === 'REPONSE_CONVAINCANTE' || prevStatut === 'PROCEDURE_SUIVANTE_GENEREE') {
         setSuccessModal({ title: 'تم إغلاق الملف بنجاح', description: 'تم إغلاق الملف التأديبي.', hasNextStep: true })
       }
@@ -511,14 +544,40 @@ export default function DossierExplicatifDetailPage() {
       } else if (actionErrorValue.message === 'procedure_type_required') {
         setActionError('المرجو اختيار نوع المسطرة')
       } else if (actionErrorValue.message === 'procedure_generation_failed') {
-        setActionError('تعذر إنشاء المسطرة اللاحقة')
+        setActionError('تعذر إنشاء طلب استكمال المسطرة التأديبية')
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
-        setActionError(actionErrorValue.message || 'تعذر إنشاء المسطرة اللاحقة')
+        setActionError(actionErrorValue.message || 'تعذر إنشاء طلب استكمال المسطرة التأديبية')
       } else {
         setActionError(translateApiError(actionErrorValue.message, dossier.statut))
       }
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleSaveExtraFields = async () => {
+    if (!dossier || extraFieldsSaving) return
+    setExtraFieldsError('')
+    setExtraFieldsSuccess(false)
+    setExtraFieldsSaving(true)
+    try {
+      const res = await fetch(`/api/dossiers-explicatifs/${dossierId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donnees_supplementaires: extraFieldsData }),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) {
+        setExtraFieldsError(body?.error || 'تعذر حفظ المعطيات الإضافية')
+        return
+      }
+      await fetchDossier({ showLoading: false })
+      setExtraFieldsSuccess(true)
+      setTimeout(() => setExtraFieldsSuccess(false), 2500)
+    } catch {
+      setExtraFieldsError('تعذر حفظ المعطيات الإضافية')
+    } finally {
+      setExtraFieldsSaving(false)
     }
   }
 
@@ -789,15 +848,81 @@ export default function DossierExplicatifDetailPage() {
     }
 
     if (dossier.statut === 'ENREGISTRE') {
+      const extraFieldsConfig = getExtraFieldsForCode(dossier.type_faute?.code)
+      const missingRequired = getMissingRequiredFields(dossier.type_faute?.code, dossier.donnees_supplementaires)
+      const hasAllRequired = missingRequired.length === 0
+      const isFinalDossier = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
+
       return (
         <div className="space-y-4">
           <RegistrationSummary dossier={dossier} />
+
+          {extraFieldsConfig.length > 0 && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-4" dir="rtl">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">معطيات إضافية مطلوبة لهذا النوع من المخالفة</p>
+                {!hasAllRequired && (
+                  <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                    غير مكتملة
+                  </span>
+                )}
+                {hasAllRequired && (
+                  <span className="rounded-full bg-green-100 border border-green-300 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                    مكتملة
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {extraFieldsConfig.map((field) => (
+                  <div key={field.key} className="space-y-1.5">
+                    <Label className={fieldLabelClassName}>
+                      {field.label}
+                      {field.required && <span className="mr-1 text-red-500">*</span>}
+                    </Label>
+                    <Input
+                      type={field.type === 'date' ? 'date' : 'text'}
+                      value={extraFieldsData[field.key] || ''}
+                      onChange={(e) => {
+                        setExtraFieldsData((prev) => ({ ...prev, [field.key]: e.target.value }))
+                        setExtraFieldsError('')
+                        setExtraFieldsSuccess(false)
+                      }}
+                      placeholder={field.placeholder}
+                      disabled={isFinalDossier || extraFieldsSaving}
+                      className={editableInputClassName}
+                    />
+                  </div>
+                ))}
+              </div>
+              {extraFieldsError && (
+                <p className="text-sm text-red-600">{extraFieldsError}</p>
+              )}
+              {extraFieldsSuccess && (
+                <p className="text-sm font-medium text-green-700">تم حفظ المعطيات الإضافية بنجاح</p>
+              )}
+              {!isFinalDossier && (
+                <div className="flex justify-start">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveExtraFields}
+                    disabled={extraFieldsSaving}
+                    className="gap-1.5"
+                  >
+                    {extraFieldsSaving ? 'جاري الحفظ...' : 'حفظ المعطيات الإضافية'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {actionFeedback}
           <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-start">
             <Button
               type="button"
               onClick={() => handleAction({ skipConfirmation: true })}
-              disabled={actionLoading || activeInitialTemplates.length === 0}
+              disabled={actionLoading || activeInitialTemplates.length === 0 || !hasAllRequired}
               className="w-full gap-2 sm:w-auto"
             >
               <FileText className="size-4" />
@@ -806,6 +931,10 @@ export default function DossierExplicatifDetailPage() {
             {activeInitialTemplates.length === 0 ? (
               <p className="text-xs text-amber-700">
                 لا توجد نماذج نشطة مرتبطة بهذا النوع لإنشاء الوثائق الأولية
+              </p>
+            ) : !hasAllRequired ? (
+              <p className="text-xs text-amber-700">
+                يرجى إكمال المعطيات الإضافية قبل إنشاء الوثائق.
               </p>
             ) : null}
           </div>
@@ -889,8 +1018,8 @@ export default function DossierExplicatifDetailPage() {
                   <Calendar className="size-4 text-slate-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">تاريخ التبليغ</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-800">{formatDate(dossier.date_notification)}</p>
+                  <p className="text-sm font-medium text-slate-700">تاريخ التبليغ</p>
+                  <p className="mt-0.5 text-sm text-slate-900">{formatDate(dossier.date_notification)}</p>
                 </div>
               </div>
             ) : null}
@@ -942,20 +1071,18 @@ export default function DossierExplicatifDetailPage() {
               )}
             </div>
             {dossier.decision_reponse ? (
-              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-right ${
-                dossier.decision_reponse === 'CONVAINCANTE'
-                  ? 'border-green-200 bg-green-50'
-                  : 'border-amber-200 bg-amber-50'
-              }`}>
+              <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-right ${dossier.decision_reponse === 'CONVAINCANTE'
+                ? 'border-green-200 bg-green-50'
+                : 'border-amber-200 bg-amber-50'
+                }`}>
                 {dossier.decision_reponse === 'CONVAINCANTE'
                   ? <CheckCircle2 className="size-5 shrink-0 text-green-600" />
                   : <AlertTriangle className="size-5 shrink-0 text-amber-600" />
                 }
                 <div>
                   <p className="text-xs text-slate-500">قرار التقييم</p>
-                  <p className={`mt-0.5 text-sm font-bold ${
-                    dossier.decision_reponse === 'CONVAINCANTE' ? 'text-green-800' : 'text-amber-800'
-                  }`}>
+                  <p className={`mt-0.5 text-sm font-bold ${dossier.decision_reponse === 'CONVAINCANTE' ? 'text-green-800' : 'text-amber-800'
+                    }`}>
                     {dossier.decision_reponse === 'CONVAINCANTE' ? 'الجواب مقنع' : 'الجواب غير مقنع'}
                   </p>
                 </div>
@@ -964,30 +1091,57 @@ export default function DossierExplicatifDetailPage() {
           </div>
         )
 
-      case 3:
+      case 3: {
+        const isFinalState = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
+        const procedureDoc = procedureDocuments[0] || null
+
+        if (!procedureDoc) {
+          return <p className="text-sm text-slate-600">لم يتم إنشاء وثيقة المسطرة التأديبية</p>
+        }
+
         return (
-          <div className="space-y-3">
-            <p className="leading-relaxed text-sm text-slate-500">وثائق المسطرة اللاحقة:</p>
-            {procedureDocuments.length > 0 ? (
-              <div className="space-y-2">
-                {procedureDocuments.map((doc) => (
-                  <div key={doc.id} className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <FileText className="size-4 shrink-0 text-slate-500" />
-                    <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(doc)}</span>
-                    {isDocumentReady(doc) ? (
-                      <a href={getDocumentDownloadUrl(dossier.id, doc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
-                        <Download className="size-3" />
-                        تحميل
-                      </a>
-                    ) : null}
-                  </div>
-                ))}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-slate-600">طلب استكمال المسطرة التأديبية</p>
+              <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <FileText className="size-4 shrink-0 text-slate-500" />
+                <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(procedureDoc)}</span>
+                {isDocumentReady(procedureDoc) ? (
+                  <a href={getDocumentDownloadUrl(dossier.id, procedureDoc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
+                    <Download className="size-3" />
+                    تحميل
+                  </a>
+                ) : null}
               </div>
-            ) : (
-              <p className="text-sm text-slate-600">لم يتم إنشاء وثائق مسطرة</p>
-            )}
+            </div>
+            {!isFinalState ? (
+              <div className="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
+                <div className="min-w-[160px] flex-1 max-w-xs space-y-1.5">
+                  <p className="text-sm font-medium text-slate-600">نوع المسطرة</p>
+                  <Select value={procedureType} onValueChange={setProcedureType} disabled={procedureLoading}>
+                    <SelectTrigger className={selectTriggerClassName}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
+                      <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGenerateProcedureFromEval}
+                  disabled={procedureLoading}
+                  className="sm:w-auto"
+                >
+                  {procedureLoading ? 'جاري إعادة التوليد...' : 'إعادة توليد طلب استكمال المسطرة التأديبية'}
+                </Button>
+              </div>
+            ) : null}
           </div>
         )
+      }
 
       case 4: {
         if (dossier.statut === 'ARCHIVE') {
@@ -1060,34 +1214,8 @@ export default function DossierExplicatifDetailPage() {
       case 2:
         return null
 
-      case 3: {
-        const isClosed = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
-        const closureIsCurrent = !isClosed && currentStepIndex === 4
-        return (
-          <ContextPanel
-            title="الإغلاق"
-            statusColor={isClosed ? 'green' : closureIsCurrent ? 'amber' : 'slate'}
-            statusLabel={isClosed ? 'مكتملة' : closureIsCurrent ? 'جاهز' : 'مقبل'}
-          >
-            {isClosed ? (
-              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                <CheckCircle2 className="size-4 shrink-0 text-green-600" />
-                <div>
-                  <p className="text-xs text-slate-500">تاريخ الإغلاق</p>
-                  <p className="text-sm font-semibold text-green-800">{formatDate(dossier.date_cloture) || '-'}</p>
-                </div>
-              </div>
-            ) : closureIsCurrent ? (
-              <p className="text-sm text-slate-500">الملف جاهز للإغلاق بعد مراجعة المسطرة</p>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Lock className="size-4 shrink-0" />
-                <span>تُكمل بعد إنشاء المسطرة اللاحقة</span>
-              </div>
-            )}
-          </ContextPanel>
-        )
-      }
+      case 3:
+        return null
 
       case 4: {
         if (dossier.statut === 'CLOTURE') {
@@ -1139,25 +1267,27 @@ export default function DossierExplicatifDetailPage() {
       return (
         <div dir="rtl">
           <div className="flex items-start justify-between gap-4">
-            <dl className="flex-1 text-right">
-              <div className="border-b border-slate-100 py-3">
+            <dl className="grid flex-1 grid-cols-1 gap-x-10 gap-y-4 md:grid-cols-2">
+              <div>
                 <dt className="text-sm font-medium text-slate-700">تاريخ التبليغ</dt>
-                <dd className="mt-1 text-sm text-slate-900">{formatDate(dossier.date_notification) || '-'}</dd>
+                <dd className="mt-1 truncate text-sm text-slate-900 text-right font-medium">{formatDate(dossier.date_notification) || '—'}</dd>
               </div>
-              <div className="py-3">
-                <dt className="text-sm font-medium text-slate-700">وصل الاستلام</dt>
-                <dd className="mt-1 text-sm text-slate-900">
+              <div>
+                <dt className="text-sm font-medium text-slate-700
+">وصل الاستلام</dt>
+                <dd className="mt-0.5 flex items-center gap-2 text-sm">
                   {notificationProofDocument ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="truncate">{getDocumentName(notificationProofDocument)}</span>
+                    <>
+                      <FileText className="size-3.5 shrink-0 text-slate-400" />
+                      <span className="max-w-[180px] mt-1 truncate text-sm text-slate-900 text-right font-medium">{getDocumentName(notificationProofDocument)}</span>
                       {isDocumentReady(notificationProofDocument) ? (
                         <a href={getDocumentDownloadUrl(dossier.id, notificationProofDocument.id)} className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800">
                           تحميل
                         </a>
                       ) : null}
-                    </span>
+                    </>
                   ) : (
-                    <span className="text-slate-400">لا يوجد وصل مرفوع</span>
+                    <span className="text-slate-500">لا يوجد وصل مرفوع</span>
                   )}
                 </dd>
               </div>
@@ -1167,7 +1297,7 @@ export default function DossierExplicatifDetailPage() {
                 type="button"
                 onClick={() => setNotifEditMode(true)}
                 title="تعديل التبليغ"
-                className="mt-3 flex cursor-pointer shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900"
+                className="flex cursor-pointer shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
                 <Pencil className="size-3.5" />
                 تعديل
@@ -1261,6 +1391,9 @@ export default function DossierExplicatifDetailPage() {
     const block = 'overflow-hidden rounded-xl border border-slate-200 bg-white'
     const blockHeader = 'flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/60 px-5 py-3.5'
     const blockBody = 'px-5 py-4'
+    const blockSubtitle = 'mt-0.5 text-xs text-slate-500'
+    const metaLabel = 'text-sm font-medium text-slate-600'
+    const metaValue = 'mt-1 truncate text-sm font-semibold text-slate-950 text-right'
     const editBtn = 'flex cursor-pointer shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900'
 
     return (
@@ -1271,7 +1404,7 @@ export default function DossierExplicatifDetailPage() {
           <div className={blockHeader}>
             <div>
               <p className="text-sm font-semibold text-slate-900">الجواب</p>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className={blockSubtitle}>
                 {isResponseLocked
                   ? 'في انتظار تسجيل التبليغ'
                   : showResponseForm
@@ -1279,46 +1412,62 @@ export default function DossierExplicatifDetailPage() {
                     : 'معلومات الجواب المرفوع من طرف المعني بالأمر'}
               </p>
             </div>
-            {canEditResponse && !showResponseForm ? (
-              <button type="button" onClick={() => setResponseEditMode(true)} className={editBtn}>
-                <Pencil className="size-3.5" />
-                تعديل
-              </button>
+            {!showResponseForm && !showEvalForm ? (
+              <div className="flex shrink-0 items-center gap-2">
+                {canEditResponse ? (
+                  <button type="button" onClick={() => setResponseEditMode(true)} className={editBtn}>
+                    <Pencil className="size-3.5" />
+                    تعديل الجواب
+                  </button>
+                ) : null}
+                {canEditEval && hasEvalData ? (
+                  <button type="button" onClick={() => setEvalEditMode(true)} className={editBtn}>
+                    <Pencil className="size-3.5" />
+                    تعديل النتيجة
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <div className={blockBody}>
             {isResponseLocked ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Lock className="size-4 shrink-0" />
                 <span>تُكمل بعد تسجيل التبليغ</span>
               </div>
             ) : !showResponseForm && hasResponseData ? (
               <div>
-                <dl className="divide-y divide-slate-50 text-sm">
-                  <div className="flex items-center justify-between gap-6 py-2.5">
-                    <dt className="shrink-0 text-xs font-medium text-slate-400">تاريخ التوصل بالجواب</dt>
-                    <dd className="font-semibold text-slate-900">{formatDate(dossier.date_reponse_recue) || '—'}</dd>
+                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3.5">
+                  <div>
+                    <dt className={metaLabel}>تاريخ التوصل بالجواب</dt>
+                    <dd className={metaValue}>{formatDate(dossier.date_reponse_recue) || '—'}</dd>
                   </div>
-                  <div className="flex items-center justify-between gap-6 py-2.5">
-                    <dt className="shrink-0 text-xs font-medium text-slate-400">وثيقة الجواب</dt>
-                    <dd className="flex min-w-0 items-center gap-2">
+                  <div>
+                    <dt className={metaLabel}>وثيقة الجواب</dt>
+                    <dd className="mt-0.5 flex items-center gap-2">
                       {responseProofDocument ? (
                         <>
                           <FileText className="size-3.5 shrink-0 text-slate-400" />
-                          <span className="max-w-[180px] truncate font-semibold text-slate-900">{getDocumentName(responseProofDocument)}</span>
+                          <span className="max-w-[220px] truncate text-sm text-slate-900 text-right font-medium">{getDocumentName(responseProofDocument)}</span>
                           {isDocumentReady(responseProofDocument) ? (
                             <a href={getDocumentDownloadUrl(dossier.id, responseProofDocument.id)} className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800">
-                              <Download className="size-3.5" />
+                              تحميل
                             </a>
                           ) : null}
                         </>
                       ) : (
-                        <span className="text-slate-400">لا يوجد وثيقة مرفوعة</span>
+                        <span className="text-sm text-slate-500">لا يوجد وثيقة مرفوعة</span>
                       )}
                     </dd>
                   </div>
                 </dl>
-                {!evalEditMode && actionFeedback}
+                {hasEvalData ? (
+                  <div className="mt-3.5 border-t border-slate-100 pt-3.5">
+                    <dt className={metaLabel}>نتيجة الجواب</dt>
+                    <dd className={metaValue}>{dossier.decision_reponse === 'CONVAINCANTE' ? 'الجواب مقنع' : 'الجواب غير مقنع'}</dd>
+                  </div>
+                ) : null}
+                {actionFeedback}
               </div>
             ) : (
               <div className="max-w-lg space-y-4">
@@ -1381,48 +1530,18 @@ export default function DossierExplicatifDetailPage() {
           </div>
         </div>
 
-        {/* ═══ Block 2: التقييم ═══ */}
-        <div className={block}>
-          <div className={blockHeader}>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">التقييم</p>
-              <p className="mt-0.5 text-xs text-slate-400">
-                {!evalReady
-                  ? 'يتوفر بعد تسجيل الجواب ورفع الوثيقة'
-                  : showEvalForm
-                    ? (evalEditMode ? 'تعديل قرار التقييم المسجل' : 'حدد نتيجة فحص جواب المعني بالأمر')
-                    : 'نتيجة فحص جواب المعني بالأمر'}
-              </p>
+        {/* ═══ Block 2: التقييم — form only, display merged into Block 1 ═══ */}
+        {showEvalForm ? (
+          <div className={block}>
+            <div className={blockHeader}>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">التقييم</p>
+                <p className={blockSubtitle}>
+                  {evalEditMode ? 'تعديل قرار التقييم المسجل' : 'حدد نتيجة فحص جواب المعني بالأمر'}
+                </p>
+              </div>
             </div>
-            {canEditEval && !showEvalForm ? (
-              <button type="button" onClick={() => setEvalEditMode(true)} className={editBtn}>
-                <Pencil className="size-3.5" />
-                تعديل
-              </button>
-            ) : null}
-          </div>
-          <div className={blockBody}>
-            {!evalReady ? (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Lock className="size-4 shrink-0" />
-                <span>يتوفر بعد تسجيل الجواب ورفع الوثيقة</span>
-              </div>
-            ) : !showEvalForm && hasEvalData ? (
-              <div className="space-y-3">
-                <div className={`inline-flex items-center gap-2.5 rounded-lg border px-4 py-2.5 text-sm font-semibold ${
-                  dossier.decision_reponse === 'CONVAINCANTE'
-                    ? 'border-green-200 bg-green-50 text-green-800'
-                    : 'border-amber-200 bg-amber-50 text-amber-800'
-                }`}>
-                  {dossier.decision_reponse === 'CONVAINCANTE'
-                    ? <CheckCircle2 className="size-4 shrink-0 text-green-600" />
-                    : <AlertTriangle className="size-4 shrink-0 text-amber-600" />
-                  }
-                  {dossier.decision_reponse === 'CONVAINCANTE' ? 'الجواب مقنع' : 'الجواب غير مقنع'}
-                </div>
-                {actionFeedback}
-              </div>
-            ) : showEvalForm ? (
+            <div className={blockBody}>
               <div className="max-w-lg space-y-4">
                 <div className="space-y-1.5">
                   <Label className={fieldLabelClassName}>نتيجة التقييم</Label>
@@ -1463,28 +1582,18 @@ export default function DossierExplicatifDetailPage() {
                   ) : null}
                 </div>
               </div>
-            ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {/* ═══ Block 3: الإجراء التالي ═══ */}
-        {!showEvalForm && hasEvalData && dossier.decision_reponse === 'NON_CONVAINCANTE' && !isFinal ? (
+        {/* ═══ Block 3: الإجراء التالي — only when procedure not yet generated ═══ */}
+        {!showEvalForm && hasEvalData && dossier.decision_reponse === 'NON_CONVAINCANTE' && !isFinal && procedureDocuments.length === 0 ? (
           <div className={block}>
             <div className={blockHeader}>
               <div>
                 <p className="text-sm font-semibold text-slate-900">الإجراء التالي</p>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {procedureDocuments.length > 0
-                    ? 'طلب استكمال المسطرة التأديبية قابل للتحديث بعد كل تعديل'
-                    : 'إنشاء طلب استكمال المسطرة التأديبية حسب نوع المخالفة'}
-                </p>
+                <p className={blockSubtitle}>إنشاء طلب استكمال المسطرة التأديبية حسب نوع المخالفة</p>
               </div>
-              {procedureDocuments.length > 0 ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
-                  <CheckCircle2 className="size-3" />
-                  تم الإنشاء
-                </span>
-              ) : null}
             </div>
             <div className={blockBody}>
               <div className="max-w-sm space-y-4">
@@ -1506,14 +1615,11 @@ export default function DossierExplicatifDetailPage() {
                 </div>
                 <Button
                   type="button"
-                  variant={procedureDocuments.length > 0 ? 'outline' : 'default'}
                   onClick={handleGenerateProcedureFromEval}
                   disabled={procedureLoading}
                   className="w-full transition-colors sm:w-auto"
                 >
-                  {procedureLoading
-                    ? (procedureDocuments.length > 0 ? 'جاري الإعادة...' : 'جاري الإنشاء...')
-                    : (procedureDocuments.length > 0 ? 'إعادة توليد الطلب' : 'إنشاء طلب استكمال المسطرة التأديبية')}
+                  {procedureLoading ? 'جاري الإنشاء...' : 'إنشاء طلب استكمال المسطرة التأديبية'}
                 </Button>
               </div>
             </div>
@@ -1588,67 +1694,57 @@ export default function DossierExplicatifDetailPage() {
     )
   }
 
-  const employeeFields = [
-    { label: 'الاسم الكامل', value: dossier.nom_complet },
-    { label: 'رقم التأجير', value: dossier.matricule },
-    { label: 'الدرجة', value: dossier.professeur?.grade?.nom || dossier.profil },
-    { label: 'المصلحة', value: dossier.professeur?.service?.nom || dossier.service },
-    { label: 'المستشفى', value: dossier.professeur?.hopital?.nom },
-    { label: 'التخصص', value: dossier.professeur?.specialite?.nom },
-  ]
-
   return (
     <PageShell>
       <meta charSet="UTF-8" />
       <div className="space-y-6" dir="rtl">
 
-        {/* Header */}
+        {/* Header — identity + badges */}
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Top row: label / badges / back button */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">الملف التأديبي</p>
-              <h1 dir="ltr" className="text-3xl font-bold tracking-tight text-slate-900">
-                {dossier.reference}
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">الملف التأديبي</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  <span dir="ltr">{dossier.reference}</span>
+                </span>
                 <Badge className={statusClassName}>
                   {getDossierStatusLabel(dossier.statut)}
                 </Badge>
-                {getTypeFauteLabel(dossier.type_faute) ? (
-                  <>
-                    <span className="text-slate-300 select-none">·</span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                      {getTypeFauteLabel(dossier.type_faute)}
-                    </span>
-                  </>
-                ) : null}
-                {formatDate(dossier.date_faute) ? (
-                  <>
-                    <span className="text-slate-300 select-none">·</span>
-                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                      <Calendar className="size-3 text-slate-400" />
-                      {formatDate(dossier.date_faute)}
-                    </span>
-                  </>
-                ) : null}
               </div>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="gap-2 border-slate-200 text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+              className="shrink-0 gap-2 border-slate-200 text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
               onClick={() => router.push('/dossiers-explicatifs')}
             >
               <ArrowRight className="size-4" />
               رجوع
             </Button>
           </div>
-        </section>
 
-        {/* Employee Info */}
-        <AppCard>
-          <InfoGrid items={employeeFields} />
-        </AppCard>
+          {/* Identity grid */}
+          <div className="mt-5 grid grid-cols-1 gap-x-8 gap-y-4 border-t border-slate-100 pt-5 sm:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <p className="text-sm font-medium text-slate-600">الاسم الكامل</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950">{dossier.nom_complet || '—'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-600">رقم التأجير</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950" dir="ltr">{dossier.matricule || '—'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-600">المصلحة</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950">{dossier.professeur?.service?.nom || dossier.service || '—'}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-600">الدرجة</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950">{dossier.professeur?.grade?.nom || dossier.profil || '—'}</p>
+            </div>
+          </div>
+        </section>
 
         {/* Workflow */}
         <AppCard title="مسار معالجة الملف">
@@ -1688,8 +1784,8 @@ export default function DossierExplicatifDetailPage() {
 
             <div className="space-y-4 text-right">
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-medium text-slate-500">نوع المخالفة</p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">{getTypeFauteLabel(dossier.type_faute) || '-'}</p>
+                <p className="text-sm font-medium text-slate-600">نوع المخالفة</p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-950">{getTypeFauteLabel(dossier.type_faute) || '-'}</p>
               </div>
 
               <div className="space-y-2">

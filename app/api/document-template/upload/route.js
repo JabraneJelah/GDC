@@ -79,7 +79,7 @@ export async function POST(request) {
         },
       }),
       prisma.documentTemplate.findFirst({
-        where: { type_faute_id, usage },
+        where: { type_faute_id, usage, actif: true },
       }),
     ])
 

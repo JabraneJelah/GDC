@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
+import { getExtraFieldsForCode } from '@/lib/dossiers-explicatifs/extraFields'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ALLOWED_TYPES_PROCEDURE = ['AVERTISSEMENT', 'RETENUE']
@@ -16,6 +17,39 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('fr-MA').format(value)
 }
 
+function formatTime(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  const date = formatDate(value)
+  const time = formatTime(value)
+  if (!time || time === '00:00') return date
+  return `${date} على الساعة ${time}`
+}
+
+function buildExtraData(dossier) {
+  const raw = dossier.donnees_supplementaires
+  if (!raw || typeof raw !== 'object') return {}
+  const fieldDefs = getExtraFieldsForCode(dossier.type_faute?.code)
+  const result = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const def = fieldDefs.find((f) => f.key === key)
+    if (def?.type === 'date' && value) {
+      result[key] = formatDate(new Date(value))
+    } else {
+      result[key] = value || ''
+    }
+  }
+  return result
+}
+
 function buildTemplateData(dossier) {
   return {
     nom_complet: dossier.nom_complet || '',
@@ -23,8 +57,11 @@ function buildTemplateData(dossier) {
     profil: dossier.profil || '',
     service: dossier.service || '',
     date_faute: formatDate(dossier.date_faute),
+    heure_faute: formatTime(dossier.date_faute),
+    date_heure_faute: formatDateTime(dossier.date_faute),
     type_faute: dossier.type_faute?.nom || '',
     details: dossier.details || '',
+    ...buildExtraData(dossier),
   }
 }
 
@@ -134,8 +171,9 @@ export async function POST(request, { params }) {
         details: true,
         statut: true,
         type_faute_id: true,
+        donnees_supplementaires: true,
         type_faute: {
-          select: { nom: true },
+          select: { nom: true, code: true },
         },
       },
     })

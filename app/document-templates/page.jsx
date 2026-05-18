@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FileText, Plus, Search } from 'lucide-react'
+import { ChevronDown, ChevronUp, FileText, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
 
 const initialFormData = {
@@ -105,6 +105,9 @@ export default function DocumentTemplatesPage() {
   const [typesFaute, setTypesFaute] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterTypeFauteId, setFilterTypeFauteId] = useState('')
+  const [filterUsage, setFilterUsage] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -164,12 +167,29 @@ export default function DocumentTemplatesPage() {
 
   const filteredTemplates = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return templates
-    return templates.filter((t) =>
-      [t.nom, t.identifiant, getTypeFauteLabel(t.type_faute), getUsageLabel(t.usage)]
-        .some((v) => v && v.toLowerCase().includes(q))
-    )
-  }, [templates, search])
+    return templates.filter((t) => {
+      if (q && ![t.nom, t.identifiant, getTypeFauteLabel(t.type_faute), getUsageLabel(t.usage)]
+        .some((v) => v && v.toLowerCase().includes(q))) return false
+      if (filterTypeFauteId && String(t.type_faute?.id) !== filterTypeFauteId) return false
+      if (filterUsage && t.usage !== filterUsage) return false
+      return true
+    })
+  }, [templates, search, filterTypeFauteId, filterUsage])
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (search.trim()) count++
+    if (filterTypeFauteId) count++
+    if (filterUsage) count++
+    return count
+  }, [search, filterTypeFauteId, filterUsage])
+
+  const resetFilters = () => {
+    setSearch('')
+    setFilterTypeFauteId('')
+    setFilterUsage('')
+    setCurrentPage(1)
+  }
 
   const activeCount = useMemo(() => templates.filter((t) => t.actif !== false).length, [templates])
   const inactiveCount = useMemo(() => templates.filter((t) => t.actif === false).length, [templates])
@@ -402,17 +422,121 @@ export default function DocumentTemplatesPage() {
           </div>
         ) : null}
 
-        {/* Search */}
-        <div className="flex">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-            <Input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
-              placeholder="ابحث عن نموذج..."
-              className="h-10 rounded-xl border-slate-300 bg-white pl-9 pr-4 text-right text-sm placeholder:text-slate-400 focus-visible:ring-blue-500"
-            />
-          </div>
+        {/* Collapsible filter bar */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Toggle header */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-5 py-4 sm:px-6"
+          >
+            <div className="flex items-center gap-2.5">
+              <SlidersHorizontal className="size-4 text-slate-500" />
+              <span className="text-sm font-semibold text-slate-800">البحث والتصفية</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </div>
+            {filtersOpen
+              ? <ChevronUp className="size-4 text-slate-400" />
+              : <ChevronDown className="size-4 text-slate-400" />
+            }
+          </button>
+
+          {/* Expanded filter form */}
+          {filtersOpen && (
+            <div className="border-t border-slate-100 px-5 pb-5 pt-4 sm:px-6">
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {/* Search */}
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">بحث عام</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <Input
+                        value={search}
+                        onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
+                        placeholder="اسم النموذج، المعرف..."
+                        className="h-9 rounded-xl border-slate-300 bg-white pl-9 pr-4 text-right text-sm placeholder:text-slate-400 focus-visible:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* نوع المخالفة */}
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">نوع المخالفة</label>
+                    <Select
+                      value={filterTypeFauteId || '__all__'}
+                      onValueChange={(v) => { setFilterTypeFauteId(v === '__all__' ? '' : v); setCurrentPage(1) }}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="الكل" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">الكل</SelectItem>
+                        {typesFaute.map((tf) => (
+                          <SelectItem key={tf.id} value={String(tf.id)}>
+                            {getTypeFauteLabel(tf)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* الاستعمال */}
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">الاستعمال</label>
+                    <Select
+                      value={filterUsage || '__all__'}
+                      onValueChange={(v) => { setFilterUsage(v === '__all__' ? '' : v); setCurrentPage(1) }}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue placeholder="الكل" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">الكل</SelectItem>
+                        {Object.entries(usageLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                  <span className="text-sm text-slate-500">
+                    عرض{' '}
+                    <span className="font-semibold text-slate-800">{filteredTemplates.length}</span>{' '}
+                    نتيجة
+                  </span>
+                  <div className="flex gap-2">
+                    {activeFilterCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetFilters}
+                        className="h-8 gap-1.5 text-slate-600"
+                      >
+                        <X className="size-3.5" />
+                        إعادة التعيين
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setFiltersOpen(false)}
+                    >
+                      عرض النتائج ({filteredTemplates.length})
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Table card */}
@@ -438,12 +562,23 @@ export default function DocumentTemplatesPage() {
                         <FileText className="size-9 text-slate-300" strokeWidth={1.5} />
                         <div className="space-y-1">
                           <p className="text-sm font-medium text-slate-600">
-                            {search ? 'لا توجد نتائج مطابقة' : 'لا توجد نماذج حاليا'}
+                            {activeFilterCount > 0 ? 'لا توجد نماذج مطابقة لمعايير التصفية' : 'لا توجد نماذج حاليا'}
                           </p>
                           <p className="text-xs text-slate-400">
-                            {search ? 'جرب كلمات بحث مختلفة' : 'أضف نموذج DOCX لربطه بنوع مخالفة'}
+                            {activeFilterCount > 0 ? 'جرب تعديل معايير البحث أو إعادة التعيين' : 'أضف نموذج DOCX لربطه بنوع مخالفة'}
                           </p>
                         </div>
+                        {activeFilterCount > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                            className="mt-1 gap-1.5"
+                          >
+                            <X className="size-3.5" />
+                            إعادة التعيين
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -19,6 +19,7 @@ import { InfoGrid } from '@/components/dossiers-explicatifs/InfoGrid'
 const initialFormData = {
   type_faute_id: '',
   date_faute: '',
+  heure_faute: '',
   details: '',
 }
 
@@ -129,10 +130,14 @@ export default function NouveauDossierExplicatifPage() {
     setSubmitting(true)
 
     try {
+      const dateTimeFaute = formData.heure_faute
+        ? `${formData.date_faute}T${formData.heure_faute}:00`
+        : formData.date_faute
+
       const payload = {
         professeur_id: selectedProfesseur.id,
         type_faute_id: parseInt(formData.type_faute_id, 10),
-        date_faute: formData.date_faute,
+        date_faute: dateTimeFaute,
       }
 
       if (formData.details.trim()) {
@@ -337,38 +342,38 @@ export default function NouveauDossierExplicatifPage() {
                 </div>
               )}
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="type_faute_id"
-                      className="block text-right text-sm font-medium text-slate-700"
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="type_faute_id"
+                    className="block text-right text-sm font-medium text-slate-700"
+                  >
+                    نوع المخالفة <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.type_faute_id}
+                    onValueChange={(value) => handleFormChange('type_faute_id', value)}
+                    disabled={!selectedProfesseur}
+                  >
+                    <SelectTrigger
+                      id="type_faute_id"
+                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
                     >
-                      نوع المخالفة <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={formData.type_faute_id}
-                      onValueChange={(value) => handleFormChange('type_faute_id', value)}
-                      disabled={!selectedProfesseur}
-                    >
-                      <SelectTrigger
-                        id="type_faute_id"
-                        className="h-11 rounded-xl border-slate-300 bg-white text-right"
-                      >
-                        <SelectValue placeholder="اختر نوع المخالفة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {typesFaute.map((typeFaute) => (
-                          <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
-                            {typeFaute.nom || typeFaute.libelle || typeFaute.code}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.type_faute_id ? (
-                      <p className="text-sm text-red-600">{formErrors.type_faute_id}</p>
-                    ) : null}
-                  </div>
+                      <SelectValue placeholder="اختر نوع المخالفة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {typesFaute.map((typeFaute) => (
+                        <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
+                          {typeFaute.nom || typeFaute.libelle || typeFaute.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.type_faute_id ? (
+                    <p className="text-sm text-red-600">{formErrors.type_faute_id}</p>
+                  ) : null}
+                </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label
                       htmlFor="date_faute"
@@ -387,6 +392,23 @@ export default function NouveauDossierExplicatifPage() {
                     {formErrors.date_faute ? (
                       <p className="text-sm text-red-600">{formErrors.date_faute}</p>
                     ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="heure_faute"
+                      className="block text-right text-sm font-medium text-slate-700"
+                    >
+                      وقت المخالفة
+                    </Label>
+                    <Input
+                      id="heure_faute"
+                      type="time"
+                      value={formData.heure_faute}
+                      onChange={(event) => handleFormChange('heure_faute', event.target.value)}
+                      disabled={!selectedProfesseur}
+                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
+                    />
                   </div>
                 </div>
 

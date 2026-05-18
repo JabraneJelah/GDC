@@ -148,6 +148,8 @@ model DossierExplicatif {
   date_faute DateTime
   details    String?
 
+  donnees_supplementaires Json?
+
   statut                     StatutDossierExplicatif     @default(BROUILLON)
   decision_reponse           DecisionReponseExplicative?
   type_procedure_selectionne TypeProcedureExplicative?

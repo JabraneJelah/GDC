@@ -16,12 +16,12 @@ export function PageShell({ children }) {
   }, [pathname])
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       {/* Full-width fixed header */}
       <Header onMobileMenuOpen={() => setIsMobileOpen(true)} />
 
       {/* Body: sidebar + content, pushed below the header */}
-      <div className="flex pt-14">
+      <div className="flex flex-1 pt-14">
         {/* Content area */}
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="flex-1 bg-[#F8FAFC]">
