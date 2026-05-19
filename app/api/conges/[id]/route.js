@@ -287,6 +287,7 @@ export async function PUT(request, { params }) {
         date_debut: new Date(date_debut),
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
+        nom_interim: nom_interim || null,
         reference_doc: reference_doc || null,
         hors_solde: existingConge.hors_solde,
       },

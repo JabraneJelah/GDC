@@ -144,6 +144,15 @@ function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function formatExtraFieldDisplay(field, value) {
+  if (!value) return '-'
+  if (field.type === 'date') {
+    const d = new Date(value + 'T00:00:00')
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('ar-MA')
+  }
+  return value || '-'
+}
+
 function getDocumentName(document) {
   return document?.titre || document?.nom || document?.identifiant || '-'
 }
@@ -162,8 +171,8 @@ function getTypeFauteLabel(typeFaute) {
   return typeFauteArabicLabels[typeFaute.code] || typeFaute.nom || null
 }
 
-function RegistrationSummary({ dossier }) {
-  const items = [
+function RegistrationSummary({ dossier, extraFieldsConfig }) {
+  const baseItems = [
     { label: 'المرجع', value: dossier.reference, dir: 'ltr' },
     { label: 'الاسم الكامل', value: dossier.nom_complet },
     { label: 'رقم التأجير', value: dossier.matricule },
@@ -172,6 +181,11 @@ function RegistrationSummary({ dossier }) {
     { label: 'نوع المخالفة', value: getTypeFauteLabel(dossier.type_faute) },
     { label: 'تاريخ المخالفة', value: formatDateTime(dossier.date_faute) },
   ]
+  const extraItems = (extraFieldsConfig || []).map((field) => ({
+    label: field.label,
+    value: formatExtraFieldDisplay(field, dossier.donnees_supplementaires?.[field.key]),
+  }))
+  const items = [...baseItems, ...extraItems]
 
   return (
     <div className="space-y-4 text-right" dir="rtl">
@@ -287,6 +301,7 @@ export default function DossierExplicatifDetailPage() {
   const [procedureType, setProcedureType] = useState('AVERTISSEMENT')
   const [initialConfirmOpen, setInitialConfirmOpen] = useState(false)
   const [procedureConfirmOpen, setProcedureConfirmOpen] = useState(false)
+  const [evalConfirmOpen, setEvalConfirmOpen] = useState(false)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [archiveError, setArchiveError] = useState('')
@@ -295,11 +310,13 @@ export default function DossierExplicatifDetailPage() {
   const [responseEditMode, setResponseEditMode] = useState(false)
   const [evalEditMode, setEvalEditMode] = useState(false)
   const [procedureLoading, setProcedureLoading] = useState(false)
+  const [procedureError, setProcedureError] = useState(null)
   const [errorModal, setErrorModal] = useState(null)
   const [extraFieldsData, setExtraFieldsData] = useState({})
   const [extraFieldsSaving, setExtraFieldsSaving] = useState(false)
   const [extraFieldsError, setExtraFieldsError] = useState('')
   const [extraFieldsSuccess, setExtraFieldsSuccess] = useState(false)
+  const [extraFieldsEditMode, setExtraFieldsEditMode] = useState(false)
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
     if (!dossierId) return null
@@ -421,12 +438,34 @@ export default function DossierExplicatifDetailPage() {
     if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
       setExtraFieldsData(saved)
     }
+    const config = getExtraFieldsForCode(dossier.type_faute?.code)
+    const allFilled = config.length > 0 && config.every((f) => saved?.[f.key]?.toString().trim())
+    setExtraFieldsEditMode(!allFilled)
   }, [dossier?.id])
+
+  // Auto-dismiss procedure error after 5 s
+  useEffect(() => {
+    if (!procedureError) return
+    const timer = setTimeout(() => setProcedureError(null), 5000)
+    return () => clearTimeout(timer)
+  }, [procedureError])
+
+  // Clear procedure error when user navigates to a different step
+  useEffect(() => {
+    setProcedureError(null)
+  }, [viewedStepIndex])
 
   const actionFeedback = actionError ? (
     <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
       <span>{actionError}</span>
+    </div>
+  ) : null
+
+  const procedureFeedback = procedureError ? (
+    <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
+      <span>{procedureError}</span>
     </div>
   ) : null
 
@@ -439,6 +478,7 @@ export default function DossierExplicatifDetailPage() {
     }
 
     setActionError('')
+    setProcedureError(null)
     setSuccessModal(null)
 
     try {
@@ -542,11 +582,11 @@ export default function DossierExplicatifDetailPage() {
       } else if (actionErrorValue.message === 'response_file_type_invalid') {
         setActionError('صيغة وثيقة الجواب غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX')
       } else if (actionErrorValue.message === 'procedure_type_required') {
-        setActionError('المرجو اختيار نوع المسطرة')
+        setProcedureError('المرجو اختيار نوع المسطرة')
       } else if (actionErrorValue.message === 'procedure_generation_failed') {
-        setActionError('تعذر إنشاء طلب استكمال المسطرة التأديبية')
+        setProcedureError('تعذر إنشاء طلب استكمال المسطرة التأديبية')
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
-        setActionError(actionErrorValue.message || 'تعذر إنشاء طلب استكمال المسطرة التأديبية')
+        setProcedureError(actionErrorValue.message || 'تعذر إنشاء طلب استكمال المسطرة التأديبية')
       } else {
         setActionError(translateApiError(actionErrorValue.message, dossier.statut))
       }
@@ -572,6 +612,7 @@ export default function DossierExplicatifDetailPage() {
         return
       }
       await fetchDossier({ showLoading: false })
+      setExtraFieldsEditMode(false)
       setExtraFieldsSuccess(true)
       setTimeout(() => setExtraFieldsSuccess(false), 2500)
     } catch {
@@ -585,6 +626,12 @@ export default function DossierExplicatifDetailPage() {
     if (dossier?.statut === 'ENREGISTRE') {
       setActionError('')
       setInitialConfirmOpen(true)
+      return
+    }
+
+    if (dossier?.statut === 'REPONSE_RECUE') {
+      setActionError('')
+      setEvalConfirmOpen(true)
       return
     }
 
@@ -720,6 +767,7 @@ export default function DossierExplicatifDetailPage() {
   const handleGenerateProcedureFromEval = async () => {
     if (!dossier || procedureLoading) return
     setProcedureLoading(true)
+    setProcedureError(null)
     setSuccessModal(null)
     setErrorModal(null)
 
@@ -735,19 +783,14 @@ export default function DossierExplicatifDetailPage() {
       if (!response.ok) {
         const errorMsg = responseBody?.error || ''
         if (errorMsg.includes('لا يوجد نموذج')) {
-          setErrorModal({
-            title: 'النموذج غير متوفر',
-            description: 'لا يوجد نموذج خاص باستكمال المسطرة التأديبية لهذا النوع من المخالفة. يرجى إضافته من صفحة نماذج الوثائق.',
-          })
+          setProcedureError('لا يوجد نموذج خاص باستكمال المسطرة التأديبية لهذا النوع من المخالفة. يرجى إضافته من صفحة نماذج الوثائق.')
         } else {
-          setErrorModal({
-            title: 'تعذر إنشاء الطلب',
-            description: errorMsg || 'حدث خطأ أثناء إنشاء طلب المسطرة التأديبية.',
-          })
+          setProcedureError(errorMsg || 'حدث خطأ أثناء إنشاء طلب المسطرة التأديبية.')
         }
         return
       }
 
+      setProcedureError(null)
       await fetchDossier({ showLoading: false })
       setSuccessModal({
         title: 'تم إنشاء طلب استكمال المسطرة التأديبية',
@@ -755,10 +798,7 @@ export default function DossierExplicatifDetailPage() {
         hasNextStep: true,
       })
     } catch {
-      setErrorModal({
-        title: 'تعذر إنشاء الطلب',
-        description: 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
-      })
+      setProcedureError('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.')
     } finally {
       setProcedureLoading(false)
     }
@@ -855,23 +895,26 @@ export default function DossierExplicatifDetailPage() {
 
       return (
         <div className="space-y-4">
-          <RegistrationSummary dossier={dossier} />
+          <RegistrationSummary dossier={dossier} extraFieldsConfig={extraFieldsConfig} />
 
-          {extraFieldsConfig.length > 0 && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-4" dir="rtl">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">معطيات إضافية مطلوبة لهذا النوع من المخالفة</p>
-                {!hasAllRequired && (
-                  <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                    غير مكتملة
-                  </span>
-                )}
-                {hasAllRequired && (
-                  <span className="rounded-full bg-green-100 border border-green-300 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                    مكتملة
-                  </span>
-                )}
-              </div>
+          {extraFieldsConfig.length > 0 && !isFinalDossier && !extraFieldsEditMode && (
+            <div className="flex items-center gap-3" dir="rtl">
+              <button
+                type="button"
+                onClick={() => { setExtraFieldsEditMode(true); setExtraFieldsError(''); setExtraFieldsSuccess(false) }}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              >
+                <Pencil className="size-3.5" />
+                تعديل معطيات الشهادة الطبية
+              </button>
+              {extraFieldsSuccess && (
+                <span className="text-sm font-medium text-green-700">✓ تم الحفظ بنجاح</span>
+              )}
+            </div>
+          )}
+
+          {extraFieldsConfig.length > 0 && extraFieldsEditMode && (
+            <div className="space-y-3" dir="rtl">
               <div className="grid gap-3 sm:grid-cols-2">
                 {extraFieldsConfig.map((field) => (
                   <div key={field.key} className="space-y-1.5">
@@ -888,7 +931,7 @@ export default function DossierExplicatifDetailPage() {
                         setExtraFieldsSuccess(false)
                       }}
                       placeholder={field.placeholder}
-                      disabled={isFinalDossier || extraFieldsSaving}
+                      disabled={extraFieldsSaving}
                       className={editableInputClassName}
                     />
                   </div>
@@ -900,22 +943,30 @@ export default function DossierExplicatifDetailPage() {
               {extraFieldsSuccess && (
                 <p className="text-sm font-medium text-green-700">تم حفظ المعطيات الإضافية بنجاح</p>
               )}
-              {!isFinalDossier && (
-                <div className="flex justify-start">
-                  <Button
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveExtraFields}
+                  disabled={extraFieldsSaving}
+                  className="cursor-pointer gap-1.5 transition-colors"
+                >
+                  {extraFieldsSaving ? 'جاري الحفظ...' : 'حفظ المعطيات'}
+                </Button>
+                {hasAllRequired && (
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveExtraFields}
-                    disabled={extraFieldsSaving}
-                    className="gap-1.5"
+                    onClick={() => { setExtraFieldsEditMode(false); setExtraFieldsError('') }}
+                    className="cursor-pointer inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
                   >
-                    {extraFieldsSaving ? 'جاري الحفظ...' : 'حفظ المعطيات الإضافية'}
-                  </Button>
-                </div>
-              )}
+                    إلغاء
+                  </button>
+                )}
+              </div>
             </div>
           )}
+
 
           {actionFeedback}
           <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-start">
@@ -951,7 +1002,7 @@ export default function DossierExplicatifDetailPage() {
               value={procedureType}
               onValueChange={(value) => {
                 setProcedureType(value)
-                setActionError('')
+                setProcedureError(null)
               }}
               disabled={actionLoading}
             >
@@ -964,7 +1015,7 @@ export default function DossierExplicatifDetailPage() {
               </SelectContent>
             </Select>
           </div>
-          {actionFeedback}
+          {procedureFeedback}
           <Button
             type="button"
             onClick={handlePrimaryActionClick}
@@ -1006,7 +1057,7 @@ export default function DossierExplicatifDetailPage() {
     switch (stepIndex) {
       case 0:
         return (
-          <RegistrationSummary dossier={dossier} />
+          <RegistrationSummary dossier={dossier} extraFieldsConfig={getExtraFieldsForCode(dossier.type_faute?.code)} />
         )
 
       case 1:
@@ -1115,28 +1166,31 @@ export default function DossierExplicatifDetailPage() {
               </div>
             </div>
             {!isFinalState ? (
-              <div className="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
-                <div className="min-w-[160px] flex-1 max-w-xs space-y-1.5">
-                  <p className="text-sm font-medium text-slate-600">نوع المسطرة</p>
-                  <Select value={procedureType} onValueChange={setProcedureType} disabled={procedureLoading}>
-                    <SelectTrigger className={selectTriggerClassName}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
-                      <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-3 border-t border-slate-100 pt-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="min-w-[160px] flex-1 max-w-xs space-y-1.5">
+                    <p className="text-sm font-medium text-slate-600">نوع المسطرة</p>
+                    <Select value={procedureType} onValueChange={(v) => { setProcedureType(v); setProcedureError(null) }} disabled={procedureLoading}>
+                      <SelectTrigger className={selectTriggerClassName}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
+                        <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGenerateProcedureFromEval}
+                    disabled={procedureLoading}
+                    className="sm:w-auto"
+                  >
+                    {procedureLoading ? 'جاري إعادة التوليد...' : 'إعادة توليد طلب استكمال المسطرة التأديبية'}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGenerateProcedureFromEval}
-                  disabled={procedureLoading}
-                  className="sm:w-auto"
-                >
-                  {procedureLoading ? 'جاري إعادة التوليد...' : 'إعادة توليد طلب استكمال المسطرة التأديبية'}
-                </Button>
+                {procedureFeedback}
               </div>
             ) : null}
           </div>
@@ -1601,7 +1655,7 @@ export default function DossierExplicatifDetailPage() {
                   <Label className={fieldLabelClassName}>نوع المسطرة</Label>
                   <Select
                     value={procedureType}
-                    onValueChange={setProcedureType}
+                    onValueChange={(v) => { setProcedureType(v); setProcedureError(null) }}
                     disabled={procedureLoading}
                   >
                     <SelectTrigger className={selectTriggerClassName}>
@@ -1613,6 +1667,7 @@ export default function DossierExplicatifDetailPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {procedureFeedback}
                 <Button
                   type="button"
                   onClick={handleGenerateProcedureFromEval}
@@ -1874,6 +1929,39 @@ export default function DossierExplicatifDetailPage() {
                   {actionLoading ? 'جاري الإنشاء...' : 'إنشاء طلب المسطرة'}
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Evaluation confirmation dialog */}
+        <Dialog open={evalConfirmOpen} onOpenChange={(open) => { if (!actionLoading) setEvalConfirmOpen(open) }}>
+          <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right text-lg font-bold text-slate-900">اعتماد التقييم</DialogTitle>
+              <DialogDescription className="text-right text-sm text-slate-600">
+                هل أنت متأكد من اعتماد نتيجة التقييم؟
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-start">
+              <button
+                type="button"
+                onClick={() => setEvalConfirmOpen(false)}
+                disabled={actionLoading}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEvalConfirmOpen(false)
+                  handleAction({ skipConfirmation: true })
+                }}
+                disabled={actionLoading}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {actionLoading ? 'جاري الحفظ...' : 'اعتماد التقييم'}
+              </button>
             </div>
           </DialogContent>
         </Dialog>

@@ -121,6 +121,8 @@ export default function DocumentTemplatesPage() {
   const [editFormErrors, setEditFormErrors] = useState({})
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [templateToDelete, setTemplateToDelete] = useState(null)
 
   const fetchTemplates = async () => {
     try {
@@ -336,13 +338,18 @@ export default function DocumentTemplatesPage() {
     }
   }
 
-  const handleDelete = async (template) => {
-    if (!window.confirm('هل تريد حذف هذا النموذج؟')) return
+  const handleDelete = (template) => {
+    setTemplateToDelete(template)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!templateToDelete) return
     setErrorMessage('')
     setSuccessMessage('')
     setActionLoading(true)
     try {
-      const response = await fetch(`/api/document-template/${template.id}`, {
+      const response = await fetch(`/api/document-template/${templateToDelete.id}`, {
         method: 'DELETE',
       })
       const responseBody = await response.json().catch(() => null)
@@ -351,6 +358,8 @@ export default function DocumentTemplatesPage() {
         return
       }
       setSuccessMessage('تم حذف النموذج بنجاح')
+      setDeleteConfirmOpen(false)
+      setTemplateToDelete(null)
       await fetchTemplates()
     } catch (error) {
       console.error('Erreur lors de la suppression du template:', error)
@@ -940,6 +949,41 @@ export default function DocumentTemplatesPage() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={deleteConfirmOpen} onOpenChange={(open) => {
+          if (!actionLoading) {
+            setDeleteConfirmOpen(open)
+            if (!open) setTemplateToDelete(null)
+          }
+        }}>
+          <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right text-xl font-bold text-slate-900">حذف النموذج</DialogTitle>
+              <DialogDescription className="text-right text-sm text-slate-600">
+                هل أنت متأكد من حذف هذا النموذج؟ سيتم تعطيله ولن يظهر ضمن النماذج النشطة.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-start">
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirmOpen(false); setTemplateToDelete(null) }}
+                disabled={actionLoading}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={actionLoading}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {actionLoading ? 'جاري الحذف...' : 'حذف النموذج'}
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
 

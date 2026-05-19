@@ -101,16 +101,31 @@ export async function POST(request) {
       }
     }
 
-    const existingIdentifiant = await prisma.documentTemplate.findFirst({
-      where: {
-        identifiant: { equals: identifiant, mode: 'insensitive' },
-      },
-    })
+    const [existingIdentifiant, existingUsagePair] = await Promise.all([
+      prisma.documentTemplate.findFirst({
+        where: {
+          identifiant: { equals: identifiant, mode: 'insensitive' },
+          actif: true,
+        },
+      }),
+      body.usage
+        ? prisma.documentTemplate.findFirst({
+            where: { type_faute_id, usage: body.usage, actif: true },
+          })
+        : Promise.resolve(null),
+    ])
 
     if (existingIdentifiant) {
       return NextResponse.json(
-        { error: 'Cet identifiant de template existe déjà' },
-        { status: 400 }
+        { error: 'يوجد بالفعل نموذج نشط بنفس المعرف' },
+        { status: 409 }
+      )
+    }
+
+    if (existingUsagePair) {
+      return NextResponse.json(
+        { error: 'يوجد بالفعل نموذج نشط بنفس نوع المخالفة ونوع الاستعمال' },
+        { status: 409 }
       )
     }
 

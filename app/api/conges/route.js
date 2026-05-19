@@ -24,6 +24,7 @@ export async function GET(request) {
         date_fin: true,
         duree_jours: true,
         hors_solde: true,
+        nom_interim: true,
         reference_doc: true,
         cree_le: true,
         professeur: {
@@ -240,7 +241,6 @@ export async function POST(request) {
 
     } // fin bloc solde (hors_solde === false)
 
-    // Créer le congé (nom_interim/prenom_interim retirés du schéma)
     const conge = await prisma.conge.create({
       data: {
         professeur_id,
@@ -249,6 +249,7 @@ export async function POST(request) {
         date_fin: new Date(date_fin),
         duree_jours: dureeJoursInt,
         hors_solde,
+        nom_interim: nom_interim || null,
         reference_doc: reference_doc || null,
         cree_par_rh_id: currentUser.userId,
       },

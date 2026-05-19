@@ -108,7 +108,7 @@ model TypeFaute {
 // Templates de documents gérés dans l'application (DOCX/PDF)
 model DocumentTemplate {
   id             String                 @id @default(uuid())
-  identifiant    String                 @unique
+  identifiant    String
   nom            String
   code           String?
   description    String?
@@ -377,6 +377,7 @@ model Conge {
   date_fin       DateTime
   duree_jours    Int
   hors_solde     Boolean  @default(false) // true = enregistré sans consommer de solde
+  nom_interim    String? // Nom complet du remplaçant (affiché dans المعوض)
   reference_doc  String? // Référence du document papier
   decision_doc   String? // JSON: fileName, fileUrl, fileType (décision officielle)
   cree_par_rh_id String

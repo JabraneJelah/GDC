@@ -76,6 +76,7 @@ export async function POST(request) {
       prisma.documentTemplate.findFirst({
         where: {
           identifiant: { equals: identifiant, mode: 'insensitive' },
+          actif: true,
         },
       }),
       prisma.documentTemplate.findFirst({
@@ -88,11 +89,11 @@ export async function POST(request) {
     }
 
     if (existingIdentifiant) {
-      return jsonError('هذا المعرف مستعمل مسبقا', 409)
+      return jsonError('يوجد بالفعل نموذج نشط بنفس المعرف', 409)
     }
 
     if (existingUsagePair) {
-      return jsonError('يوجد بالفعل نموذج بنفس نوع المخالفة ونوع الاستعمال', 409)
+      return jsonError('يوجد بالفعل نموذج نشط بنفس نوع المخالفة ونوع الاستعمال', 409)
     }
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'templates')
@@ -141,7 +142,7 @@ export async function POST(request) {
     console.error("Erreur lors de l'upload du template de document:", error)
 
     if (error?.code === 'P2002') {
-      return jsonError('هذا المعرف مستعمل مسبقا', 409)
+      return jsonError('يوجد بالفعل نموذج نشط بنفس المعرف', 409)
     }
 
     return jsonError('حدث خطأ غير متوقع أثناء رفع النموذج', 500)

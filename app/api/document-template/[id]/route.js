@@ -70,18 +70,45 @@ export async function PUT(request, { params }) {
       )
     }
 
+    // When reactivating (actif: false → true), check for active conflicts before
+    // any field-level checks, since those will also run and may be redundant.
+    const isReactivating = typeof actif === 'boolean' && actif === true && existing.actif === false
+
+    if (isReactivating) {
+      const [activeDuplicateIdentifiant, activeUsagePair] = await Promise.all([
+        prisma.documentTemplate.findFirst({
+          where: {
+            identifiant: { equals: nextIdentifiant, mode: 'insensitive' },
+            actif: true,
+            NOT: { id },
+          },
+        }),
+        prisma.documentTemplate.findFirst({
+          where: { type_faute_id: nextTypeFauteId, usage, actif: true, NOT: { id } },
+        }),
+      ])
+
+      if (activeDuplicateIdentifiant || activeUsagePair) {
+        return NextResponse.json(
+          { error: 'لا يمكن تفعيل هذا النموذج لوجود نموذج نشط بنفس الخصائص' },
+          { status: 409 }
+        )
+      }
+    }
+
     if (nextIdentifiant.toLowerCase() !== existing.identifiant.toLowerCase()) {
       const identifiantExists = await prisma.documentTemplate.findFirst({
         where: {
           identifiant: { equals: nextIdentifiant, mode: 'insensitive' },
+          actif: true,
           NOT: { id },
         },
       })
 
       if (identifiantExists) {
         return NextResponse.json(
-          { error: 'Cet identifiant de template existe déjà' },
-          { status: 400 }
+          { error: 'يوجد بالفعل نموذج نشط بنفس المعرف' },
+          { status: 409 }
         )
       }
     }
@@ -91,13 +118,13 @@ export async function PUT(request, { params }) {
 
     if (usagePairChanged) {
       const usagePairExists = await prisma.documentTemplate.findFirst({
-        where: { type_faute_id: nextTypeFauteId, usage, NOT: { id } },
+        where: { type_faute_id: nextTypeFauteId, usage, actif: true, NOT: { id } },
       })
 
       if (usagePairExists) {
         return NextResponse.json(
-          { error: 'Un template avec ce type de faute et cet usage existe déjà' },
-          { status: 400 }
+          { error: 'يوجد بالفعل نموذج نشط بنفس نوع المخالفة ونوع الاستعمال' },
+          { status: 409 }
         )
       }
     }

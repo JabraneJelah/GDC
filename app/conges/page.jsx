@@ -1,24 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -28,8 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { Badge } from '@/components/ui/badge'
-import { FileText, Pencil, Trash2, X } from 'lucide-react'
+import { CalendarCheck, FileText, Plus, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -85,6 +74,17 @@ const parseReferenceDoc = (value) => {
   return { referenceNumber: value, fileUrl: '', fileName: '', fileType: '' }
 }
 
+function formatDate(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleDateString('fr-FR')
+}
+
+function getProfLabel(conge) {
+  if (!conge.professeur) return '—'
+  const t = conge.professeur.titre?.nom ? `${conge.professeur.titre.nom} ` : ''
+  return `${t}${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '—'
+}
+
 export default function CongesPage() {
   const [conges, setConges] = useState([])
   const [professeurs, setProfesseurs] = useState([])
@@ -115,6 +115,9 @@ export default function CongesPage() {
   })
   const [professeurSearch, setProfesseurSearch] = useState('')
   const [professeurSearchOpen, setProfesseurSearchOpen] = useState(false)
+  const [interimSearch, setInterimSearch] = useState('')
+  const [interimSearchOpen, setInterimSearchOpen] = useState(false)
+  const [selectedInterimId, setSelectedInterimId] = useState('')
   const [calculatingDateRetour, setCalculatingDateRetour] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState('')
@@ -122,10 +125,19 @@ export default function CongesPage() {
   // Date de reprise au travail (jour suivant le dernier jour de congé) — affichée comme "date de retour"
   const [dateRetourTravailDisplay, setDateRetourTravailDisplay] = useState('')
   const [horsSolde, setHorsSolde] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [toast, setToast] = useState('')
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   const fetchData = async () => {
     try {
@@ -256,6 +268,9 @@ export default function CongesPage() {
     setExistingReferenceFile(null)
     setHorsSolde(false)
     setEditingConge(null)
+    setInterimSearch('')
+    setInterimSearchOpen(false)
+    setSelectedInterimId('')
   }
 
   const clearReferenceFile = () => {
@@ -269,12 +284,12 @@ export default function CongesPage() {
     e.preventDefault()
     // Ne pas envoyer NaN (évite "Tous les champs obligatoires") : garder type_conge_id en string si vide, et bloquer si date_fin non calculée
     if (!formData.date_fin && !dateRetourTravailDisplay) {
-      setErrorMessage('Veuillez attendre le calcul de la date de retour (dernier jour de congé) avant d\'enregistrer.')
+      setErrorMessage('الرجاء انتظار اكتمال حساب تاريخ الرجوع قبل التسجيل.')
       setErrorDialogOpen(true)
       return
     }
     if (!formData.professeur_id) {
-      setErrorMessage('Veuillez sélectionner un professeur dans la liste (recherchez puis cliquez sur son nom).')
+      setErrorMessage('الرجاء اختيار موظف من القائمة (ابحث ثم انقر على الاسم).')
       setErrorDialogOpen(true)
       return
     }
@@ -282,10 +297,11 @@ export default function CongesPage() {
       ? parseInt(formData.type_conge_id, 10)
       : formData.type_conge_id
     if (typeCongeId === '' || typeCongeId == null) {
-      setErrorMessage('Veuillez sélectionner un type de congé.')
+      setErrorMessage('الرجاء اختيار نوع الرخصة.')
       setErrorDialogOpen(true)
       return
     }
+    setSubmitLoading(true)
     try {
       const url = editingConge ? `/api/conges/${editingConge.id}` : '/api/conges'
       const method = editingConge ? 'PUT' : 'POST'
@@ -337,9 +353,10 @@ export default function CongesPage() {
         setProfesseurSearch('')
         setProfesseurSearchOpen(false)
         setCurrentPage(1)
+        setToast(editingConge ? 'تم تعديل الرخصة بنجاح' : 'تمت إضافة الرخصة بنجاح')
         fetchData()
       } else {
-        let message = `Erreur lors de la ${editingConge ? 'modification' : 'création'} (${response.status})`
+        let message = `حدث خطأ أثناء ${editingConge ? 'التعديل' : 'الإضافة'} (${response.status})`
         try {
           const data = await response.json()
           if (data?.error) message = data.error
@@ -349,8 +366,10 @@ export default function CongesPage() {
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage(error?.message || `Erreur lors de la ${editingConge ? 'modification' : 'création'}`)
+      setErrorMessage(error?.message || `حدث خطأ أثناء ${editingConge ? 'التعديل' : 'الإضافة'}`)
       setErrorDialogOpen(true)
+    } finally {
+      setSubmitLoading(false)
     }
   }
 
@@ -371,7 +390,7 @@ export default function CongesPage() {
       duree_jours: conge.duree_jours.toString(),
       reference_doc: conge.reference_doc || '',
       nom_interim: conge.nom_interim || '',
-      prenom_interim: conge.prenom_interim || '',
+      prenom_interim: '',
     })
     const reference = parseReferenceDoc(conge.reference_doc)
     setExistingReferenceFile(
@@ -387,6 +406,9 @@ export default function CongesPage() {
     setFilePreviewUrl('')
     setHorsSolde(!!conge.hors_solde)
     setDateRetourTravailDisplay(nextWorkingDayAfter(lastDay, new Set()))
+    // Preload interim selector with stored display name
+    setSelectedInterimId('')
+    setInterimSearch(conge.nom_interim || '')
     setEditOpen(true)
   }
 
@@ -397,7 +419,7 @@ export default function CongesPage() {
 
   const handleDeleteConfirm = async () => {
     if (!congeToDelete) return
-
+    setDeleteLoading(true)
     try {
       const response = await fetch(`/api/conges/${congeToDelete.id}`, {
         method: 'DELETE',
@@ -407,50 +429,58 @@ export default function CongesPage() {
         setDeleteDialogOpen(false)
         setCongeToDelete(null)
         setCurrentPage(1)
+        setToast('تم حذف الرخصة بنجاح')
         fetchData()
       } else {
         const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorMessage(data.error || 'حدث خطأ أثناء الحذف')
         setErrorDialogOpen(true)
         setDeleteDialogOpen(false)
         setCongeToDelete(null)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la suppression')
+      setErrorMessage('حدث خطأ غير متوقع')
       setErrorDialogOpen(true)
       setDeleteDialogOpen(false)
       setCongeToDelete(null)
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
-  const handleOpenChange = (open) => {
-    setOpen(open)
-    if (!open) {
+  const handleOpenChange = (next) => {
+    setOpen(next)
+    if (!next) {
       resetForm()
       setProfesseurSearch('')
       setProfesseurSearchOpen(false)
     }
   }
 
-  const handleEditOpenChange = (open) => {
-    setEditOpen(open)
-    if (open && formData.professeur_id) {
+  const handleEditOpenChange = (next) => {
+    setEditOpen(next)
+    if (next && formData.professeur_id) {
       const prof = professeurs.find(p => p.id === formData.professeur_id)
       if (prof) {
         setProfesseurSearch(`${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}${prof.ppr ? ` (${prof.ppr})` : ''}`)
       }
-    } else if (!open) {
+    } else if (!next) {
       setProfesseurSearch('')
       setProfesseurSearchOpen(false)
     }
-    if (!open) {
+    if (!next) {
       resetForm()
     }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <span className="size-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
+        <p className="text-sm text-slate-600">جاري تحميل الرخص...</p>
+      </div>
+    )
   }
 
   // Filter conges based on filters
@@ -473,507 +503,253 @@ export default function CongesPage() {
   const paginatedConges = filteredConges.slice(startIndex, endIndex)
 
   const handleClearFilters = () => {
-    setFilters({
-      professeur_id: 'all',
-      type_conge_id: 'all',
-      duree: '',
-    })
+    setFilters({ professeur_id: 'all', type_conge_id: 'all', duree: '' })
     setCurrentPage(1)
   }
 
   const hasActiveFilters = filters.professeur_id !== 'all' || filters.type_conge_id !== 'all' || filters.duree !== ''
 
-  return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Congés</h1>
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">Nouveau Congé</Button>
-          </DialogTrigger>
-          <DialogContent className="flex max-h-[80vh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-            <DialogHeader className="flex-shrink-0 space-y-1.5 px-6 pt-6 pb-2 pr-12 text-left">
-              <DialogTitle>{editingConge ? 'Modifier le Congé' : 'Nouveau Congé'}</DialogTitle>
-              <DialogDescription>
-                {editingConge
-                  ? 'Modifier les informations du congé'
-                  : ''}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="professeur_id">Professeur *</Label>
-                <div className="relative">
-                  {(() => {
-                    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
-                    const displayValue = selectedProf
-                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}${selectedProf.ppr ? ` (${selectedProf.ppr})` : ''}`.trim()
-                      : professeurSearch
-                    const searchLower = professeurSearch.toLowerCase()
-                    const filtered = professeurs.filter((prof) => {
-                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
-                      return nomComplet.includes(searchLower)
-                    }).slice(0, 10)
-                    return (
-                      <>
-                        <Input
-                          id="professeur_id"
-                          placeholder="Rechercher un professeur (nom, prénom, PPR)..."
-                          value={displayValue}
-                          onChange={(e) => {
-                            setProfesseurSearch(e.target.value)
-                            setFormData(prev => ({ ...prev, professeur_id: '' }))
-                            setProfesseurSearchOpen(true)
-                          }}
-                          onFocus={() => setProfesseurSearchOpen(true)}
-                          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 220)}
-                          required
-                          autoComplete="off"
-                        />
-                        {professeurSearchOpen && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                            {filtered.length > 0 ? (
-                              filtered.map((prof) => (
-                                <div
-                                  key={prof.id}
-                                  className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault()
-                                    setFormData(prev => ({ ...prev, professeur_id: prof.id }))
-                                    setProfesseurSearch('')
-                                    setProfesseurSearchOpen(false)
-                                  }}
-                                >
-                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type_conge_id">Type de congé *</Label>
-                <Select
-                  value={formData.type_conge_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, type_conge_id: value })
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {typesConge.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="date_debut">Date de départ *</Label>
-                <Input
-                  id="date_debut"
-                  type="date"
-                  value={formData.date_debut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="duree_jours">Durée du congé (jours ouvrables) *</Label>
-                <Input
-                  id="duree_jours"
-                  type="number"
-                  min={1}
-                  value={formData.duree_jours}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setFormData(prev => ({ ...prev, duree_jours: v }))
+  // Shared professor search dropdown markup (used in both create and edit forms)
+  const ProfesseurDropdown = ({ idPrefix }) => {
+    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
+    const displayValue = selectedProf
+      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}${selectedProf.ppr ? ` (${selectedProf.ppr})` : ''}`.trim()
+      : professeurSearch
+    const searchLower = professeurSearch.toLowerCase()
+    const filtered = professeurs.filter((prof) => {
+      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
+      return nomComplet.includes(searchLower)
+    }).slice(0, 10)
+    return (
+      <div className="relative">
+        <Input
+          id={`${idPrefix}_professeur_id`}
+          placeholder="البحث عن موظف (الاسم، اللقب، PPR)..."
+          value={displayValue}
+          onChange={(e) => {
+            setProfesseurSearch(e.target.value)
+            setFormData(prev => ({ ...prev, professeur_id: '' }))
+            setProfesseurSearchOpen(true)
+          }}
+          onFocus={() => setProfesseurSearchOpen(true)}
+          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 220)}
+          required
+          autoComplete="off"
+          className="h-10 rounded-xl border-slate-300 text-right text-sm"
+        />
+        {professeurSearchOpen && (
+          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-right">
+            {filtered.length > 0 ? (
+              filtered.map((prof) => (
+                <div
+                  key={prof.id}
+                  className="px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer text-slate-800"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    setFormData(prev => ({ ...prev, professeur_id: prof.id }))
+                    setProfesseurSearch('')
+                    setProfesseurSearchOpen(false)
                   }}
-                  placeholder="Ex: 5"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="date_fin">Date de retour au travail (calculée) *</Label>
-                <Input
-                  id="date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="bg-slate-100"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nom_interim">Nom de l'intérim</Label>
-                <Input
-                  id="nom_interim"
-                  value={formData.nom_interim}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nom_interim: e.target.value })
-                  }
-                  placeholder="Nom de la personne en intérim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prenom_interim">Prénom de l'intérim</Label>
-                <Input
-                  id="prenom_interim"
-                  value={formData.prenom_interim}
-                  onChange={(e) =>
-                    setFormData({ ...formData, prenom_interim: e.target.value })
-                  }
-                  placeholder="Prénom de la personne en intérim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reference_file">Pièce justificative / Référence</Label>
-                <div className="rounded-md border border-slate-200 p-3 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="reference_file"
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
-                        setSelectedFile(file)
-                        setExistingReferenceFile(null)
-                        if (file.type.startsWith('image/')) {
-                          setFilePreviewUrl(URL.createObjectURL(file))
-                        } else {
-                          setFilePreviewUrl('')
-                        }
-                      }}
-                    />
-                    {(selectedFile || existingReferenceFile) && (
-                      <Button type="button" variant="ghost" size="sm" onClick={clearReferenceFile} className="h-9 w-9 p-0">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  {(selectedFile || existingReferenceFile) && (
-                    <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
-                      {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
-                        <img
-                          src={filePreviewUrl || toCongesUploadApiUrl(existingReferenceFile?.fileUrl)}
-                          alt="Aperçu pièce justificative"
-                          className="h-20 w-20 object-cover rounded border border-slate-200"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2 text-sm text-slate-700">
-                          <FileText className="h-4 w-4 text-red-600" />
-                          <span>{selectedFile?.name || existingReferenceFile?.fileName || 'Document PDF'}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-md border border-slate-200 p-3">
-                <input
-                  id="hors_solde"
-                  type="checkbox"
-                  checked={horsSolde}
-                  onChange={(e) => setHorsSolde(e.target.checked)}
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300"
-                />
-                <div className="space-y-0.5">
-                  <Label htmlFor="hors_solde" className="text-slate-800">
-                    Hors solde
-                  </Label>
-                  <p className="text-xs text-slate-500">
-                    Enregistrer ce congé sans déduire de jours de solde (aucun solde requis).
-                  </p>
-                </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={calculatingDateRetour || !formData.date_fin}
-              >
-                {calculatingDateRetour ? 'Calcul de la date de retour...' : (editingConge ? 'Modifier' : 'Enregistrer')}
-              </Button>
-            </form>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/*  modification model */}
-        <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
-          <DialogContent className="flex max-h-[80vh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-            <DialogHeader className="flex-shrink-0 space-y-1.5 px-6 pt-6 pb-2 pr-12 text-left">
-              <DialogTitle>Modifier le Congé</DialogTitle>
-              <DialogDescription>
-                Modifier les informations du congé
-              </DialogDescription>
-            </DialogHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_professeur_id">Professeur *</Label>
-                <div className="relative">
-                  {(() => {
-                    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
-                    const displayValue = selectedProf
-                      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}${selectedProf.ppr ? ` (${selectedProf.ppr})` : ''}`.trim()
-                      : professeurSearch
-                    const searchLower = professeurSearch.toLowerCase()
-                    const filtered = professeurs.filter((prof) => {
-                      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
-                      return nomComplet.includes(searchLower)
-                    }).slice(0, 10)
-                    return (
-                      <>
-                        <Input
-                          id="edit_professeur_id"
-                          placeholder="Rechercher un professeur (nom, prénom, PPR)..."
-                          value={displayValue}
-                          onChange={(e) => {
-                            setProfesseurSearch(e.target.value)
-                            setFormData(prev => ({ ...prev, professeur_id: '' }))
-                            setProfesseurSearchOpen(true)
-                          }}
-                          onFocus={() => setProfesseurSearchOpen(true)}
-                          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 220)}
-                          required
-                          autoComplete="off"
-                        />
-                        {professeurSearchOpen && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                            {filtered.length > 0 ? (
-                              filtered.map((prof) => (
-                                <div
-                                  key={prof.id}
-                                  className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault()
-                                    setFormData(prev => ({ ...prev, professeur_id: prof.id }))
-                                    setProfesseurSearch('')
-                                    setProfesseurSearchOpen(false)
-                                  }}
-                                >
-                                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="px-3 py-2 text-sm text-slate-500">Aucun professeur trouvé</div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_type_conge_id">Type de congé *</Label>
-                <Select
-                  value={formData.type_conge_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, type_conge_id: value })
-                  }
-                  required
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {typesConge.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
-                        {type.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_date_debut">Date de départ *</Label>
-                <Input
-                  id="edit_date_debut"
-                  type="date"
-                  value={formData.date_debut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_duree_jours">Durée du congé (jours ouvrables) *</Label>
-                <Input
-                  id="edit_duree_jours"
-                  type="number"
-                  min={1}
-                  value={formData.duree_jours}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_date_fin">Date de retour au travail (calculée) *</Label>
-                <Input
-                  id="edit_date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="bg-slate-100"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_nom_interim">Nom de l'intérim</Label>
-                <Input
-                  id="edit_nom_interim"
-                  value={formData.nom_interim}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nom_interim: e.target.value })
-                  }
-                  placeholder="Nom de la personne en intérim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_prenom_interim">Prénom de l'intérim</Label>
-                <Input
-                  id="edit_prenom_interim"
-                  value={formData.prenom_interim}
-                  onChange={(e) =>
-                    setFormData({ ...formData, prenom_interim: e.target.value })
-                  }
-                  placeholder="Prénom de la personne en intérim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_reference_file">Pièce justificative / Référence</Label>
-                <div className="rounded-md border border-slate-200 p-3 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="edit_reference_file"
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
-                        setSelectedFile(file)
-                        setExistingReferenceFile(null)
-                        if (file.type.startsWith('image/')) {
-                          setFilePreviewUrl(URL.createObjectURL(file))
-                        } else {
-                          setFilePreviewUrl('')
-                        }
-                      }}
-                    />
-                    {(selectedFile || existingReferenceFile) && (
-                      <Button type="button" variant="ghost" size="sm" onClick={clearReferenceFile} className="h-9 w-9 p-0">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  {(selectedFile || existingReferenceFile) && (
-                    <div className="rounded-md border border-slate-200 p-2 bg-slate-50">
-                      {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
-                        <img
-                          src={filePreviewUrl || toCongesUploadApiUrl(existingReferenceFile?.fileUrl)}
-                          alt="Aperçu pièce justificative"
-                          className="h-20 w-20 object-cover rounded border border-slate-200"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-2 text-sm text-slate-700">
-                          <FileText className="h-4 w-4 text-red-600" />
-                          <span>{selectedFile?.name || existingReferenceFile?.fileName || 'Document PDF'}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {prof.titre?.nom ? `${prof.titre.nom} ` : ''}{prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
                 </div>
-              </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <span className="font-medium text-slate-800">Hors solde :</span>{' '}
-                {editingConge?.hors_solde ? 'Oui' : 'Non'}
-                <span className="block text-xs text-slate-500 mt-1">
-                  Le mode ne peut pas être modifié ici. Supprimez et recréez le congé pour changer.
-                </span>
-              </div>
-              <Button type="submit" className="w-full" disabled={calculatingDateRetour}>
-                {calculatingDateRetour ? 'Calcul...' : 'Modifier'}
-              </Button>
-            </form>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* model de suppresion */}
-        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="text-red-600">Supprimer le congé</DialogTitle>
-              <DialogDescription>
-                Êtes-vous sûr de vouloir supprimer ce congé ? Cette action est irréversible.
-                {congeToDelete && (
-                  <div className="mt-4 p-3 bg-slate-50 rounded-md">
-                    <p className="text-sm font-medium">
-                      {congeToDelete.professeur
-                        ? `${congeToDelete.professeur.titre?.nom ? `${congeToDelete.professeur.titre.nom} ` : ''}${congeToDelete.professeur.prenom || ''} ${congeToDelete.professeur.nom || ''}`.trim() || 'Professeur inconnu'
-                        : 'Professeur inconnu'}
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      {new Date(congeToDelete.date_debut).toLocaleDateString('fr-FR')} -{' '}
-                      {new Date(congeToDelete.date_fin).toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDeleteDialogOpen(false)
-                  setCongeToDelete(null)
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-              >
-                Supprimer
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-slate-500">لا يوجد أستاذ مطابق</div>
+            )}
+          </div>
+        )}
       </div>
+    )
+  }
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex flex-col sm:flex-row gap-3 items-end">
-          <div className="flex-1 w-full sm:w-auto">
-            <Label htmlFor="filter-professeur" className="text-xs text-slate-600 mb-1.5 block">
-              Professeur
-            </Label>
+  // Shared interim (المعوض) employee selector
+  const InterimDropdown = ({ idPrefix }) => {
+    const selectedInterim = selectedInterimId ? professeurs.find(p => p.id === selectedInterimId) : null
+    const displayValue = selectedInterim
+      ? `${selectedInterim.titre?.nom ? `${selectedInterim.titre.nom} ` : ''}${selectedInterim.prenom} ${selectedInterim.nom}${selectedInterim.ppr ? ` (${selectedInterim.ppr})` : ''}`.trim()
+      : interimSearch
+    const searchLower = interimSearch.toLowerCase()
+    const filtered = professeurs.filter((prof) => {
+      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
+      return nomComplet.includes(searchLower)
+    }).slice(0, 10)
+    return (
+      <div className="relative">
+        <div className="flex gap-1.5">
+          <Input
+            id={`${idPrefix}_interim`}
+            placeholder="البحث عن موظف..."
+            value={displayValue}
+            onChange={(e) => {
+              setInterimSearch(e.target.value)
+              setSelectedInterimId('')
+              setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
+              setInterimSearchOpen(true)
+            }}
+            onFocus={() => setInterimSearchOpen(true)}
+            onBlur={() => setTimeout(() => setInterimSearchOpen(false), 220)}
+            autoComplete="off"
+            className="h-10 flex-1 rounded-xl border-slate-300 text-right text-sm"
+          />
+          {(selectedInterimId || interimSearch) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedInterimId('')
+                setInterimSearch('')
+                setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
+              }}
+              className="cursor-pointer flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {interimSearchOpen && (
+          <div className="absolute z-50 mt-1 w-full overflow-auto rounded-xl border border-slate-200 bg-white text-right shadow-lg max-h-60">
+            {filtered.length > 0 ? (
+              filtered.map((prof) => {
+                const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}${prof.ppr ? ` (${prof.ppr})` : ''}`.trim()
+                return (
+                  <div
+                    key={prof.id}
+                    className="cursor-pointer px-3 py-2 hover:bg-slate-50"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setSelectedInterimId(prof.id)
+                      setInterimSearch('')
+                      setFormData(prev => ({ ...prev, nom_interim: label, prenom_interim: '' }))
+                      setInterimSearchOpen(false)
+                    }}
+                  >
+                    <div className="text-sm font-medium text-slate-800">{label}</div>
+                    {prof.ppr && <div className="text-xs text-slate-500">{prof.ppr}</div>}
+                  </div>
+                )
+              })
+            ) : (
+              <div className="px-3 py-2 text-sm text-slate-500">لا يوجد موظف مطابق</div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Shared file upload section
+  const ReferenceFileSection = ({ idPrefix }) => (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Input
+          id={`${idPrefix}_reference_file`}
+          type="file"
+          accept="image/*,application/pdf"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl)
+            setSelectedFile(file)
+            setExistingReferenceFile(null)
+            if (file.type.startsWith('image/')) {
+              setFilePreviewUrl(URL.createObjectURL(file))
+            } else {
+              setFilePreviewUrl('')
+            }
+          }}
+          className="h-10 rounded-xl border-slate-300 text-sm"
+        />
+        {(selectedFile || existingReferenceFile) && (
+          <button
+            type="button"
+            onClick={clearReferenceFile}
+            className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {(selectedFile || existingReferenceFile) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-2">
+          {((selectedFile?.type || existingReferenceFile?.fileType || '').startsWith('image/')) ? (
+            <img
+              src={filePreviewUrl || toCongesUploadApiUrl(existingReferenceFile?.fileUrl)}
+              alt="معاينة الوثيقة"
+              className="h-20 w-20 object-cover rounded-lg border border-slate-200"
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <FileText className="h-4 w-4 text-red-600" />
+              <span>{selectedFile?.name || existingReferenceFile?.fileName || 'وثيقة PDF'}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="space-y-5" dir="rtl">
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-medium text-emerald-700 shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      {/* Header */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1 text-right">
+            <div className="flex items-center gap-2">
+              <CalendarCheck className="size-5 text-blue-600" />
+              <h1 className="text-2xl font-semibold text-slate-950">إدارة الرخص</h1>
+            </div>
+            <p className="text-sm text-slate-600">تدبير وتتبع رخص الموظفين وحساب أيام الغياب</p>
+            <div className="flex items-center gap-4 pt-1 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-blue-500" />
+                <span className="font-semibold text-slate-900">{conges.length}</span>
+                <span className="text-slate-600">رخصة مسجلة</span>
+              </span>
+              {hasActiveFilters && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-amber-400" />
+                    <span className="font-semibold text-slate-900">{filteredConges.length}</span>
+                    <span className="text-slate-600">بعد الفلتر</span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { resetForm(); setProfesseurSearch(''); setOpen(true) }}
+            className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
+          >
+            <Plus className="size-4" />
+            إضافة رخصة
+          </button>
+        </div>
+      </section>
+
+      {/* Filters */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">الموظف</Label>
             <Select
               value={filters.professeur_id}
-              onValueChange={(value) => {
-                setFilters({ ...filters, professeur_id: value })
-                setCurrentPage(1)
-              }}
+              onValueChange={(value) => { setFilters({ ...filters, professeur_id: value }); setCurrentPage(1) }}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Tous les professeurs" />
+              <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900">
+                <SelectValue placeholder="جميع الموظفين" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les professeurs</SelectItem>
+                <SelectItem value="all">جميع الموظفين</SelectItem>
                 {professeurs.map((prof) => (
                   <SelectItem key={prof.id} value={prof.id}>
                     {prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
@@ -982,22 +758,17 @@ export default function CongesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex-1 w-full sm:w-auto">
-            <Label htmlFor="filter-type-conge" className="text-xs text-slate-600 mb-1.5 block">
-              Type de Congé
-            </Label>
+          <div className="flex-1">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">نوع الرخصة</Label>
             <Select
               value={filters.type_conge_id}
-              onValueChange={(value) => {
-                setFilters({ ...filters, type_conge_id: value })
-                setCurrentPage(1)
-              }}
+              onValueChange={(value) => { setFilters({ ...filters, type_conge_id: value }); setCurrentPage(1) }}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Tous les types" />
+              <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900">
+                <SelectValue placeholder="جميع الأنواع" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="all">جميع الأنواع</SelectItem>
                 {typesConge.map((type) => (
                   <SelectItem key={type.id} value={type.id.toString()}>
                     {type.nom}
@@ -1006,169 +777,498 @@ export default function CongesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex-1 w-full sm:w-auto">
-            <Label htmlFor="filter-duree" className="text-xs text-slate-600 mb-1.5 block">
-              Durée (jours)
-            </Label>
+          <div className="w-full sm:w-36">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">المدة (أيام)</Label>
             <Input
-              id="filter-duree"
               type="number"
-              placeholder="Durée..."
+              placeholder="المدة..."
               value={filters.duree}
-              onChange={(e) => {
-                setFilters({ ...filters, duree: e.target.value })
-                setCurrentPage(1)
-              }}
-              className="w-full"
+              onChange={(e) => { setFilters({ ...filters, duree: e.target.value }); setCurrentPage(1) }}
+              className="h-10 rounded-xl border-slate-300 text-right text-sm"
             />
           </div>
           {hasActiveFilters && (
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               onClick={handleClearFilters}
-              className="w-full sm:w-auto"
+              className="cursor-pointer inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              <X className="h-4 w-4 mr-1.5" />
-              Effacer
-            </Button>
+              <X className="size-3.5" />
+              مسح
+            </button>
           )}
         </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white">
-        <Table>
-          <TableHeader className="bg-slate-100">
-            <TableRow>
-              <TableHead>Professeur</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Date début</TableHead>
-              <TableHead>Date fin</TableHead>
-              <TableHead>Durée</TableHead>
-              <TableHead>Intérim</TableHead>
-              <TableHead>Référence</TableHead>
-              <TableHead>Créé par</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
-            {filteredConges.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center">
-                  {conges.length === 0 ? 'Aucun congé enregistré' : 'Aucun congé ne correspond aux filtres'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedConges.map((conge) => (
-                <TableRow key={conge.id}>
-                  <TableCell>
-                    {conge.professeur
-                      ? `${conge.professeur.titre?.nom ? `${conge.professeur.titre.nom} ` : ''}${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '-'
-                      : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {conge.type_conge?.nom || '-'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(conge.date_debut).toLocaleDateString('fr-FR')}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(conge.date_fin).toLocaleDateString('fr-FR')}
-                  </TableCell>
-                  <TableCell>{conge.duree_jours} jours</TableCell>
-                  <TableCell>
-                    {conge.nom_interim && conge.prenom_interim
-                      ? `${conge.nom_interim} ${conge.prenom_interim}`
-                      : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const ref = parseReferenceDoc(conge.reference_doc)
-                      if (!ref.referenceNumber && !ref.fileUrl) return '-'
-                      return (
-                        <div className="space-y-1">
-                          {ref.referenceNumber && (
-                            <div className="text-xs text-slate-700">{ref.referenceNumber}</div>
-                          )}
-                          {ref.fileUrl && (
-                            ref.fileType?.startsWith('image/') ? (
-                              <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" className="inline-block">
-                                <img
-                                  src={toCongesUploadApiUrl(ref.fileUrl)}
-                                  alt={ref.fileName || 'Pièce justificative'}
-                                  className="h-10 w-10 rounded border border-slate-200 object-cover"
-                                />
-                              </a>
-                            ) : (
-                              <a
-                                href={toCongesUploadApiUrl(ref.fileUrl)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                              >
-                                <FileText className="h-3 w-3" />
-                                <span>{ref.fileName || 'Ouvrir PDF'}</span>
-                              </a>
-                            )
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </TableCell>
-                  <TableCell>{conge.cree_par_rh?.nom_complet || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(conge)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClick(conge)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-right text-xs font-medium text-slate-600 sm:px-6">
+          عرض{' '}
+          <span className="font-bold text-slate-900">{filteredConges.length}</span>{' '}
+          رخصة
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الموظف</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع الرخصة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ المغادرة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ النهاية</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المدة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المعوض</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الوثيقة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">أنشئ من قبل</th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-slate-700">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredConges.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-5 py-16 text-center">
+                    <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
+                      <CalendarCheck className="size-9 text-slate-300" strokeWidth={1.5} />
+                      <p className="text-sm font-medium text-slate-700">
+                        {conges.length === 0 ? 'لا توجد رخص مسجلة' : 'لا توجد رخص مطابقة للفلتر'}
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={handleClearFilters}
+                          className="text-xs text-blue-600 underline hover:text-blue-800"
+                        >
+                          مسح الفلاتر
+                        </button>
+                      )}
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  </td>
+                </tr>
+              ) : (
+                paginatedConges.map((conge) => (
+                  <tr key={conge.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
+                    <td className="px-4 py-3.5 text-right">
+                      <span
+                        className="block max-w-[180px] truncate text-sm font-medium text-slate-900"
+                        title={getProfLabel(conge)}
+                      >
+                        {getProfLabel(conge)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span
+                        className="inline-flex max-w-[140px] items-center overflow-hidden rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700"
+                        title={conge.type_conge?.nom || '—'}
+                      >
+                        <span className="truncate">{conge.type_conge?.nom || '—'}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span dir="ltr" className="text-sm text-slate-700">{formatDate(conge.date_debut)}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span dir="ltr" className="text-sm text-slate-700">{formatDate(conge.date_fin)}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-sm font-medium text-slate-800">{conge.duree_jours} أيام</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span
+                        className="block max-w-[160px] truncate text-sm text-slate-700"
+                        title={conge.nom_interim || '—'}
+                      >
+                        {conge.nom_interim || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      {(() => {
+                        const ref = parseReferenceDoc(conge.reference_doc)
+                        if (!ref.referenceNumber && !ref.fileUrl) return <span className="text-sm text-slate-400">—</span>
+                        return (
+                          <div className="space-y-1">
+                            {ref.referenceNumber && (
+                              <div
+                                className="max-w-[120px] truncate text-xs text-slate-700"
+                                title={ref.referenceNumber}
+                              >
+                                {ref.referenceNumber}
+                              </div>
+                            )}
+                            {ref.fileUrl && (
+                              ref.fileType?.startsWith('image/') ? (
+                                <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" className="inline-block">
+                                  <img
+                                    src={toCongesUploadApiUrl(ref.fileUrl)}
+                                    alt={ref.fileName || 'وثيقة'}
+                                    className="h-10 w-10 rounded-lg border border-slate-200 object-cover"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  href={toCongesUploadApiUrl(ref.fileUrl)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex max-w-[120px] items-center gap-1 overflow-hidden text-xs text-blue-600 hover:underline"
+                                  title={ref.fileName || 'فتح PDF'}
+                                >
+                                  <FileText className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{ref.fileName || 'فتح PDF'}</span>
+                                </a>
+                              )
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span
+                        className="block max-w-[140px] truncate text-sm text-slate-600"
+                        title={conge.cree_par_rh?.nom_complet || '—'}
+                      >
+                        {conge.cree_par_rh?.nom_complet || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(conge)}
+                          className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          تعديل
+                        </button>
+                        <span className="text-slate-200">|</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(conge)}
+                          className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
+                        >
+                          حذف
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
         {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+          <div className="border-t border-slate-100">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         )}
       </div>
 
-      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Erreur</DialogTitle>
-            <DialogDescription className="text-slate-700 whitespace-pre-line">
-              {errorMessage}
+      {/* Create dialog */}
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl sm:max-w-2xl" dir="rtl">
+          <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">إضافة رخصة جديدة</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              أدخل معلومات الرخصة وسيتم حساب تاريخ الرجوع تلقائياً
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setErrorDialogOpen(false)}>
-              Fermer
-            </Button>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <form onSubmit={handleSubmit} className="space-y-4 text-right">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">
+                  الموظف <span className="text-red-500">*</span>
+                </Label>
+                <ProfesseurDropdown idPrefix="create" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">
+                  نوع الرخصة <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.type_conge_id}
+                  onValueChange={(value) => setFormData({ ...formData, type_conge_id: value })}
+                  required
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر نوع الرخصة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesConge.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create_date_debut" className="text-sm font-medium text-slate-700">
+                  تاريخ المغادرة <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create_date_debut"
+                  type="date"
+                  value={formData.date_debut}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-300 text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create_duree_jours" className="text-sm font-medium text-slate-700">
+                  مدة الرخصة بالأيام المفتوحة <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="create_duree_jours"
+                  type="number"
+                  min={1}
+                  value={formData.duree_jours}
+                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
+                  placeholder="مثال: 5"
+                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create_date_fin" className="text-sm font-medium text-slate-700">
+                  تاريخ الرجوع للعمل
+                  {calculatingDateRetour && (
+                    <span className="mr-2 text-xs font-normal text-blue-600">جاري الحساب...</span>
+                  )}
+                </Label>
+                <Input
+                  id="create_date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
+                  readOnly
+                  className="h-10 rounded-xl border-slate-200 bg-slate-100 text-sm text-slate-600"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المعوض</Label>
+                <InterimDropdown idPrefix="create" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">الوثيقة المرجعية</Label>
+                <ReferenceFileSection idPrefix="create" />
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <input
+                  id="create_hors_solde"
+                  type="checkbox"
+                  checked={horsSolde}
+                  onChange={(e) => setHorsSolde(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300 accent-blue-600"
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="create_hors_solde" className="cursor-pointer text-sm font-medium text-slate-800">
+                    خارج الرصيد
+                  </Label>
+                  <p className="text-xs text-slate-500">
+                    تسجيل هذه الرخصة دون خصم أيام من الرصيد (لا يُشترط وجود رصيد).
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={submitLoading}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading || calculatingDateRetour || !formData.date_fin}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  {calculatingDateRetour ? 'جاري حساب تاريخ الرجوع...' : submitLoading ? 'جاري الحفظ...' : 'إضافة الرخصة'}
+                </button>
+              </div>
+            </form>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
+        <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl sm:max-w-2xl" dir="rtl">
+          <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تعديل الرخصة</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              تعديل معلومات الرخصة المسجلة
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <form onSubmit={handleSubmit} className="space-y-4 text-right">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">
+                  الموظف <span className="text-red-500">*</span>
+                </Label>
+                <ProfesseurDropdown idPrefix="edit" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">
+                  نوع الرخصة <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.type_conge_id}
+                  onValueChange={(value) => setFormData({ ...formData, type_conge_id: value })}
+                  required
+                >
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر نوع الرخصة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesConge.map((type) => (
+                      <SelectItem key={type.id} value={type.id.toString()}>
+                        {type.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_date_debut" className="text-sm font-medium text-slate-700">
+                  تاريخ المغادرة <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit_date_debut"
+                  type="date"
+                  value={formData.date_debut}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-300 text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_duree_jours" className="text-sm font-medium text-slate-700">
+                  مدة الرخصة بالأيام المفتوحة <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit_duree_jours"
+                  type="number"
+                  min={1}
+                  value={formData.duree_jours}
+                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
+                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_date_fin" className="text-sm font-medium text-slate-700">
+                  تاريخ الرجوع للعمل
+                  {calculatingDateRetour && (
+                    <span className="mr-2 text-xs font-normal text-blue-600">جاري الحساب...</span>
+                  )}
+                </Label>
+                <Input
+                  id="edit_date_fin"
+                  type="date"
+                  value={dateRetourTravailDisplay || formData.date_fin}
+                  readOnly
+                  className="h-10 rounded-xl border-slate-200 bg-slate-100 text-sm text-slate-600"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المعوض</Label>
+                <InterimDropdown idPrefix="edit" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">الوثيقة المرجعية</Label>
+                <ReferenceFileSection idPrefix="edit" />
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+                <span className="font-medium text-slate-800">خارج الرصيد: </span>
+                {editingConge?.hors_solde ? 'نعم' : 'لا'}
+                <span className="mt-1 block text-xs text-slate-500">
+                  لا يمكن تغيير هذا الخيار هنا. احذف الرخصة وأعد إنشاءها لتغييره.
+                </span>
+              </div>
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(false)}
+                  disabled={submitLoading}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading || calculatingDateRetour}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  {calculatingDateRetour ? 'جاري الحساب...' : submitLoading ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(v) => { if (!deleteLoading) setDeleteDialogOpen(v) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تأكيد الحذف</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              هل أنت متأكد من حذف هذه الرخصة؟ هذا الإجراء لا يمكن التراجع عنه.
+              {congeToDelete && (
+                <span className="mt-3 block rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span className="block text-sm font-medium text-slate-800">{getProfLabel(congeToDelete)}</span>
+                  <span className="block text-xs text-slate-600 mt-0.5" dir="ltr">
+                    {formatDate(congeToDelete.date_debut)} — {formatDate(congeToDelete.date_fin)}
+                  </span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button
+              type="button"
+              onClick={() => { setDeleteDialogOpen(false); setCongeToDelete(null) }}
+              disabled={deleteLoading}
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {deleteLoading ? 'جاري الحذف...' : 'حذف'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-red-600">خطأ</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-start pt-1">
+            <button
+              type="button"
+              onClick={() => setErrorDialogOpen(false)}
+              className="cursor-pointer inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              إغلاق
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
-
-
