@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { CalendarCheck, FileText, Plus, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, FileText, Plus, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -122,12 +123,18 @@ export default function CongesPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [filePreviewUrl, setFilePreviewUrl] = useState('')
   const [existingReferenceFile, setExistingReferenceFile] = useState(null)
-  // Date de reprise au travail (jour suivant le dernier jour de congé) — affichée comme "date de retour"
-  const [dateRetourTravailDisplay, setDateRetourTravailDisplay] = useState('')
+  // Premier jour de retour au travail, sélectionné par l'utilisateur
+  const [dateRetour, setDateRetour] = useState('')
   const [horsSolde, setHorsSolde] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [toast, setToast] = useState('')
+  const [joursFeriesAll, setJoursFeriesAll] = useState([])
+  const [appSettings, setAppSettings] = useState({ block_holiday_selection: false, block_weekend_selection: false })
+  const [debutCalendarOpen, setDebutCalendarOpen] = useState(false)
+  const [debutCalendarMonth, setDebutCalendarMonth] = useState(new Date())
+  const [retourCalendarOpen, setRetourCalendarOpen] = useState(false)
+  const [retourCalendarMonth, setRetourCalendarMonth] = useState(new Date())
 
   useEffect(() => {
     fetchData()
@@ -138,6 +145,20 @@ export default function CongesPage() {
     const t = setTimeout(() => setToast(''), 3000)
     return () => clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    fetch('/api/jours-feries')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setJoursFeriesAll(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/app-settings')
+      .then(r => r.ok ? r.json() : {})
+      .then(data => setAppSettings(prev => ({ ...prev, ...data })))
+      .catch(() => {})
+  }, [])
 
   const fetchData = async () => {
     try {
@@ -186,29 +207,20 @@ export default function CongesPage() {
     return ''
   }
 
-  // Calcule le dernier jour de congé (date_fin pour l'API) et la date de reprise au travail (affichée comme "date de retour")
-  const calculateDateRetour = async (dateDebut, dureeJours) => {
-    if (!dateDebut || !dureeJours || parseInt(dureeJours, 10) < 1) {
+  // Calcule duree_jours et date_fin à partir de date_debut et dateRetour (premier jour de retour)
+  // date_fin = dernier jour ouvrable AVANT dateRetour
+  // duree_jours = nombre de jours ouvrables de date_debut (inclus) jusqu'à date_fin (inclus)
+  const calculateDureeFromDates = async (dateDebut, dateRetourVal) => {
+    if (!dateDebut || !dateRetourVal || dateRetourVal <= dateDebut) {
+      setFormData(prev => ({ ...prev, date_fin: '', duree_jours: '' }))
       setCalculatingDateRetour(false)
       return
     }
     setCalculatingDateRetour(true)
-    const start = new Date(dateDebut + 'T00:00:00')
-    const n = parseInt(dureeJours, 10)
-    if (isNaN(n) || n < 1) {
-      setCalculatingDateRetour(false)
-      return
-    }
-
-    const endRange = new Date(start)
-    endRange.setDate(endRange.getDate() + Math.max(n * 2 + 30, 60))
-    const toStr = endRange.getFullYear() + '-' +
-      String(endRange.getMonth() + 1).padStart(2, '0') + '-' +
-      String(endRange.getDate()).padStart(2, '0')
 
     let ferieSet = new Set()
     try {
-      const res = await fetch(`/api/jours-feries?from=${dateDebut}&to=${toStr}`)
+      const res = await fetch(`/api/jours-feries?from=${dateDebut}&to=${dateRetourVal}`)
       if (res.ok) {
         const joursFeries = await res.json()
         ferieSet = expandJourFerieRangesToYmdSet(joursFeries)
@@ -217,39 +229,44 @@ export default function CongesPage() {
       console.error('Erreur chargement jours fériés:', e)
     }
 
+    // Compter les jours ouvrables de dateDebut (inclus) à dateRetour (exclus)
     let count = 0
-    const current = new Date(start)
+    let lastWorkingDay = ''
+    const current = new Date(dateDebut + 'T00:00:00')
+    const end = new Date(dateRetourVal + 'T00:00:00')
     const maxDays = 400
     let days = 0
-    while (count < n && days < maxDays) {
+    while (current < end && days < maxDays) {
       const ymd = current.getFullYear() + '-' +
         String(current.getMonth() + 1).padStart(2, '0') + '-' +
         String(current.getDate()).padStart(2, '0')
       const dayOfWeek = current.getDay()
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
       const isFerie = ferieSet.has(ymd)
-      if (!isWeekend && !isFerie) count++
-      if (count === n) {
-        const dateReprise = nextWorkingDayAfter(ymd, ferieSet)
-        setFormData(prev => ({ ...prev, date_fin: ymd }))
-        setDateRetourTravailDisplay(dateReprise)
-        setCalculatingDateRetour(false)
-        return
+      if (!isWeekend && !isFerie) {
+        count++
+        lastWorkingDay = ymd
       }
       current.setDate(current.getDate() + 1)
       days++
     }
-    setFormData(prev => ({ ...prev, date_fin: '' }))
-    setDateRetourTravailDisplay('')
+
+    setFormData(prev => ({
+      ...prev,
+      date_fin: lastWorkingDay,
+      duree_jours: count > 0 ? count.toString() : '',
+    }))
     setCalculatingDateRetour(false)
   }
 
-  // Calcul automatique de la date de retour quand la date de départ ou la durée change
+  // Recalcule automatiquement quand date_debut ou dateRetour change
   useEffect(() => {
-    if (formData.date_debut && formData.duree_jours && parseInt(formData.duree_jours, 10) >= 1) {
-      calculateDateRetour(formData.date_debut, formData.duree_jours)
+    if (formData.date_debut && dateRetour) {
+      calculateDureeFromDates(formData.date_debut, dateRetour)
+    } else {
+      setFormData(prev => ({ ...prev, date_fin: '', duree_jours: '' }))
     }
-  }, [formData.date_debut, formData.duree_jours])
+  }, [formData.date_debut, dateRetour])
 
   const resetForm = () => {
     setFormData({
@@ -262,7 +279,7 @@ export default function CongesPage() {
       nom_interim: '',
       prenom_interim: '',
     })
-    setDateRetourTravailDisplay('')
+    setDateRetour('')
     setSelectedFile(null)
     setFilePreviewUrl('')
     setExistingReferenceFile(null)
@@ -271,6 +288,8 @@ export default function CongesPage() {
     setInterimSearch('')
     setInterimSearchOpen(false)
     setSelectedInterimId('')
+    setDebutCalendarOpen(false)
+    setRetourCalendarOpen(false)
   }
 
   const clearReferenceFile = () => {
@@ -282,9 +301,13 @@ export default function CongesPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    // Ne pas envoyer NaN (évite "Tous les champs obligatoires") : garder type_conge_id en string si vide, et bloquer si date_fin non calculée
-    if (!formData.date_fin && !dateRetourTravailDisplay) {
-      setErrorMessage('الرجاء انتظار اكتمال حساب تاريخ الرجوع قبل التسجيل.')
+    if (!dateRetour) {
+      setErrorMessage('الرجاء اختيار تاريخ الرجوع للعمل.')
+      setErrorDialogOpen(true)
+      return
+    }
+    if (!formData.date_fin || !formData.duree_jours) {
+      setErrorMessage('الرجاء انتظار اكتمال حساب مدة الرخصة قبل التسجيل.')
       setErrorDialogOpen(true)
       return
     }
@@ -292,6 +315,18 @@ export default function CongesPage() {
       setErrorMessage('الرجاء اختيار موظف من القائمة (ابحث ثم انقر على الاسم).')
       setErrorDialogOpen(true)
       return
+    }
+    if (appSettings.block_holiday_selection || appSettings.block_weekend_selection) {
+      if (isNonWorkingDay(formData.date_debut)) {
+        setErrorMessage('لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ مغادرة.')
+        setErrorDialogOpen(true)
+        return
+      }
+      if (isNonWorkingDay(dateRetour)) {
+        setErrorMessage('لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ رجوع.')
+        setErrorDialogOpen(true)
+        return
+      }
     }
     const typeCongeId = formData.type_conge_id !== '' && !isNaN(parseInt(formData.type_conge_id, 10))
       ? parseInt(formData.type_conge_id, 10)
@@ -405,7 +440,9 @@ export default function CongesPage() {
     setSelectedFile(null)
     setFilePreviewUrl('')
     setHorsSolde(!!conge.hors_solde)
-    setDateRetourTravailDisplay(nextWorkingDayAfter(lastDay, new Set()))
+    // Compute return-to-work date using the already-fetched holidays for accuracy
+    const ferieSetEdit = expandJourFerieRangesToYmdSet(joursFeriesAll)
+    setDateRetour(nextWorkingDayAfter(lastDay, ferieSetEdit))
     // Preload interim selector with stored display name
     setSelectedInterimId('')
     setInterimSearch(conge.nom_interim || '')
@@ -474,6 +511,61 @@ export default function CongesPage() {
     }
   }
 
+  // Holiday highlight data for the date picker (must be before any early return)
+  const [holidayDatesArray, holidayNamesMap] = useMemo(() => {
+    const dates = []
+    const names = {}
+    for (const j of joursFeriesAll) {
+      if (!j?.date_debut || !j?.date_fin) continue
+      const start = new Date(j.date_debut)
+      const end = new Date(j.date_fin)
+      const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+      const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+      while (cur <= endDay) {
+        dates.push(new Date(cur))
+        const ymd = cur.getFullYear() + '-' +
+          String(cur.getMonth() + 1).padStart(2, '0') + '-' +
+          String(cur.getDate()).padStart(2, '0')
+        names[ymd] = j.nom
+        cur.setDate(cur.getDate() + 1)
+      }
+    }
+    return [dates, names]
+  }, [joursFeriesAll])
+
+  // Disabled days: conditional on appSettings
+  const disabledDays = useMemo(() => {
+    const days = []
+    if (appSettings.block_weekend_selection) days.push({ dayOfWeek: [0, 6] })
+    if (appSettings.block_holiday_selection) days.push(...holidayDatesArray)
+    return days
+  }, [holidayDatesArray, appSettings])
+
+  // Custom DayButton: highlights holidays in amber, adds tooltip for non-working days
+  const HolidayDayButton = useMemo(() => {
+    return function HolidayDayButtonInner({ className, day, modifiers, ...props }) {
+      const ymd = day.date.getFullYear() + '-' +
+        String(day.date.getMonth() + 1).padStart(2, '0') + '-' +
+        String(day.date.getDate()).padStart(2, '0')
+      const holidayName = holidayNamesMap[ymd]
+      const isWeekend = day.date.getDay() === 0 || day.date.getDay() === 6
+      const holidayStyle = (holidayName && !modifiers.selected)
+        ? { backgroundColor: 'rgb(254 243 199)', color: 'rgb(146 64 14)', ...props.style }
+        : props.style
+      const titleAttr = holidayName || (isWeekend ? 'يوم غير مفتوح' : undefined)
+      return (
+        <CalendarDayButton
+          className={className}
+          day={day}
+          modifiers={modifiers}
+          {...props}
+          style={holidayStyle}
+          title={titleAttr}
+        />
+      )
+    }
+  }, [holidayNamesMap])
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
@@ -481,6 +573,14 @@ export default function CongesPage() {
         <p className="text-sm text-slate-600">جاري تحميل الرخص...</p>
       </div>
     )
+  }
+
+  // Returns true if a YYYY-MM-DD string is a weekend or active holiday
+  const isNonWorkingDay = (ymd) => {
+    if (!ymd) return false
+    const d = new Date(ymd + 'T00:00:00')
+    if (d.getDay() === 0 || d.getDay() === 6) return true
+    return Boolean(holidayNamesMap[ymd])
   }
 
   // Filter conges based on filters
@@ -687,6 +787,134 @@ export default function CongesPage() {
       )}
     </div>
   )
+
+  // Date picker for تاريخ المغادرة with holiday highlights
+  const DateDebutPicker = () => {
+    const selectedDate = formData.date_debut
+      ? new Date(formData.date_debut + 'T00:00:00')
+      : undefined
+    const displayText = formData.date_debut
+      ? new Date(formData.date_debut + 'T00:00:00').toLocaleDateString('fr-FR')
+      : null
+    return (
+      <div
+        className="relative"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setDebutCalendarOpen(false)
+          }
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (!debutCalendarOpen && formData.date_debut) {
+              setDebutCalendarMonth(new Date(formData.date_debut + 'T00:00:00'))
+            }
+            setDebutCalendarOpen(v => !v)
+          }}
+          className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-3 text-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          <span className={displayText ? 'text-slate-900' : 'text-slate-400'} dir="ltr">
+            {displayText || 'اختر التاريخ'}
+          </span>
+          <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+        {debutCalendarOpen && (
+          <div className="absolute right-0 z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" dir="ltr">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              month={debutCalendarMonth}
+              onMonthChange={setDebutCalendarMonth}
+              disabled={disabledDays}
+              onSelect={(date) => {
+                if (!date) return
+                const ymd = date.getFullYear() + '-' +
+                  String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                  String(date.getDate()).padStart(2, '0')
+                setFormData(prev => ({ ...prev, date_debut: ymd }))
+                setDebutCalendarOpen(false)
+              }}
+              components={{ DayButton: HolidayDayButton }}
+            />
+            {holidayDatesArray.length > 0 && (
+              <div className="flex items-center gap-1.5 border-t border-slate-100 px-3 pb-2.5 pt-2 text-xs text-slate-500" dir="rtl">
+                <span className="inline-block h-3 w-3 shrink-0 rounded-sm bg-amber-100 ring-1 ring-amber-200" />
+                عطلة رسمية
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Date picker for تاريخ الرجوع للعمل with holiday highlights
+  const DateRetourPicker = () => {
+    const selectedDate = dateRetour
+      ? new Date(dateRetour + 'T00:00:00')
+      : undefined
+    const displayText = dateRetour
+      ? new Date(dateRetour + 'T00:00:00').toLocaleDateString('fr-FR')
+      : null
+    const isInvalid = dateRetour && formData.date_debut && dateRetour <= formData.date_debut
+    return (
+      <div
+        className="relative"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setRetourCalendarOpen(false)
+          }
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (!retourCalendarOpen && dateRetour) {
+              setRetourCalendarMonth(new Date(dateRetour + 'T00:00:00'))
+            }
+            setRetourCalendarOpen(v => !v)
+          }}
+          className={`flex h-10 w-full items-center justify-between rounded-xl border px-3 text-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 bg-white ${isInvalid ? 'border-red-400' : 'border-slate-300'}`}
+        >
+          <span className={displayText ? 'text-slate-900' : 'text-slate-400'} dir="ltr">
+            {displayText || 'اختر تاريخ الرجوع'}
+          </span>
+          <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+        {isInvalid && (
+          <p className="mt-1 text-xs text-red-600">يجب أن يكون تاريخ الرجوع بعد تاريخ المغادرة</p>
+        )}
+        {retourCalendarOpen && (
+          <div className="absolute right-0 z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" dir="ltr">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              month={retourCalendarMonth}
+              onMonthChange={setRetourCalendarMonth}
+              disabled={disabledDays}
+              onSelect={(date) => {
+                if (!date) return
+                const ymd = date.getFullYear() + '-' +
+                  String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                  String(date.getDate()).padStart(2, '0')
+                setDateRetour(ymd)
+                setRetourCalendarOpen(false)
+              }}
+              components={{ DayButton: HolidayDayButton }}
+            />
+            {holidayDatesArray.length > 0 && (
+              <div className="flex items-center gap-1.5 border-t border-slate-100 px-3 pb-2.5 pt-2 text-xs text-slate-500" dir="rtl">
+                <span className="inline-block h-3 w-3 shrink-0 rounded-sm bg-amber-100 ring-1 ring-amber-200" />
+                عطلة رسمية
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5" dir="rtl">
@@ -969,7 +1197,7 @@ export default function CongesPage() {
           <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
             <DialogTitle className="text-right text-lg font-bold text-slate-900">إضافة رخصة جديدة</DialogTitle>
             <DialogDescription className="text-right text-sm text-slate-600">
-              أدخل معلومات الرخصة وسيتم حساب تاريخ الرجوع تلقائياً
+              اختر تاريخ المغادرة وتاريخ الرجوع، وسيتم حساب المدة تلقائياً
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
@@ -1002,48 +1230,33 @@ export default function CongesPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="create_date_debut" className="text-sm font-medium text-slate-700">
+                <Label className="text-sm font-medium text-slate-700">
                   تاريخ المغادرة <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="create_date_debut"
-                  type="date"
-                  value={formData.date_debut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
-                  className="h-10 rounded-xl border-slate-300 text-sm"
-                  required
-                />
+                <DateDebutPicker />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="create_duree_jours" className="text-sm font-medium text-slate-700">
-                  مدة الرخصة بالأيام المفتوحة <span className="text-red-500">*</span>
+                <Label className="text-sm font-medium text-slate-700">
+                  تاريخ الرجوع للعمل <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="create_duree_jours"
-                  type="number"
-                  min={1}
-                  value={formData.duree_jours}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
-                  placeholder="مثال: 5"
-                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
-                  required
-                />
+                <DateRetourPicker />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="create_date_fin" className="text-sm font-medium text-slate-700">
-                  تاريخ الرجوع للعمل
+                <Label className="text-sm font-medium text-slate-700">
+                  مدة الرخصة المحسوبة
                   {calculatingDateRetour && (
                     <span className="mr-2 text-xs font-normal text-blue-600">جاري الحساب...</span>
                   )}
                 </Label>
-                <Input
-                  id="create_date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="h-10 rounded-xl border-slate-200 bg-slate-100 text-sm text-slate-600"
-                  required
-                />
+                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-100 px-3">
+                  {calculatingDateRetour ? (
+                    <span className="text-sm text-slate-500">جاري الحساب...</span>
+                  ) : formData.duree_jours ? (
+                    <span className="text-sm font-semibold text-blue-700">{formData.duree_jours} {parseInt(formData.duree_jours) === 1 ? 'يوم مفتوح' : 'أيام مفتوحة'}</span>
+                  ) : (
+                    <span className="text-sm text-slate-400">اختر التاريخين لحساب المدة</span>
+                  )}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-700">المعوض</Label>
@@ -1081,10 +1294,10 @@ export default function CongesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitLoading || calculatingDateRetour || !formData.date_fin}
+                  disabled={submitLoading || calculatingDateRetour || !formData.date_fin || !formData.duree_jours}
                   className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  {calculatingDateRetour ? 'جاري حساب تاريخ الرجوع...' : submitLoading ? 'جاري الحفظ...' : 'إضافة الرخصة'}
+                  {calculatingDateRetour ? 'جاري الحساب...' : submitLoading ? 'جاري الحفظ...' : 'إضافة الرخصة'}
                 </button>
               </div>
             </form>
@@ -1131,47 +1344,33 @@ export default function CongesPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit_date_debut" className="text-sm font-medium text-slate-700">
+                <Label className="text-sm font-medium text-slate-700">
                   تاريخ المغادرة <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="edit_date_debut"
-                  type="date"
-                  value={formData.date_debut}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date_debut: e.target.value }))}
-                  className="h-10 rounded-xl border-slate-300 text-sm"
-                  required
-                />
+                <DateDebutPicker />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit_duree_jours" className="text-sm font-medium text-slate-700">
-                  مدة الرخصة بالأيام المفتوحة <span className="text-red-500">*</span>
+                <Label className="text-sm font-medium text-slate-700">
+                  تاريخ الرجوع للعمل <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="edit_duree_jours"
-                  type="number"
-                  min={1}
-                  value={formData.duree_jours}
-                  onChange={(e) => setFormData(prev => ({ ...prev, duree_jours: e.target.value }))}
-                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
-                  required
-                />
+                <DateRetourPicker />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit_date_fin" className="text-sm font-medium text-slate-700">
-                  تاريخ الرجوع للعمل
+                <Label className="text-sm font-medium text-slate-700">
+                  مدة الرخصة المحسوبة
                   {calculatingDateRetour && (
                     <span className="mr-2 text-xs font-normal text-blue-600">جاري الحساب...</span>
                   )}
                 </Label>
-                <Input
-                  id="edit_date_fin"
-                  type="date"
-                  value={dateRetourTravailDisplay || formData.date_fin}
-                  readOnly
-                  className="h-10 rounded-xl border-slate-200 bg-slate-100 text-sm text-slate-600"
-                  required
-                />
+                <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-100 px-3">
+                  {calculatingDateRetour ? (
+                    <span className="text-sm text-slate-500">جاري الحساب...</span>
+                  ) : formData.duree_jours ? (
+                    <span className="text-sm font-semibold text-blue-700">{formData.duree_jours} {parseInt(formData.duree_jours) === 1 ? 'يوم مفتوح' : 'أيام مفتوحة'}</span>
+                  ) : (
+                    <span className="text-sm text-slate-400">اختر التاريخين لحساب المدة</span>
+                  )}
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-700">المعوض</Label>
@@ -1199,7 +1398,7 @@ export default function CongesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitLoading || calculatingDateRetour}
+                  disabled={submitLoading || calculatingDateRetour || !formData.date_fin || !formData.duree_jours}
                   className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {calculatingDateRetour ? 'جاري الحساب...' : submitLoading ? 'جاري الحفظ...' : 'حفظ التعديلات'}

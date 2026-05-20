@@ -45,7 +45,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
   useEffect(() => {
     const referentielPaths = [
       '/services', '/specialites', '/types-conge', '/categories-personnel',
-      '/titres', '/hopitaux', '/grades', '/jours-feries', '/types-fautes',
+      '/titres', '/hopitaux', '/grades', '/jours-feries', '/types-fautes', '/parametrage',
     ]
     if (referentielPaths.some((p) => pathname.startsWith(p))) {
       setIsReferentielOpen(true)
@@ -76,6 +76,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
         { href: '/hopitaux', label: 'المستشفيات' },
         { href: '/jours-feries', label: 'العطل الرسمية' },
         { href: '/types-fautes', label: 'أنواع المخالفات' },
+        { href: '/parametrage', label: 'الإعدادات' },
       ],
     },
   ]

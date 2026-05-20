@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { getWorkingDaysBetween } from '@/lib/working-days'
+import { getWorkingDaysBetween, isWorkingDay } from '@/lib/working-days'
+import { getAppSettings } from '@/lib/app-settings'
 
 // PUT - Mettre à jour un congé
 export async function PUT(request, { params }) {
@@ -66,6 +67,22 @@ export async function PUT(request, { params }) {
         { error: 'Tous les champs obligatoires doivent être remplis' },
         { status: 400 }
       )
+    }
+
+    const appSettings = getAppSettings()
+    if (appSettings.block_holiday_selection || appSettings.block_weekend_selection) {
+      if (!await isWorkingDay(date_debut, prisma)) {
+        return NextResponse.json(
+          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ مغادرة.' },
+          { status: 400 }
+        )
+      }
+      if (!await isWorkingDay(date_fin, prisma)) {
+        return NextResponse.json(
+          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ نهاية الرخصة.' },
+          { status: 400 }
+        )
+      }
     }
 
     const dureeJoursInt = await getWorkingDaysBetween(date_debut, date_fin, prisma)

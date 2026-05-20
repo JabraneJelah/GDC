@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { getWorkingDaysBetween } from '@/lib/working-days'
+import { getWorkingDaysBetween, isWorkingDay } from '@/lib/working-days'
+import { getAppSettings } from '@/lib/app-settings'
 
 // GET - Liste des congés
 export async function GET(request) {
@@ -105,6 +106,23 @@ export async function POST(request) {
         { error: `Champs obligatoires manquants : ${missing.join(', ')}. Vérifiez que vous avez sélectionné un professeur, un type de congé, une date de départ et une durée (la date de fin est calculée automatiquement).` },
         { status: 400 }
       )
+    }
+
+    // Valider que date_debut et date_fin sont des jours ouvrables (si blocage activé)
+    const appSettings = getAppSettings()
+    if (appSettings.block_holiday_selection || appSettings.block_weekend_selection) {
+      if (!await isWorkingDay(date_debut, prisma)) {
+        return NextResponse.json(
+          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ مغادرة.' },
+          { status: 400 }
+        )
+      }
+      if (!await isWorkingDay(date_fin, prisma)) {
+        return NextResponse.json(
+          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ نهاية الرخصة.' },
+          { status: 400 }
+        )
+      }
     }
 
     // Calculer la durée en jours ouvrables (exclut samedi, dimanche et jours fériés)
