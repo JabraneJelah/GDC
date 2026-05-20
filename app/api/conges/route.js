@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { getWorkingDaysBetween, isWorkingDay } from '@/lib/working-days'
+import { getDateFinFromDuree, isWorkingDay } from '@/lib/working-days'
 import { getAppSettings } from '@/lib/app-settings'
 
 // GET - Liste des congés
@@ -81,7 +81,6 @@ export async function POST(request) {
       professeur_id,
       type_conge_id: typeCongeIdRaw,
       date_debut,
-      date_fin,
       duree_jours,
       reference_doc,
       nom_interim,
@@ -96,19 +95,21 @@ export async function POST(request) {
       ? (typeof typeCongeIdRaw === 'number' ? typeCongeIdRaw : parseInt(typeCongeIdRaw, 10))
       : null
 
+    const dureeJoursInt = parseInt(duree_jours, 10) || 0
+
     const missing = []
     if (!professeur_id) missing.push('professeur')
     if (type_conge_id == null || isNaN(type_conge_id)) missing.push('type de congé')
     if (!date_debut) missing.push('date de départ')
-    if (!date_fin) missing.push('date de fin / date de retour')
+    if (dureeJoursInt <= 0) missing.push('durée (en jours)')
     if (missing.length > 0) {
       return NextResponse.json(
-        { error: `Champs obligatoires manquants : ${missing.join(', ')}. Vérifiez que vous avez sélectionné un professeur, un type de congé, une date de départ et une durée (la date de fin est calculée automatiquement).` },
+        { error: `Champs obligatoires manquants : ${missing.join(', ')}.` },
         { status: 400 }
       )
     }
 
-    // Valider que date_debut et date_fin sont des jours ouvrables (si blocage activé)
+    // Valider que date_debut est un jour ouvrable (si blocage activé)
     const appSettings = getAppSettings()
     if (appSettings.block_holiday_selection || appSettings.block_weekend_selection) {
       if (!await isWorkingDay(date_debut, prisma)) {
@@ -117,19 +118,13 @@ export async function POST(request) {
           { status: 400 }
         )
       }
-      if (!await isWorkingDay(date_fin, prisma)) {
-        return NextResponse.json(
-          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ نهاية الرخصة.' },
-          { status: 400 }
-        )
-      }
     }
 
-    // Calculer la durée en jours ouvrables (exclut samedi, dimanche et jours fériés)
-    const dureeJoursInt = await getWorkingDaysBetween(date_debut, date_fin, prisma)
-    if (dureeJoursInt <= 0) {
+    // Calculer date_fin côté serveur à partir de date_debut + duree_jours (source de vérité)
+    const date_fin = await getDateFinFromDuree(date_debut, dureeJoursInt, prisma)
+    if (!date_fin) {
       return NextResponse.json(
-        { error: 'Aucun jour ouvrable dans cette période (vérifiez les dates et les jours fériés)' },
+        { error: 'Impossible de calculer la date de fin (vérifiez les dates et les jours fériés)' },
         { status: 400 }
       )
     }

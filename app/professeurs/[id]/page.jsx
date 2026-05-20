@@ -2,22 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,9 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Download, FileText, Pencil, Trash2, Plus, Upload } from 'lucide-react'
+import { Download, FileText, Pencil, Trash2, Plus, Upload, ArrowRight, Users } from 'lucide-react'
+import { Pagination } from '@/components/ui/pagination'
 
 function toCongesUploadApiUrl(fileUrl) {
   if (!fileUrl) return ''
@@ -67,9 +56,7 @@ const parseReferenceDoc = (value) => {
         fileType: parsed.fileType || '',
       }
     }
-  } catch (_) {
-    // Compatibilité avec les anciennes valeurs texte.
-  }
+  } catch (_) {}
   return { referenceNumber: value, fileUrl: '', fileName: '', fileType: '' }
 }
 
@@ -119,6 +106,8 @@ export default function ProfesseurDetailsPage() {
   const decisionFileInputRef = useRef(null)
   const decisionTargetCongeIdRef = useRef(null)
   const [decisionBusyCongeId, setDecisionBusyCongeId] = useState(null)
+  const [deleteDecisionDialogOpen, setDeleteDecisionDialogOpen] = useState(false)
+  const [deleteDecisionTargetId, setDeleteDecisionTargetId] = useState(null)
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -133,19 +122,13 @@ export default function ProfesseurDetailsPage() {
 
   useEffect(() => {
     if (params.id) {
-      // Charger les données critiques en premier
       fetchProfesseur()
-      // Charger les types de congé dès le début (nécessaires pour les dialogs de solde)
       fetchTypesConge()
-      // Les autres options seront chargées seulement quand nécessaire (lazy loading)
     }
   }, [params.id])
 
   const congesSignature = professeur
-    ? [...(professeur.conges || [])]
-        .map((c) => c.id)
-        .sort((a, b) => a - b)
-        .join(',')
+    ? [...(professeur.conges || [])].map((c) => c.id).sort((a, b) => a - b).join(',')
     : ''
 
   useEffect(() => {
@@ -162,31 +145,12 @@ export default function ProfesseurDetailsPage() {
         fetch('/api/hopitaux'),
         fetch('/api/grades'),
       ])
-
-      if (categoriesRes.ok) {
-        const data = await categoriesRes.json()
-        setCategories(data)
-      }
-      if (specialitesRes.ok) {
-        const data = await specialitesRes.json()
-        setSpecialites(data)
-      }
-      if (titresRes.ok) {
-        const data = await titresRes.json()
-        setTitres(data)
-      }
-      if (servicesRes.ok) {
-        const data = await servicesRes.json()
-        setServices(data)
-      }
-      if (hopitauxRes.ok) {
-        const data = await hopitauxRes.json()
-        setHopitaux(data)
-      }
-      if (gradesRes.ok) {
-        const data = await gradesRes.json()
-        setGrades(data)
-      }
+      if (categoriesRes.ok) setCategories(await categoriesRes.json())
+      if (specialitesRes.ok) setSpecialites(await specialitesRes.json())
+      if (titresRes.ok) setTitres(await titresRes.json())
+      if (servicesRes.ok) setServices(await servicesRes.json())
+      if (hopitauxRes.ok) setHopitaux(await hopitauxRes.json())
+      if (gradesRes.ok) setGrades(await gradesRes.json())
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
     }
@@ -195,10 +159,7 @@ export default function ProfesseurDetailsPage() {
   const fetchTypesConge = async () => {
     try {
       const response = await fetch('/api/types-conge')
-      if (response.ok) {
-        const data = await response.json()
-        setTypesConge(data)
-      }
+      if (response.ok) setTypesConge(await response.json())
     } catch (error) {
       console.error('Erreur lors du chargement des types de congé:', error)
     }
@@ -210,7 +171,6 @@ export default function ProfesseurDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setProfesseur(data)
-        // Utiliser les soldes déjà chargés depuis l'API
         setSoldes(data.soldes || [])
         setFormData({
           nom: data.nom || '',
@@ -224,8 +184,6 @@ export default function ProfesseurDetailsPage() {
           grade_id: data.grade_id?.toString() || '',
         })
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }))
-        console.error('Erreur API:', errorData.error || 'Professeur non trouvé')
         setProfesseur(null)
       }
     } catch (error) {
@@ -247,7 +205,6 @@ export default function ProfesseurDetailsPage() {
     decisionTargetCongeIdRef.current = null
     e.target.value = ''
     if (!file || !targetId) return
-
     setDecisionBusyCongeId(targetId)
     try {
       const fd = new FormData()
@@ -255,7 +212,7 @@ export default function ProfesseurDetailsPage() {
       const res = await fetch(`/api/conges/${targetId}/decision`, { method: 'POST', body: fd })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Échec du téléversement de la décision')
+        setErrorMessage(err.error || 'فشل رفع القرار')
         setErrorDialogOpen(true)
         return
       }
@@ -265,14 +222,17 @@ export default function ProfesseurDetailsPage() {
     }
   }
 
-  const handleDeleteDecision = async (congeId) => {
-    if (!window.confirm('Retirer la décision de congé de cet enregistrement ?')) return
+  const handleDeleteDecision = async () => {
+    const congeId = deleteDecisionTargetId
+    if (!congeId) return
+    setDeleteDecisionDialogOpen(false)
+    setDeleteDecisionTargetId(null)
     setDecisionBusyCongeId(congeId)
     try {
       const res = await fetch(`/api/conges/${congeId}/decision`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        setErrorMessage(err.error || 'Échec de la suppression')
+        setErrorMessage(err.error || 'فشل حذف القرار')
         setErrorDialogOpen(true)
         return
       }
@@ -281,22 +241,11 @@ export default function ProfesseurDetailsPage() {
       setDecisionBusyCongeId(null)
     }
   }
-  
-  // Charger les options seulement quand nécessaire (lazy loading)
+
   const loadOptionsIfNeeded = async () => {
-    if (categories.length > 0 && specialites.length > 0 && titres.length > 0 && 
-        services.length > 0 && hopitaux.length > 0 && grades.length > 0) {
-      return // Déjà chargées
-    }
+    if (categories.length > 0 && specialites.length > 0 && titres.length > 0 &&
+        services.length > 0 && hopitaux.length > 0 && grades.length > 0) return
     await fetchOptions()
-  }
-  
-  // Charger les types de congé seulement quand nécessaire
-  const loadTypesCongeIfNeeded = async () => {
-    if (typesConge.length > 0) {
-      return // Déjà chargés
-    }
-    await fetchTypesConge()
   }
 
   const handleSubmit = async (e) => {
@@ -304,9 +253,7 @@ export default function ProfesseurDetailsPage() {
     try {
       const response = await fetch(`/api/professeurs/${params.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
           specialite_id: formData.specialite_id ? parseInt(formData.specialite_id, 10) : undefined,
@@ -317,18 +264,17 @@ export default function ProfesseurDetailsPage() {
           grade_id: formData.grade_id ? parseInt(formData.grade_id, 10) : undefined,
         }),
       })
-
       if (response.ok) {
         setOpen(false)
         fetchProfesseur()
       } else {
         const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la mise à jour')
+        setErrorMessage(data.error || 'حدث خطأ أثناء التحديث')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la mise à jour')
+      setErrorMessage('حدث خطأ أثناء التحديث')
       setErrorDialogOpen(true)
     }
   }
@@ -360,14 +306,10 @@ export default function ProfesseurDetailsPage() {
       const url = editingSolde
         ? `/api/professeurs/${params.id}/soldes/${editingSolde.id}`
         : `/api/professeurs/${params.id}/soldes`
-      
       const method = editingSolde ? 'PUT' : 'POST'
-      
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           annee: parseInt(soldeFormData.annee, 10),
           jours_total: parseInt(soldeFormData.jours_total, 10),
@@ -375,19 +317,17 @@ export default function ProfesseurDetailsPage() {
           type_conge_id: soldeFormData.type_conge_id ? parseInt(soldeFormData.type_conge_id, 10) : null,
         }),
       })
-
       if (response.ok) {
         setSoldeDialogOpen(false)
-        // Rafraîchir les données du professeur (qui inclut les soldes)
         fetchProfesseur()
       } else {
         const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de l\'opération')
+        setErrorMessage(data.error || 'حدث خطأ في العملية')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de l\'opération')
+      setErrorMessage('حدث خطأ في العملية')
       setErrorDialogOpen(true)
     }
   }
@@ -399,731 +339,568 @@ export default function ProfesseurDetailsPage() {
 
   const handleDeleteSoldeConfirm = async () => {
     try {
-      const response = await fetch(
-        `/api/professeurs/${params.id}/soldes/${soldeToDelete.id}`,
-        {
-          method: 'DELETE',
-        }
-      )
-
+      const response = await fetch(`/api/professeurs/${params.id}/soldes/${soldeToDelete.id}`, { method: 'DELETE' })
       if (response.ok) {
         setDeleteSoldeDialogOpen(false)
         setSoldeToDelete(null)
-        // Rafraîchir les données du professeur (qui inclut les soldes)
         fetchProfesseur()
       } else {
         const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorMessage(data.error || 'حدث خطأ أثناء الحذف')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la suppression')
+      setErrorMessage('حدث خطأ أثناء الحذف')
       setErrorDialogOpen(true)
     }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <span className="size-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
+        <p className="text-sm text-slate-600">جاري تحميل بيانات الموظف...</p>
+      </div>
+    )
   }
 
   if (!professeur) {
-    return <div>Professeur non trouvé</div>
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <p className="text-sm text-slate-600">لم يتم العثور على الموظف</p>
+        <Link href="/professeurs" className="text-xs text-blue-600 underline">رجوع إلى قائمة الموظفين</Link>
+      </div>
+    )
   }
 
   const congesList = professeur.conges ?? []
   const totalHistoriquePages = Math.ceil(congesList.length / HISTORIQUE_CONGES_PAGE_SIZE)
   const historiquePageSafe =
-    totalHistoriquePages === 0
-      ? 1
-      : Math.min(Math.max(1, historiqueCongesPage), totalHistoriquePages)
+    totalHistoriquePages === 0 ? 1 : Math.min(Math.max(1, historiqueCongesPage), totalHistoriquePages)
   const historiqueStart = (historiquePageSafe - 1) * HISTORIQUE_CONGES_PAGE_SIZE
-  const historiqueCongesPageRows = congesList.slice(
-    historiqueStart,
-    historiqueStart + HISTORIQUE_CONGES_PAGE_SIZE
-  )
+  const historiqueCongesPageRows = congesList.slice(historiqueStart, historiqueStart + HISTORIQUE_CONGES_PAGE_SIZE)
   const showHistoriquePagination = congesList.length > HISTORIQUE_CONGES_PAGE_SIZE
 
+  const fullName = `${professeur.titre?.nom ? `${professeur.titre.nom} ` : ''}${professeur.prenom} ${professeur.nom}`.trim()
+
+  const totalSoldeDisponible = soldes
+    .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
+    .filter(s => {
+      const typeNom = (s.type_conge?.nom || '').toLowerCase()
+      return !typeNom.includes('exceptionnel') && !typeNom.includes('excepcionel')
+    })
+    .reduce((sum, s) => sum + s.jours_restants, 0)
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <Link href="/professeurs">
-            <Button variant="outline" className="w-full sm:w-auto">← Retour</Button>
-          </Link>
-        </div>
-        <Dialog open={open} onOpenChange={(isOpen) => {
-          setOpen(isOpen)
-          // Charger les options seulement quand le dialog s'ouvre
-          if (isOpen) {
-            loadOptionsIfNeeded()
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">Modifier les informations</Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-full max-w-[95vw] sm:max-w-2xl flex flex-col">
-            <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Modifier les informations du professeur</DialogTitle>
-              <DialogDescription>
-                Modifier les informations du professeur
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2 -mr-2 min-h-0">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nom">Nom *</Label>
-                  <Input
-                    id="nom"
-                    value={formData.nom}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nom: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prenom">Prénom *</Label>
-                  <Input
-                    id="prenom"
-                    value={formData.prenom}
-                    onChange={(e) =>
-                      setFormData({ ...formData, prenom: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ppr">PPR *</Label>
-                  <Input
-                    id="ppr"
-                    value={formData.ppr}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ppr: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="categorie_personnel_id">Catégorie Personnel</Label>
-                  <Select
-                    value={formData.categorie_personnel_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, categorie_personnel_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une catégorie (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id.toString()}>
-                          {cat.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="specialite_id">Spécialité</Label>
-                  <Select
-                    value={formData.specialite_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, specialite_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une spécialité (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {specialites.map((spec) => (
-                        <SelectItem key={spec.id} value={spec.id.toString()}>
-                          {spec.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="titre_id">Titre</Label>
-                  <Select
-                    value={formData.titre_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, titre_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un titre (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {titres.map((titre) => (
-                        <SelectItem key={titre.id} value={titre.id.toString()}>
-                          {titre.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="service_id">Service</Label>
-                  <Select
-                    value={formData.service_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, service_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un service (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services.map((service) => (
-                        <SelectItem key={service.id} value={service.id.toString()}>
-                          {service.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hopital_id">Hôpital</Label>
-                  <Select
-                    value={formData.hopital_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, hopital_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un hôpital (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hopitaux.map((hopital) => (
-                        <SelectItem key={hopital.id} value={hopital.id.toString()}>
-                          {hopital.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="grade_id">Grade</Label>
-                  <Select
-                    value={formData.grade_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, grade_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un grade (optionnel)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {grades.map((grade) => (
-                        <SelectItem key={grade.id} value={grade.id.toString()}>
-                          {grade.nom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full">
-                  Enregistrer les modifications
-                </Button>
-              </form>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+    <div className="space-y-5" dir="rtl">
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {professeur.titre?.nom ? `${professeur.titre.nom} ` : ''}{professeur.prenom} {professeur.nom}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-slate-700">PPR : <span className="font-medium">{professeur.ppr}</span></p>
+      {/* Header */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Identity */}
+          <div className="space-y-3 text-right">
+            <div className="flex items-center gap-2">
+              <Users className="size-5 text-blue-600 shrink-0" />
+              <h1 className="text-2xl font-bold text-slate-950">{fullName}</h1>
             </div>
-            <div>
-              <p className="text-sm text-slate-700">Catégorie Personnel : <span className="font-medium">{professeur.categorie_personnel?.nom || '-'}</span></p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-700">Spécialité : <span className="font-medium">{professeur.specialite?.nom || '-'}</span></p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-700">Service : <span className="font-medium">{professeur.service?.nom || '-'}</span></p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-700">Hôpital : <span className="font-medium">{professeur.hopital?.nom || '-'}</span></p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-700">Grade : <span className="font-medium">{professeur.grade?.nom || '-'}</span></p>
+            {professeur.ppr && (
+              <p className="text-sm text-slate-500">رقم التأجير: <span className="font-semibold text-slate-700">{professeur.ppr}</span></p>
+            )}
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+              {professeur.specialite?.nom && (
+                <span><span className="text-slate-400">التخصص:</span> <span className="font-medium text-slate-800">{professeur.specialite.nom}</span></span>
+              )}
+              {professeur.grade?.nom && (
+                <span><span className="text-slate-400">الدرجة:</span> <span className="font-medium text-slate-800">{professeur.grade.nom}</span></span>
+              )}
+              {professeur.service?.nom && (
+                <span><span className="text-slate-400">المصلحة:</span> <span className="font-medium text-slate-800">{professeur.service.nom}</span></span>
+              )}
+              {professeur.hopital?.nom && (
+                <span><span className="text-slate-400">المستشفى:</span> <span className="font-medium text-slate-800">{professeur.hopital.nom}</span></span>
+              )}
+              {professeur.categorie_personnel?.nom && (
+                <span><span className="text-slate-400">الفئة المهنية:</span> <span className="font-medium text-slate-800">{professeur.categorie_personnel.nom}</span></span>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Gestion des Soldes de Congé</CardTitle>
-            <Button
-              onClick={() => handleOpenSoldeDialog()}
-              size="sm"
-              className="h-8"
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Link
+              href="/professeurs"
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Ajouter un solde
-            </Button>
+              <ArrowRight className="size-4" />
+              رجوع
+            </Link>
+            <button
+              type="button"
+              onClick={() => { loadOptionsIfNeeded(); setOpen(true) }}
+              className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              <Pencil className="size-4" />
+              تعديل المعلومات
+            </button>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+      </section>
+
+      {/* Soldes section */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+          <h2 className="text-sm font-semibold text-slate-800">تدبير أرصدة الرخص</h2>
+          <button
+            type="button"
+            onClick={() => handleOpenSoldeDialog()}
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            <Plus className="size-3.5" />
+            إضافة رصيد
+          </button>
+        </div>
+        <div className="p-5 sm:p-6">
           {soldes.length === 0 ? (
-            <p className="text-sm text-slate-500 text-center py-4">
-              Aucun solde enregistré
-            </p>
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+              <p className="text-sm text-slate-500">لا يوجد رصيد مسجل</p>
+            </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-md border border-slate-200">
-                <Table>
-                  <TableHeader className="">
-                    <TableRow className="">
-                      <TableHead className="">Année</TableHead>
-                      <TableHead className="">Type de congé</TableHead>
-                      <TableHead className="">Jours totaux</TableHead>
-                      <TableHead className="">Jours restants</TableHead>
-                      <TableHead className="">Expire le</TableHead>
-                      <TableHead className="">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-700">السنة</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-700">نوع الرخصة</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-700">الأيام الإجمالية</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-700">الأيام المتبقية</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-700">تاريخ الانتهاء</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-700">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
                     {soldes.map((solde) => {
-                      const maintenant = new Date()
                       const expireLe = new Date(solde.expire_le)
-                      const isExpired = expireLe < maintenant
-                      
+                      const isExpired = expireLe < new Date()
                       return (
-                        <TableRow key={solde.id}>
-                          <TableCell className="font-medium">{solde.annee}</TableCell>
-                          <TableCell>{solde.type_conge?.nom || '-'}</TableCell>
-                          <TableCell>{solde.jours_total}</TableCell>
-                          <TableCell>
-                            <span className={isExpired ? 'text-slate-400' : 'text-[#16A34A] font-semibold'}>
+                        <tr key={solde.id} className="bg-white transition-colors hover:bg-slate-50">
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm font-semibold text-slate-800">{solde.annee}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm text-slate-700">{solde.type_conge?.nom || '—'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm text-slate-700">{solde.jours_total}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`text-sm font-semibold ${isExpired ? 'text-slate-400' : 'text-emerald-700'}`}>
                               {solde.jours_restants}
                             </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={isExpired ? 'text-slate-400' : ''}>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`text-sm ${isExpired ? 'text-slate-400' : 'text-slate-700'}`} dir="ltr">
                               {expireLe.toLocaleDateString('fr-FR')}
                             </span>
                             {isExpired && (
-                              <span className="ml-2 text-xs text-red-600">(Expiré)</span>
+                              <span className="mr-2 text-xs text-red-500">(منتهي)</span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
                                 onClick={() => handleOpenSoldeDialog(solde)}
-                                className="h-7 w-7 p-0"
-                                title="Modifier"
+                                className="cursor-pointer flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                title="تعديل"
                               >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleDeleteSoldeClick(solde)}
-                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Supprimer"
+                                className="cursor-pointer flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                title="حذف"
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </td>
+                        </tr>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
-              <div className="pt-2 border-t border-slate-200">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-slate-700">Total disponible</p>
-                  <p className="text-lg font-semibold text-[#16A34A]">
-                    {soldes
-                      .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
-                      .filter(s => {
-                        const typeNom = (s.type_conge?.nom || '').toLowerCase()
-                        return !typeNom.includes('exceptionnel') && !typeNom.includes('excepcionel')
-                      })
-                      .reduce((sum, solde) => sum + solde.jours_restants, 0)} jours
-                  </p>
-                </div>
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                <p className="text-sm font-medium text-slate-600">الرصيد الإجمالي المتاح</p>
+                <p className="text-lg font-bold text-emerald-700">{totalSoldeDisponible} يوم</p>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Historique des Congés</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Date début</TableHead>
-                <TableHead>Date fin</TableHead>
-                <TableHead>Durée (jours)</TableHead>
-                <TableHead>Grade</TableHead>
-                <TableHead>Référence doc</TableHead>
-                <TableHead>Décision</TableHead>
-                <TableHead>Créé par</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      {/* Congé history section */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">سجل الرخص</h2>
+            <span className="text-xs text-slate-500">{congesList.length} رخصة</span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">النوع</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ المغادرة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ الرجوع</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المدة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الدرجة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الوثيقة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">القرار</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">أنشئ من طرف</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
               {congesList.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">
-                    Aucun congé enregistré
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td colSpan={8} className="px-5 py-12 text-center">
+                    <p className="text-sm text-slate-500">لا توجد رخص مسجلة</p>
+                  </td>
+                </tr>
               ) : (
                 historiqueCongesPageRows.map((conge) => (
-                  <TableRow key={conge.id}>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                  <tr key={conge.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
                         {conge.type_conge.nom}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(conge.date_debut).toLocaleDateString('fr-FR')}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(conge.date_fin).toLocaleDateString('fr-FR')}
-                    </TableCell>
-                    <TableCell>{conge.duree_jours}</TableCell>
-                    <TableCell>{professeur.grade?.nom || '-'}</TableCell>
-                    <TableCell>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-sm text-slate-700" dir="ltr">{new Date(conge.date_debut).toLocaleDateString('fr-FR')}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-sm text-slate-700" dir="ltr">{new Date(conge.date_fin).toLocaleDateString('fr-FR')}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-sm font-medium text-slate-800">{conge.duree_jours} أيام</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="text-sm text-slate-600">{professeur.grade?.nom || '—'}</span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
                       {(() => {
                         const ref = parseReferenceDoc(conge.reference_doc)
-                        if (!ref.referenceNumber && !ref.fileUrl) return '-'
+                        if (!ref.referenceNumber && !ref.fileUrl) return <span className="text-sm text-slate-400">—</span>
                         return (
                           <div className="space-y-1">
                             {ref.referenceNumber && (
-                              <div className="text-xs text-slate-700">{ref.referenceNumber}</div>
+                              <div className="max-w-[120px] truncate text-xs text-slate-700" title={ref.referenceNumber}>
+                                {ref.referenceNumber}
+                              </div>
                             )}
                             {ref.fileUrl && (
                               ref.fileType?.startsWith('image/') ? (
-                                <div className="flex items-center gap-2">
-                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" className="inline-block">
-                                    <img
-                                      src={toCongesUploadApiUrl(ref.fileUrl)}
-                                      alt={ref.fileName || 'Pièce justificative'}
-                                      className="h-10 w-10 rounded border border-slate-200 object-cover"
-                                    />
+                                <div className="flex items-center gap-1.5">
+                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer">
+                                    <img src={toCongesUploadApiUrl(ref.fileUrl)} alt={ref.fileName || 'وثيقة'} className="h-9 w-9 rounded-lg border border-slate-200 object-cover" />
                                   </a>
-                                  <a
-                                    href={toCongesUploadApiUrl(ref.fileUrl)}
-                                    download={ref.fileName || true}
-                                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                                  >
+                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} download={ref.fileName || true} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
                                     <Download className="h-3 w-3" />
-                                    Télécharger
+                                    تحميل
                                   </a>
                                 </div>
                               ) : (
-                                <a
-                                  href={toCongesUploadApiUrl(ref.fileUrl)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  download={ref.fileName || true}
-                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" download={ref.fileName || true}
+                                  className="inline-flex max-w-[120px] items-center gap-1 overflow-hidden text-xs text-blue-600 hover:underline"
+                                  title={ref.fileName || 'فتح PDF'}
                                 >
-                                  <FileText className="h-3 w-3 text-red-600" />
-                                  <span>{ref.fileName || 'Ouvrir PDF'}</span>
+                                  <FileText className="h-3 w-3 shrink-0 text-red-500" />
+                                  <span className="truncate">{ref.fileName || 'PDF'}</span>
                                 </a>
                               )
                             )}
                           </div>
                         )
                       })()}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
                       {(() => {
                         const dec = parseDecisionDoc(conge.decision_doc)
                         const busy = decisionBusyCongeId === conge.id
                         if (!dec.fileUrl) {
                           return (
-                            <Button
+                            <button
                               type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1 px-2 text-xs"
                               disabled={busy}
                               onClick={() => openDecisionPicker(conge.id)}
-                              title="Ajouter une décision de congé"
+                              className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
                             >
-                              <Upload className="h-3.5 w-3.5" />
-                              Ajouter
-                            </Button>
+                              <Upload className="h-3 w-3" />
+                              إضافة
+                            </button>
                           )
                         }
                         const apiUrl = toDecisionsUploadApiUrl(dec.fileUrl)
                         return (
                           <div className="flex flex-wrap items-center gap-1">
                             {dec.fileType?.startsWith('image/') ? (
-                              <a
-                                href={apiUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-block"
-                                title={dec.fileName || 'Décision'}
-                              >
-                                <img
-                                  src={apiUrl}
-                                  alt={dec.fileName || 'Décision'}
-                                  className="h-10 w-10 rounded border border-slate-200 object-cover"
-                                />
+                              <a href={apiUrl} target="_blank" rel="noreferrer" title={dec.fileName || 'قرار'}>
+                                <img src={apiUrl} alt={dec.fileName || 'قرار'} className="h-9 w-9 rounded-lg border border-slate-200 object-cover" />
                               </a>
                             ) : (
-                              <a
-                                href={apiUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                download={dec.fileName || true}
-                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                                title={dec.fileName || 'Ouvrir la décision'}
+                              <a href={apiUrl} target="_blank" rel="noreferrer" download={dec.fileName || true}
+                                className="inline-flex max-w-[100px] items-center gap-1 overflow-hidden text-xs text-blue-600 hover:underline"
+                                title={dec.fileName || 'فتح القرار'}
                               >
-                                <FileText className="h-3 w-3 text-red-600 shrink-0" />
-                                <span className="max-w-[8rem] truncate">{dec.fileName || 'PDF'}</span>
+                                <FileText className="h-3 w-3 shrink-0 text-red-500" />
+                                <span className="truncate">{dec.fileName || 'PDF'}</span>
                               </a>
                             )}
-                            <Button
+                            <button
                               type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
                               disabled={busy}
                               onClick={() => openDecisionPicker(conge.id)}
-                              title="Remplacer la décision"
+                              className="cursor-pointer flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                              title="استبدال القرار"
                             >
-                              <Upload className="h-3.5 w-3.5" />
-                            </Button>
-                            <a
-                              href={apiUrl}
-                              download={dec.fileName || true}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
-                              title="Télécharger"
+                              <Upload className="h-3 w-3" />
+                            </button>
+                            <a href={apiUrl} download={dec.fileName || true}
+                              className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                              title="تحميل"
                             >
-                              <Download className="h-3.5 w-3.5" />
+                              <Download className="h-3 w-3" />
                             </a>
-                            <Button
+                            <button
                               type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                               disabled={busy}
-                              onClick={() => handleDeleteDecision(conge.id)}
-                              title="Supprimer la décision"
+                              onClick={() => { setDeleteDecisionTargetId(conge.id); setDeleteDecisionDialogOpen(true) }}
+                              className="cursor-pointer flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              title="حذف القرار"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                              <Trash2 className="h-3 w-3" />
+                            </button>
                           </div>
                         )
                       })()}
-                    </TableCell>
-                    <TableCell>{conge.cree_par_rh.nom_complet}</TableCell>
-                  </TableRow>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span className="block max-w-[120px] truncate text-sm text-slate-600" title={conge.cree_par_rh.nom_complet}>
+                        {conge.cree_par_rh.nom_complet}
+                      </span>
+                    </td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
-          <input
-            ref={decisionFileInputRef}
-            type="file"
-            className="hidden"
-            accept="image/jpeg,image/png,application/pdf,.pdf,.png,.jpg,.jpeg"
-            onChange={handleDecisionFileChange}
-          />
-          {showHistoriquePagination && (
-            <div className="flex items-center justify-center gap-4 pt-4 mt-4 border-t border-slate-200">
-              <Button
+            </tbody>
+          </table>
+        </div>
+        {showHistoriquePagination && (
+          <div className="border-t border-slate-100 px-5 py-3">
+            <div className="flex items-center justify-center gap-3">
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
                 disabled={historiquePageSafe <= 1}
                 onClick={() => setHistoriqueCongesPage((p) => Math.max(1, p - 1))}
+                className="cursor-pointer inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Précédent
-              </Button>
-              <p className="text-sm text-slate-700 min-w-[7rem] text-center">
-                Page {historiquePageSafe} / {totalHistoriquePages}
-              </p>
-              <Button
+                السابق
+              </button>
+              <span className="min-w-[6rem] text-center text-sm text-slate-600">
+                {historiquePageSafe} / {totalHistoriquePages}
+              </span>
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
                 disabled={historiquePageSafe >= totalHistoriquePages}
-                onClick={() =>
-                  setHistoriqueCongesPage((p) => Math.min(totalHistoriquePages, p + 1))
-                }
+                onClick={() => setHistoriqueCongesPage((p) => Math.min(totalHistoriquePages, p + 1))}
+                className="cursor-pointer inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Suivant
-              </Button>
+                التالي
+              </button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+        <input
+          ref={decisionFileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/jpeg,image/png,application/pdf,.pdf,.png,.jpg,.jpeg"
+          onChange={handleDecisionFileChange}
+        />
+      </section>
 
-      {/* Dialog pour ajouter/modifier un solde */}
-      <Dialog open={soldeDialogOpen} onOpenChange={setSoldeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingSolde ? 'Modifier le solde' : 'Ajouter un solde'}
-            </DialogTitle>
-            <DialogDescription>
-              {editingSolde
-                ? 'Modifier les informations du solde de congé'
-                : 'Ajouter un nouveau solde de congé pour ce professeur'}
+      {/* Edit employee dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl" dir="rtl">
+          <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تعديل معلومات الموظف</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              تعديل البيانات الشخصية والوظيفية للموظف
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSoldeSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="annee">Année *</Label>
-              <Input
-                id="annee"
-                type="number"
-                min="2000"
-                max="2100"
-                value={soldeFormData.annee}
-                onChange={(e) =>
-                  setSoldeFormData({ ...soldeFormData, annee: e.target.value })
-                }
-                required
-              />
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <form onSubmit={handleSubmit} className="space-y-4 text-right">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_nom" className="text-sm font-medium text-slate-700">النسب <span className="text-red-500">*</span></Label>
+                <Input id="edit_nom" value={formData.nom} onChange={(e) => setFormData({ ...formData, nom: e.target.value })} required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_prenom" className="text-sm font-medium text-slate-700">الاسم <span className="text-red-500">*</span></Label>
+                <Input id="edit_prenom" value={formData.prenom} onChange={(e) => setFormData({ ...formData, prenom: e.target.value })} required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_ppr" className="text-sm font-medium text-slate-700">رقم التأجير <span className="text-red-500">*</span></Label>
+                <Input id="edit_ppr" value={formData.ppr} onChange={(e) => setFormData({ ...formData, ppr: e.target.value })} required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">اللقب</Label>
+                <Select value={formData.titre_id} onValueChange={(v) => setFormData({ ...formData, titre_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر اللقب (اختياري)" /></SelectTrigger>
+                  <SelectContent>{titres.map((t) => <SelectItem key={t.id} value={t.id.toString()}>{t.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">الفئة المهنية</Label>
+                <Select value={formData.categorie_personnel_id} onValueChange={(v) => setFormData({ ...formData, categorie_personnel_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر الفئة (اختياري)" /></SelectTrigger>
+                  <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">التخصص</Label>
+                <Select value={formData.specialite_id} onValueChange={(v) => setFormData({ ...formData, specialite_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر التخصص (اختياري)" /></SelectTrigger>
+                  <SelectContent>{specialites.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{s.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">الدرجة</Label>
+                <Select value={formData.grade_id} onValueChange={(v) => setFormData({ ...formData, grade_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر الدرجة (اختياري)" /></SelectTrigger>
+                  <SelectContent>{grades.map((g) => <SelectItem key={g.id} value={g.id.toString()}>{g.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المصلحة</Label>
+                <Select value={formData.service_id} onValueChange={(v) => setFormData({ ...formData, service_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر المصلحة (اختياري)" /></SelectTrigger>
+                  <SelectContent>{services.map((s) => <SelectItem key={s.id} value={s.id.toString()}>{s.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المستشفى</Label>
+                <Select value={formData.hopital_id} onValueChange={(v) => setFormData({ ...formData, hopital_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر المستشفى (اختياري)" /></SelectTrigger>
+                  <SelectContent>{hopitaux.map((h) => <SelectItem key={h.id} value={h.id.toString()}>{h.nom}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <button type="button" onClick={() => setOpen(false)} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
+                <button type="submit" className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto">حفظ التعديلات</button>
+              </div>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/edit solde dialog */}
+      <Dialog open={soldeDialogOpen} onOpenChange={setSoldeDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">
+              {editingSolde ? 'تعديل الرصيد' : 'إضافة رصيد'}
+            </DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              {editingSolde ? 'تعديل معلومات رصيد الرخصة' : 'إضافة رصيد رخصة جديد لهذا الموظف'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSoldeSubmit} className="space-y-4 text-right">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">السنة <span className="text-red-500">*</span></Label>
+              <Input type="number" min="2000" max="2100" value={soldeFormData.annee}
+                onChange={(e) => setSoldeFormData({ ...soldeFormData, annee: e.target.value })}
+                required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="type_conge_id">Type de congé *</Label>
-              <Select
-                value={soldeFormData.type_conge_id}
-                onValueChange={(value) =>
-                  setSoldeFormData({ ...soldeFormData, type_conge_id: value })
-                }
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un type de congé" />
-                </SelectTrigger>
-                <SelectContent>
-                  {typesConge.map((type) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">نوع الرخصة <span className="text-red-500">*</span></Label>
+              <Select value={soldeFormData.type_conge_id} onValueChange={(v) => setSoldeFormData({ ...soldeFormData, type_conge_id: v })} required>
+                <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر نوع الرخصة" /></SelectTrigger>
+                <SelectContent>{typesConge.map((t) => <SelectItem key={t.id} value={t.id.toString()}>{t.nom}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jours_total">Jours totaux *</Label>
-              <Input
-                id="jours_total"
-                type="number"
-                min="1"
-                value={soldeFormData.jours_total}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">الأيام الإجمالية <span className="text-red-500">*</span></Label>
+              <Input type="number" min="1" value={soldeFormData.jours_total}
                 onChange={(e) => {
-                  const joursTotal = e.target.value
-                  setSoldeFormData({
-                    ...soldeFormData,
-                    jours_total: joursTotal,
-                    // Si on crée un nouveau solde, jours_restants = jours_total
-                    jours_restants: editingSolde ? soldeFormData.jours_restants : joursTotal,
-                  })
+                  const v = e.target.value
+                  setSoldeFormData({ ...soldeFormData, jours_total: v, jours_restants: editingSolde ? soldeFormData.jours_restants : v })
                 }}
-                required
-              />
+                required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="jours_restants">Jours restants *</Label>
-              <Input
-                id="jours_restants"
-                type="number"
-                min="0"
-                max={soldeFormData.jours_total || 999}
-                value={soldeFormData.jours_restants}
-                onChange={(e) =>
-                  setSoldeFormData({ ...soldeFormData, jours_restants: e.target.value })
-                }
-                required
-              />
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">الأيام المتبقية <span className="text-red-500">*</span></Label>
+              <Input type="number" min="0" max={soldeFormData.jours_total || 999} value={soldeFormData.jours_restants}
+                onChange={(e) => setSoldeFormData({ ...soldeFormData, jours_restants: e.target.value })}
+                required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
             </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setSoldeDialogOpen(false)}
-              >
-                Annuler
-              </Button>
-              <Button type="submit">
-                {editingSolde ? 'Modifier' : 'Ajouter'}
-              </Button>
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+              <button type="button" onClick={() => setSoldeDialogOpen(false)} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
+              <button type="submit" className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto">
+                {editingSolde ? 'حفظ التعديلات' : 'إضافة الرصيد'}
+              </button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de confirmation de suppression */}
-      <Dialog open={deleteSoldeDialogOpen} onOpenChange={setDeleteSoldeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer le solde de {soldeToDelete?.annee} ? 
-              Cette action est irréversible.
+      {/* Delete solde confirm dialog */}
+      <Dialog open={deleteSoldeDialogOpen} onOpenChange={(v) => { setDeleteSoldeDialogOpen(v); if (!v) setSoldeToDelete(null) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تأكيد الحذف</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700">
+              هل أنت متأكد من حذف رصيد سنة <strong>{soldeToDelete?.annee}</strong>؟ هذا الإجراء لا يمكن التراجع عنه.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteSoldeDialogOpen(false)
-                setSoldeToDelete(null)
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteSoldeConfirm}
-            >
-              Supprimer
-            </Button>
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button type="button" onClick={() => { setDeleteSoldeDialogOpen(false); setSoldeToDelete(null) }} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
+            <button type="button" onClick={handleDeleteSoldeConfirm} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto">حذف</button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Erreur</DialogTitle>
-            <DialogDescription className="text-slate-700 whitespace-pre-line">
-              {errorMessage}
+      {/* Delete decision confirm dialog */}
+      <Dialog open={deleteDecisionDialogOpen} onOpenChange={(v) => { setDeleteDecisionDialogOpen(v); if (!v) setDeleteDecisionTargetId(null) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">حذف القرار</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700">
+              هل تريد إزالة وثيقة القرار من هذه الرخصة؟
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setErrorDialogOpen(false)}>
-              Fermer
-            </Button>
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button type="button" onClick={() => { setDeleteDecisionDialogOpen(false); setDeleteDecisionTargetId(null) }} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
+            <button type="button" onClick={handleDeleteDecision} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto">حذف</button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Error dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-red-600">خطأ</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700 whitespace-pre-line">{errorMessage}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-start pt-1">
+            <button type="button" onClick={() => setErrorDialogOpen(false)} className="cursor-pointer inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">إغلاق</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
 {
-  "block_holiday_selection": true,
-  "block_weekend_selection": true
+  "block_holiday_selection": false,
+  "block_weekend_selection": false
 }

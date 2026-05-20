@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { getWorkingDaysBetween, isWorkingDay } from '@/lib/working-days'
+import { getDateFinFromDuree, isWorkingDay } from '@/lib/working-days'
 import { getAppSettings } from '@/lib/app-settings'
 
 // PUT - Mettre à jour un congé
@@ -28,7 +28,6 @@ export async function PUT(request, { params }) {
       professeur_id,
       type_conge_id,
       date_debut,
-      date_fin,
       duree_jours,
       reference_doc,
       nom_interim,
@@ -62,7 +61,9 @@ export async function PUT(request, { params }) {
       }
     }
 
-    if (!professeur_id || !type_conge_id || !date_debut || !date_fin) {
+    const dureeJoursInt = parseInt(duree_jours, 10) || 0
+
+    if (!professeur_id || !type_conge_id || !date_debut || dureeJoursInt <= 0) {
       return NextResponse.json(
         { error: 'Tous les champs obligatoires doivent être remplis' },
         { status: 400 }
@@ -77,18 +78,13 @@ export async function PUT(request, { params }) {
           { status: 400 }
         )
       }
-      if (!await isWorkingDay(date_fin, prisma)) {
-        return NextResponse.json(
-          { error: 'لا يمكن اختيار يوم عطلة رسمية أو غير مفتوح كتاريخ نهاية الرخصة.' },
-          { status: 400 }
-        )
-      }
     }
 
-    const dureeJoursInt = await getWorkingDaysBetween(date_debut, date_fin, prisma)
-    if (dureeJoursInt <= 0) {
+    // Calculer date_fin côté serveur à partir de date_debut + duree_jours (source de vérité)
+    const date_fin = await getDateFinFromDuree(date_debut, dureeJoursInt, prisma)
+    if (!date_fin) {
       return NextResponse.json(
-        { error: 'Aucun jour ouvrable dans cette période (vérifiez les dates et les jours fériés)' },
+        { error: 'Impossible de calculer la date de fin (vérifiez les dates et les jours fériés)' },
         { status: 400 }
       )
     }

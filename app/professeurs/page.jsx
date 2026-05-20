@@ -1,23 +1,13 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import {
@@ -29,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import Link from 'next/link'
 import { Pagination } from '@/components/ui/pagination'
-import { X, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download, Eye } from 'lucide-react'
+import { Users, Plus, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download, Eye, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -89,7 +79,6 @@ export default function ProfesseursPage() {
     setSelectedProfesseurs(new Set())
   }, [filters.nom, filters.prenom, filters.ppr, filters.hopital_id, filters.service_id, filters.grade_id])
 
-  // Set indeterminate state for select all checkbox
   useEffect(() => {
     if (selectAllCheckboxRef.current) {
       const paginatedProfesseurs = professeurs.slice(
@@ -111,31 +100,12 @@ export default function ProfesseursPage() {
         fetch('/api/hopitaux'),
         fetch('/api/grades'),
       ])
-
-      if (categoriesRes.ok) {
-        const data = await categoriesRes.json()
-        setCategories(data)
-      }
-      if (specialitesRes.ok) {
-        const data = await specialitesRes.json()
-        setSpecialites(data)
-      }
-      if (titresRes.ok) {
-        const data = await titresRes.json()
-        setTitres(data)
-      }
-      if (servicesRes.ok) {
-        const data = await servicesRes.json()
-        setServices(data)
-      }
-      if (hopitauxRes.ok) {
-        const data = await hopitauxRes.json()
-        setHopitaux(data)
-      }
-      if (gradesRes.ok) {
-        const data = await gradesRes.json()
-        setGrades(data)
-      }
+      if (categoriesRes.ok) setCategories(await categoriesRes.json())
+      if (specialitesRes.ok) setSpecialites(await specialitesRes.json())
+      if (titresRes.ok) setTitres(await titresRes.json())
+      if (servicesRes.ok) setServices(await servicesRes.json())
+      if (hopitauxRes.ok) setHopitaux(await hopitauxRes.json())
+      if (gradesRes.ok) setGrades(await gradesRes.json())
     } catch (error) {
       console.error('Erreur lors du chargement des options:', error)
     }
@@ -144,31 +114,15 @@ export default function ProfesseursPage() {
   const fetchProfesseurs = async () => {
     try {
       const params = new URLSearchParams()
-      if (filters.nom.trim()) {
-        params.append('nom', filters.nom.trim())
-      }
-      if (filters.prenom.trim()) {
-        params.append('prenom', filters.prenom.trim())
-      }
-      if (filters.ppr.trim()) {
-        params.append('ppr', filters.ppr.trim())
-      }
-      if (filters.hopital_id) {
-        params.append('hopital_id', filters.hopital_id)
-      }
-      if (filters.service_id) {
-        params.append('service_id', filters.service_id)
-      }
-      if (filters.grade_id) {
-        params.append('grade_id', filters.grade_id)
-      }
-
+      if (filters.nom.trim()) params.append('nom', filters.nom.trim())
+      if (filters.prenom.trim()) params.append('prenom', filters.prenom.trim())
+      if (filters.ppr.trim()) params.append('ppr', filters.ppr.trim())
+      if (filters.hopital_id) params.append('hopital_id', filters.hopital_id)
+      if (filters.service_id) params.append('service_id', filters.service_id)
+      if (filters.grade_id) params.append('grade_id', filters.grade_id)
       const url = params.toString() ? `/api/professeurs?${params.toString()}` : '/api/professeurs'
       const response = await fetch(url)
-      if (response.ok) {
-        const data = await response.json()
-        setProfesseurs(data)
-      }
+      if (response.ok) setProfesseurs(await response.json())
     } catch (error) {
       console.error('Erreur lors du chargement des professeurs:', error)
     } finally {
@@ -177,14 +131,7 @@ export default function ProfesseursPage() {
   }
 
   const handleClearFilter = () => {
-    setFilters({
-      nom: '',
-      prenom: '',
-      ppr: '',
-      hopital_id: '',
-      service_id: '',
-      grade_id: '',
-    })
+    setFilters({ nom: '', prenom: '', ppr: '', hopital_id: '', service_id: '', grade_id: '' })
     setCurrentPage(1)
   }
 
@@ -193,37 +140,24 @@ export default function ProfesseursPage() {
     try {
       const response = await fetch('/api/professeurs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
       if (response.ok) {
         setOpen(false)
-        setFormData({
-          nom: '',
-          prenom: '',
-          ppr: '',
-          specialite_id: '',
-          categorie_personnel_id: '',
-          titre_id: '',
-          service_id: '',
-          hopital_id: '',
-          grade_id: '',
-        })
+        setFormData({ nom: '', prenom: '', ppr: '', specialite_id: '', categorie_personnel_id: '', titre_id: '', service_id: '', hopital_id: '', grade_id: '' })
         setCurrentPage(1)
         fetchProfesseurs()
       } else {
         const data = await response.json()
         setMessageDialogIsError(true)
-        setErrorMessage(data.error || 'Erreur lors de la création')
+        setErrorMessage(data.error || 'حدث خطأ أثناء الإنشاء')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
       setMessageDialogIsError(true)
-      setErrorMessage('Erreur lors de la création')
+      setErrorMessage('حدث خطأ أثناء الإنشاء')
       setErrorDialogOpen(true)
     }
   }
@@ -232,70 +166,50 @@ export default function ProfesseursPage() {
     e.preventDefault()
     if (!importFile) {
       setMessageDialogIsError(true)
-      setErrorMessage('Veuillez sélectionner un fichier Excel')
+      setErrorMessage('الرجاء اختيار ملف Excel')
       setErrorDialogOpen(true)
       return
     }
-
     setImporting(true)
     setImportResult(null)
-
     try {
-      const formData = new FormData()
-      formData.append('file', importFile)
-
-      const response = await fetch('/api/soldes/import-excel', {
-        method: 'POST',
-        body: formData,
-      })
-
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const response = await fetch('/api/soldes/import-excel', { method: 'POST', body: fd })
       const data = await response.json()
-
       if (response.ok) {
         setImportResult(data)
         setImportFile(null)
-        // Recharger les professeurs pour voir les nouveaux soldes
         fetchProfesseurs()
       } else {
-        let errorMsg = data.error || 'Erreur lors de l\'import'
-        
-        // Ajouter des détails de débogage si disponibles
-        if (data.foundColumns) {
-          errorMsg += `\n\nColonnes trouvées dans le fichier:\n${data.foundColumns.join(', ')}`
-        }
+        let errorMsg = data.error || 'حدث خطأ أثناء الاستيراد'
+        if (data.foundColumns) errorMsg += `\n\nالأعمدة الموجودة في الملف:\n${data.foundColumns.join(', ')}`
         if (data.details) {
-          errorMsg += `\n\nDétails:\n`
-          errorMsg += `- Colonne "Nom" trouvée: ${data.details.nomFound ? 'Oui' : 'Non'}\n`
-          errorMsg += `- Colonne "Prénom" trouvée: ${data.details.prenomFound ? 'Oui' : 'Non'}`
-          if (data.details.allColumns && data.details.allColumns.length > 0) {
-            errorMsg += `\n\nToutes les colonnes détectées:\n`
+          errorMsg += `\n\nالتفاصيل:\n`
+          errorMsg += `- عمود "Nom" موجود: ${data.details.nomFound ? 'نعم' : 'لا'}\n`
+          errorMsg += `- عمود "Prénom" موجود: ${data.details.prenomFound ? 'نعم' : 'لا'}`
+          if (data.details.allColumns?.length > 0) {
+            errorMsg += `\n\nجميع الأعمدة المكتشفة:\n`
             data.details.allColumns.forEach((col, idx) => {
-              const displayValue = col.original || '(vide)'
-              errorMsg += `${idx + 1}. "${displayValue}"${col.normalized ? ` (normalisé: "${col.normalized}")` : ''}\n`
-            })
-          } else {
-            errorMsg += `\n\nAucune colonne détectée dans la ligne d'en-têtes.`
-          }
-        }
-        if (data.debug) {
-          errorMsg += `\n\nInformations de débogage:\n`
-          if (data.debug.firstFewRows) {
-            errorMsg += `Premières lignes du fichier:\n`
-            data.debug.firstFewRows.forEach((rowInfo) => {
-              errorMsg += `Ligne ${rowInfo.rowIndex + 1}: ${rowInfo.values.join(', ')}\n`
+              const displayValue = col.original || '(فارغ)'
+              errorMsg += `${idx + 1}. "${displayValue}"${col.normalized ? ` (${col.normalized})` : ''}\n`
             })
           }
         }
-        
+        if (data.debug?.firstFewRows) {
+          errorMsg += `\n\nأول بضعة صفوف:\n`
+          data.debug.firstFewRows.forEach((rowInfo) => {
+            errorMsg += `صف ${rowInfo.rowIndex + 1}: ${rowInfo.values.join(', ')}\n`
+          })
+        }
         setMessageDialogIsError(true)
         setErrorMessage(errorMsg)
         setErrorDialogOpen(true)
-        setImporting(false)
       }
     } catch (error) {
       console.error('Erreur:', error)
       setMessageDialogIsError(true)
-      setErrorMessage('Erreur lors de l\'import')
+      setErrorMessage('حدث خطأ أثناء الاستيراد')
       setErrorDialogOpen(true)
     } finally {
       setImporting(false)
@@ -309,13 +223,9 @@ export default function ProfesseursPage() {
 
   const handleDeleteProfesseur = async () => {
     if (!professeurToDelete) return
-
     setDeleting(true)
     try {
-      const response = await fetch(`/api/professeurs/${professeurToDelete.id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await fetch(`/api/professeurs/${professeurToDelete.id}`, { method: 'DELETE' })
       if (response.ok) {
         setDeleteDialogOpen(false)
         setProfesseurToDelete(null)
@@ -325,7 +235,7 @@ export default function ProfesseursPage() {
       } else {
         const data = await response.json()
         setMessageDialogIsError(true)
-        setErrorMessage(data.error || 'Erreur lors de la suppression')
+        setErrorMessage(data.error || 'حدث خطأ أثناء الحذف')
         setErrorDialogOpen(true)
         setDeleteDialogOpen(false)
         setProfesseurToDelete(null)
@@ -333,7 +243,7 @@ export default function ProfesseursPage() {
     } catch (error) {
       console.error('Erreur:', error)
       setMessageDialogIsError(true)
-      setErrorMessage('Erreur lors de la suppression')
+      setErrorMessage('حدث خطأ أثناء الحذف')
       setErrorDialogOpen(true)
       setDeleteDialogOpen(false)
       setProfesseurToDelete(null)
@@ -362,17 +272,13 @@ export default function ProfesseursPage() {
 
   const handleBulkDelete = async () => {
     if (selectedProfesseurs.size === 0) return
-
     setDeleting(true)
     try {
       const response = await fetch('/api/professeurs', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedProfesseurs) }),
       })
-
       if (response.ok) {
         const data = await response.json()
         setBulkDeleteDialogOpen(false)
@@ -380,19 +286,19 @@ export default function ProfesseursPage() {
         setCurrentPage(1)
         fetchProfesseurs()
         setMessageDialogIsError(false)
-        setErrorMessage(data.message || 'Suppression effectuée avec succès')
+        setErrorMessage(data.message || 'تم الحذف بنجاح')
         setErrorDialogOpen(true)
       } else {
         const data = await response.json()
         setMessageDialogIsError(true)
-        setErrorMessage(data.error || 'Erreur lors de la suppression multiple')
+        setErrorMessage(data.error || 'حدث خطأ أثناء الحذف المتعدد')
         setErrorDialogOpen(true)
         setBulkDeleteDialogOpen(false)
       }
     } catch (error) {
       console.error('Erreur:', error)
       setMessageDialogIsError(true)
-      setErrorMessage('Erreur lors de la suppression multiple')
+      setErrorMessage('حدث خطأ أثناء الحذف المتعدد')
       setErrorDialogOpen(true)
       setBulkDeleteDialogOpen(false)
     } finally {
@@ -416,13 +322,13 @@ export default function ProfesseursPage() {
         fetchProfesseurs()
       } else {
         setMessageDialogIsError(true)
-        setErrorMessage(data.error || "Erreur lors de l'ajout en masse des soldes")
+        setErrorMessage(data.error || 'حدث خطأ أثناء إضافة الأرصدة')
         setErrorDialogOpen(true)
       }
     } catch (error) {
       console.error('Erreur:', error)
       setMessageDialogIsError(true)
-      setErrorMessage("Erreur lors de l'ajout en masse des soldes")
+      setErrorMessage('حدث خطأ أثناء إضافة الأرصدة')
       setErrorDialogOpen(true)
     } finally {
       setBulkAddLoading(false)
@@ -436,7 +342,7 @@ export default function ProfesseursPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setMessageDialogIsError(true)
-        setErrorMessage(data.error || 'Erreur lors de l\'export')
+        setErrorMessage(data.error || 'حدث خطأ أثناء التصدير')
         setErrorDialogOpen(true)
         return
       }
@@ -453,7 +359,7 @@ export default function ProfesseursPage() {
     } catch (error) {
       console.error('Erreur export:', error)
       setMessageDialogIsError(true)
-      setErrorMessage('Erreur lors de l\'export Excel')
+      setErrorMessage('حدث خطأ أثناء تصدير Excel')
       setErrorDialogOpen(true)
     } finally {
       setExportLoading(false)
@@ -461,7 +367,12 @@ export default function ProfesseursPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]">Chargement...</div>
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <span className="size-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
+        <p className="text-sm text-slate-600">جاري تحميل الموظفين...</p>
+      </div>
+    )
   }
 
   const totalPages = Math.ceil(professeurs.length / ITEMS_PER_PAGE)
@@ -470,737 +381,736 @@ export default function ProfesseursPage() {
   const paginatedProfesseurs = professeurs.slice(startIndex, endIndex)
   const allSelected = paginatedProfesseurs.length > 0 && selectedProfesseurs.size === paginatedProfesseurs.length
 
+  const hasActiveFilters = filters.nom || filters.prenom || filters.ppr || filters.hopital_id || filters.service_id || filters.grade_id
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Professeurs</h1>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Dialog open={bulkAddSoldesDialogOpen} onOpenChange={(open) => {
-            setBulkAddSoldesDialogOpen(open)
-            if (!open) setBulkAddResult(null)
-          }}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto">
-                <CalendarPlus className="h-4 w-4 mr-2" />
-                Ajouter Soldes Annuels
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Ajouter les soldes annuels à tous les professeurs</DialogTitle>
+    <div className="space-y-5" dir="rtl">
 
-              </DialogHeader>
-              <form onSubmit={handleBulkAddAnnualSoldes} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bulk-add-year">Année</Label>
-                  <Select
-                    value={bulkAddYear}
-                    onValueChange={setBulkAddYear}
-                    disabled={bulkAddLoading}
-                  >
-                    <SelectTrigger id="bulk-add-year">
-                      <SelectValue placeholder="Sélectionner l'année" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const y = new Date().getFullYear() - 2 + i
-                        return (
-                          <SelectItem key={y} value={y.toString()}>
-                            {y}
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {bulkAddResult ? (
-                  bulkAddResult.summary.professeursTotal === 0 ? (
-                    <div className="p-3 rounded-md bg-slate-50 border border-slate-200 space-y-2">
-                      <p className="font-medium text-slate-800">Aucun professeur</p>
-                      <p className="text-sm text-slate-600">Aucun solde n&apos;a été affecté.</p>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-md bg-green-50 border border-green-200 space-y-2">
-                      <p className="font-medium text-green-800">Opération terminée</p>
-                      <p className="text-sm text-green-700">
-                        {bulkAddResult.summary.professeursMisAJour} professeur(s) mis à jour sur {bulkAddResult.summary.professeursTotal} au total.
-                      </p>
-                      <p className="text-sm text-green-700">
-                        {bulkAddResult.summary.soldesCrees} solde(s) créé(s), {bulkAddResult.summary.soldesIgnores} déjà existant(s).
-                      </p>
-                    </div>
-                  )
-                ) : null}
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={bulkAddLoading} className="flex-1">
-                    {bulkAddLoading ? 'Ajout en cours...' : 'Ajouter à tous'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setBulkAddSoldesDialogOpen(false)}
-                  >
-                    Fermer
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Button
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={handleExportSoldes}
-            disabled={exportLoading}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {exportLoading ? 'Export...' : 'Exporter Soldes (Excel)'}
-          </Button>
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto">
-                <Upload className="h-4 w-4 mr-2" />
-                Importer Soldes (Excel)
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Importer les Soldes de Congé depuis Excel</DialogTitle>
-               
-              </DialogHeader>
-              <form onSubmit={handleImportExcel} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="excel-file">Fichier Excel (.xlsx ou .xls) *</Label>
-                  <Input
-                    id="excel-file"
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    required
-                    disabled={importing}
-                  />
-                  
-                </div>
-                {importResult && (
-                  <div className="space-y-2">
-                    {importResult.summary?.importSansColonneSolde && (
-                      <p className="text-sm text-blue-900 p-3 bg-blue-50 border border-blue-100 rounded-md">
-                        Aucune colonne de solde détectée — les professeurs sont importés sans solde initial.
-                      </p>
-                    )}
-                    {importResult.summary?.warnings > 0 && (
-                      <p className="text-xs text-amber-900 p-2 bg-amber-50 border border-amber-100 rounded-md">
-                        {importResult.summary.warnings} avertissement(s) (grade ou spécialité non reconnus sur certaines lignes — voir le détail de la réponse si besoin).
-                      </p>
-                    )}
-                    <p className="text-sm text-slate-700 p-3 bg-slate-50 rounded-md">
-                      L'import s'est terminé. Succès : {importResult.summary.success}, Erreurs : {importResult.summary.errors}, Ignorés : {importResult.summary.skipped}.
-                    </p>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={importing || !importFile} className="flex-1">
-                    {importing ? (
-                      'Import en cours...'
-                    ) : (
-                      <span className="flex items-center">
-                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                        Importer
-                      </span>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setImportDialogOpen(false)
-                      setImportFile(null)
-                      setImportResult(null)
-                    }}
-                  >
-                    Annuler
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto cursor-pointer">Nouveau Professeur</Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] w-full max-w-[95vw] sm:max-w-2xl flex flex-col">
-            <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Nouveau Professeur</DialogTitle>
-              
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2 -mr-2 min-h-0">
-              <form onSubmit={handleSubmit} className="space-y-4">       
-              <div className="space-y-2">
-                <Label htmlFor="titre_id">Titre</Label>
-                <Select
-                  value={formData.titre_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, titre_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un titre (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {titres.map((titre) => (
-                      <SelectItem key={titre.id} value={titre.id.toString()}>
-                        {titre.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="service_id">Service</Label>
-                <Select
-                  value={formData.service_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, service_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un service (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id.toString()}>
-                        {service.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="hopital_id">Hôpital</Label>
-                <Select
-                  value={formData.hopital_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, hopital_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un hôpital (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hopitaux.map((hopital) => (
-                      <SelectItem key={hopital.id} value={hopital.id.toString()}>
-                        {hopital.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="grade_id">Grade</Label>
-                <Select
-                  value={formData.grade_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, grade_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un grade (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {grades.map((grade) => (
-                      <SelectItem key={grade.id} value={grade.id.toString()}>
-                        {grade.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>       
-                <div className="space-y-2">
-                <Label htmlFor="categorie_personnel_id">Catégorie Personnel</Label>
-                <Select
-                  value={formData.categorie_personnel_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, categorie_personnel_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une catégorie (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="specialite_id">Spécialité</Label>
-                <Select
-                  value={formData.specialite_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, specialite_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une spécialité (optionnel)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {specialites.map((spec) => (
-                      <SelectItem key={spec.id} value={spec.id.toString()}>
-                        {spec.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nom">Nom *</Label>
-                <Input
-                  id="nom"
-                  value={formData.nom}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nom: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prenom">Prénom *</Label>
-                <Input
-                  id="prenom"
-                  value={formData.prenom}
-                  onChange={(e) =>
-                    setFormData({ ...formData, prenom: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ppr">PPR</Label>
-                <Input
-                  id="ppr"
-                  value={formData.ppr}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ppr: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Créer
-              </Button>
-              </form>
+      {/* Header */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1 text-right">
+            <div className="flex items-center gap-2">
+              <Users className="size-5 text-blue-600" />
+              <h1 className="text-2xl font-semibold text-slate-950">الموظفون</h1>
             </div>
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
-
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-end">
-            <div className="flex-1 w-full sm:w-auto">
-              <Label htmlFor="filter-nom" className="text-xs text-slate-600 mb-1.5 block">
-                Nom
-              </Label>
-              <Input
-                id="filter-nom"
-                placeholder="Entrez le nom..."
-                value={filters.nom}
-                onChange={(e) => {
-                  setFilters({ ...filters, nom: e.target.value })
-                  setCurrentPage(1)
-                }}
-                className="w-full"
-              />
+            <p className="text-sm text-slate-600">تدبير بيانات الموظفين وأرصدة الرخص</p>
+            <div className="flex items-center gap-4 pt-1 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-blue-500" />
+                <span className="font-semibold text-slate-900">{professeurs.length}</span>
+                <span className="text-slate-600">موظف مسجل</span>
+              </span>
+              {selectedProfesseurs.size > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-amber-400" />
+                    <span className="font-semibold text-slate-900">{selectedProfesseurs.size}</span>
+                    <span className="text-slate-600">محدد</span>
+                  </span>
+                </>
+              )}
             </div>
-            <div className="flex-1 w-full sm:w-auto">
-              <Label htmlFor="filter-prenom" className="text-xs text-slate-600 mb-1.5 block">
-                Prénom
-              </Label>
-              <Input
-                id="filter-prenom"
-                placeholder="Entrez le prénom..."
-                value={filters.prenom}
-                onChange={(e) => {
-                  setFilters({ ...filters, prenom: e.target.value })
-                  setCurrentPage(1)
-                }}
-                className="w-full"
-              />
-            </div>
-            <div className="flex-1 w-full sm:w-auto">
-              <Label htmlFor="filter-ppr" className="text-xs text-slate-600 mb-1.5 block">
-                PPR
-              </Label>
-              <Input
-                id="filter-ppr"
-                placeholder="Entrez le PPR..."
-                value={filters.ppr}
-                onChange={(e) => {
-                  setFilters({ ...filters, ppr: e.target.value })
-                  setCurrentPage(1)
-                }}
-                className="w-full"
-              />
-            </div>
-            <div className="flex-1 w-full sm:w-auto">
-              <Label htmlFor="filter-hopital" className="text-xs text-slate-600 mb-1.5 block">
-                Hôpital
-              </Label>
-              <Select
-                value={filters.hopital_id || 'all'}
-                onValueChange={(value) => {
-                  setFilters({ ...filters, hopital_id: value === 'all' ? '' : value })
-                  setCurrentPage(1)
-                }}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* إضافة الأرصدة السنوية */}
+            <button
+              type="button"
+              onClick={() => { setBulkAddResult(null); setBulkAddSoldesDialogOpen(true) }}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <CalendarPlus className="size-3.5" />
+              إضافة الأرصدة السنوية
+            </button>
+            {/* تصدير الأرصدة */}
+            <button
+              type="button"
+              onClick={handleExportSoldes}
+              disabled={exportLoading}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download className="size-3.5" />
+              {exportLoading ? 'جاري التصدير...' : 'تصدير الأرصدة'}
+            </button>
+            {/* استيراد الأرصدة */}
+            <button
+              type="button"
+              onClick={() => { setImportFile(null); setImportResult(null); setImportDialogOpen(true) }}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Upload className="size-3.5" />
+              استيراد الأرصدة
+            </button>
+            {/* حذف المحدد */}
+            {selectedProfesseurs.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+                disabled={deleting}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sélectionner un hôpital" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les hôpitaux</SelectItem>
-                  {hopitaux.map((hopital) => (
-                    <SelectItem key={hopital.id} value={hopital.id.toString()}>
-                      {hopital.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 w-full sm:w-auto min-w-[10rem]">
-              <Label htmlFor="filter-service" className="text-xs text-slate-600 mb-1.5 block">
-                Service
-              </Label>
-              <Select
-                value={filters.service_id || 'all'}
-                onValueChange={(value) => {
-                  setFilters({ ...filters, service_id: value === 'all' ? '' : value })
-                  setCurrentPage(1)
-                }}
-              >
-                <SelectTrigger id="filter-service" className="w-full">
-                  <SelectValue placeholder="Tous les services" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  {services.map((service) => (
-                    <SelectItem key={service.id} value={service.id.toString()}>
-                      {service.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 w-full sm:w-auto min-w-[10rem]">
-              <Label htmlFor="filter-grade" className="text-xs text-slate-600 mb-1.5 block">
-                Grade
-              </Label>
-              <Select
-                value={filters.grade_id || 'all'}
-                onValueChange={(value) => {
-                  setFilters({ ...filters, grade_id: value === 'all' ? '' : value })
-                  setCurrentPage(1)
-                }}
-              >
-                <SelectTrigger id="filter-grade" className="w-full">
-                  <SelectValue placeholder="Tous les grades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  {grades.map((grade) => (
-                    <SelectItem key={grade.id} value={grade.id.toString()}>
-                      {grade.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {(filters.nom || filters.prenom || filters.ppr || filters.hopital_id || filters.service_id || filters.grade_id) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearFilter}
-                className="w-full sm:w-auto"
-              >
-                <X className="h-4 w-4 mr-1.5" />
-                Effacer
-              </Button>
+                <Trash2 className="size-3.5" />
+                حذف المحدد ({selectedProfesseurs.size})
+              </button>
             )}
+            {/* إضافة موظف */}
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            >
+              <Plus className="size-4" />
+              إضافة موظف
+            </button>
           </div>
+        </div>
+      </section>
+
+      {/* Filter bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[8rem]">
+            <Label htmlFor="filter-nom" className="mb-1.5 block text-xs font-medium text-slate-600">النسب</Label>
+            <Input
+              id="filter-nom"
+              placeholder="أدخل النسب..."
+              value={filters.nom}
+              onChange={(e) => { setFilters({ ...filters, nom: e.target.value }); setCurrentPage(1) }}
+              className="h-10 rounded-xl border-slate-300 text-right text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[8rem]">
+            <Label htmlFor="filter-prenom" className="mb-1.5 block text-xs font-medium text-slate-600">الاسم</Label>
+            <Input
+              id="filter-prenom"
+              placeholder="أدخل الاسم..."
+              value={filters.prenom}
+              onChange={(e) => { setFilters({ ...filters, prenom: e.target.value }); setCurrentPage(1) }}
+              className="h-10 rounded-xl border-slate-300 text-right text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[8rem]">
+            <Label htmlFor="filter-ppr" className="mb-1.5 block text-xs font-medium text-slate-600">رقم التأجير</Label>
+            <Input
+              id="filter-ppr"
+              placeholder="أدخل رقم التأجير..."
+              value={filters.ppr}
+              onChange={(e) => { setFilters({ ...filters, ppr: e.target.value }); setCurrentPage(1) }}
+              className="h-10 rounded-xl border-slate-300 text-right text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[10rem]">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">المستشفى</Label>
+            <Select
+              value={filters.hopital_id || 'all'}
+              onValueChange={(value) => { setFilters({ ...filters, hopital_id: value === 'all' ? '' : value }); setCurrentPage(1) }}
+            >
+              <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                <SelectValue placeholder="جميع المستشفيات" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع المستشفيات</SelectItem>
+                {hopitaux.map((h) => (
+                  <SelectItem key={h.id} value={h.id.toString()}>{h.nom}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[10rem]">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">المصلحة</Label>
+            <Select
+              value={filters.service_id || 'all'}
+              onValueChange={(value) => { setFilters({ ...filters, service_id: value === 'all' ? '' : value }); setCurrentPage(1) }}
+            >
+              <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                <SelectValue placeholder="جميع المصالح" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع المصالح</SelectItem>
+                {services.map((s) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>{s.nom}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1 min-w-[10rem]">
+            <Label className="mb-1.5 block text-xs font-medium text-slate-600">الدرجة</Label>
+            <Select
+              value={filters.grade_id || 'all'}
+              onValueChange={(value) => { setFilters({ ...filters, grade_id: value === 'all' ? '' : value }); setCurrentPage(1) }}
+            >
+              <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                <SelectValue placeholder="جميع الدرجات" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الدرجات</SelectItem>
+                {grades.map((g) => (
+                  <SelectItem key={g.id} value={g.id.toString()}>{g.nom}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleClearFilter}
+              className="cursor-pointer inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <X className="size-3.5" />
+              مسح
+            </button>
+          )}
         </div>
       </div>
 
-      {selectedProfesseurs.size > 0 && (
-        <div className="rounded-md border border-slate-200 bg-white p-4 flex items-center justify-between">
-          <div className="text-sm text-slate-700">
-            {selectedProfesseurs.size} professeur(s) sélectionné(s)
-          </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setBulkDeleteDialogOpen(true)}
-            disabled={deleting}
-          >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            Supprimer la sélection
-          </Button>
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-right text-xs font-medium text-slate-600 sm:px-6">
+          عرض{' '}
+          <span className="font-bold text-slate-900">{professeurs.length}</span>{' '}
+          موظف
         </div>
-      )}
-
-      <div className="rounded-md border border-slate-200 bg-white">
-        <Table>
-          <TableHeader className="bg-slate-100">
-            <TableRow>
-              <TableHead className="w-12">
-                <input
-                  type="checkbox"
-                  ref={selectAllCheckboxRef}
-                  checked={allSelected}
-                  onChange={handleSelectAll}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-              </TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Prénom</TableHead>
-              <TableHead>PPR</TableHead>
-              <TableHead>Spécialité</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Service</TableHead>
-              <TableHead>Hopitale</TableHead>
-              <TableHead>Solde Congé</TableHead>
-              <TableHead>Congés</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
-            {professeurs.length === 0 ? (
-              <TableRow className="bg-white">
-                <TableCell colSpan={9} className="text-center">
-                  Aucun professeur trouvé
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedProfesseurs.map((professeur) => {
-                const soldesNonExpires = professeur.soldes || []
-                const totalJoursRestants = soldesNonExpires.reduce(
-                  (sum, solde) => sum + solde.jours_restants,
-                  0
-                )
-                const isSelected = selectedProfesseurs.has(professeur.id)
-                return (
-                  <TableRow key={professeur.id} className={`bg-white hover:bg-slate-50 ${isSelected ? 'bg-slate-100' : ''}`}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleSelectProfesseur(professeur.id)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                    </TableCell>
-                    <TableCell>{professeur.nom}</TableCell>
-                    <TableCell>{professeur.prenom}</TableCell>
-                    <TableCell>{professeur.ppr ?? '—'}</TableCell>
-                    <TableCell>
-                      {professeur.specialite?.nom || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {professeur.grade?.nom || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {professeur.service?.nom || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {professeur.hopital?.nom || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {soldesNonExpires.length > 0 ? (
-                        <div className="space-y-1">
-                          <div className="font-semibold text-[#16A34A]">
-                            Total: {totalJoursRestants} jours
-                          </div>
-                          <div className="text-xs text-slate-600 space-y-0.5">
-                            {soldesNonExpires.map((solde) => (
-                              <div key={solde.id}>
-                                {solde.annee}: {solde.jours_restants} / {solde.jours_total} jours
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{professeur._count.conges}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Link
-                          href={`/professeurs/${professeur.id}`}
-                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-slate-500 hover:text-blue-600 transition-colors duration-200"
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4 shrink-0" aria-hidden />
-                          <span>Détails</span>
-                        </Link>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                <th scope="col" className="w-10 px-4 py-3 text-right">
+                  <input
+                    type="checkbox"
+                    ref={selectAllCheckboxRef}
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-blue-600"
+                  />
+                </th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">النسب</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الاسم</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">رقم التأجير</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">التخصص</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الدرجة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المصلحة</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المستشفى</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">رصيد الرخص</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الرخص</th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-slate-700">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {professeurs.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-5 py-16 text-center">
+                    <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
+                      <Users className="size-9 text-slate-300" strokeWidth={1.5} />
+                      <p className="text-sm font-medium text-slate-700">لا يوجد موظف مطابق</p>
+                      {hasActiveFilters && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteClick(professeur)}
-                          className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-slate-400 hover:text-red-500 transition-colors duration-200"
-                          title="Supprimer"
+                          onClick={handleClearFilter}
+                          className="text-xs text-blue-600 underline hover:text-blue-800"
                         >
-                          <Trash2 className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Supprimer</span>
+                          مسح الفلاتر
                         </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedProfesseurs.map((professeur) => {
+                  const soldesNonExpires = professeur.soldes || []
+                  const totalJoursRestants = soldesNonExpires.reduce((sum, s) => sum + s.jours_restants, 0)
+                  const isSelected = selectedProfesseurs.has(professeur.id)
+                  return (
+                    <tr
+                      key={professeur.id}
+                      className={`transition-colors hover:bg-[#F8FAFC] ${isSelected ? 'bg-blue-50' : 'bg-white'}`}
+                    >
+                      <td className="px-4 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleSelectProfesseur(professeur.id)}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-blue-600"
+                        />
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[140px] truncate text-sm font-medium text-slate-900" title={professeur.nom}>
+                          {professeur.nom}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[140px] truncate text-sm text-slate-700" title={professeur.prenom}>
+                          {professeur.prenom}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="text-sm text-slate-600">{professeur.ppr ?? '—'}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[120px] truncate text-sm text-slate-600" title={professeur.specialite?.nom || ''}>
+                          {professeur.specialite?.nom || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[120px] truncate text-sm text-slate-600" title={professeur.grade?.nom || ''}>
+                          {professeur.grade?.nom || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[120px] truncate text-sm text-slate-600" title={professeur.service?.nom || ''}>
+                          {professeur.service?.nom || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="block max-w-[120px] truncate text-sm text-slate-600" title={professeur.hopital?.nom || ''}>
+                          {professeur.hopital?.nom || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        {soldesNonExpires.length > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="text-sm font-semibold text-emerald-700">
+                              {totalJoursRestants} يوم
+                            </div>
+                            <div className="space-y-0.5">
+                              {soldesNonExpires.map((solde) => (
+                                <div key={solde.id} className="text-xs text-slate-500">
+                                  {solde.annee}: {solde.jours_restants}/{solde.jours_total}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <span className="text-sm font-medium text-slate-700">{professeur._count.conges}</span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-center gap-1">
+                          <Link
+                            href={`/professeurs/${professeur.id}`}
+                            className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            تفاصيل
+                          </Link>
+                          <span className="text-slate-200">|</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(professeur)}
+                            className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
+                            title="حذف"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
         {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(page) => {
-              setCurrentPage(page)
-              setSelectedProfesseurs(new Set())
-            }}
-          />
+          <div className="border-t border-slate-100">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => { setCurrentPage(page); setSelectedProfesseurs(new Set()) }}
+            />
+          </div>
         )}
       </div>
 
-      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className={messageDialogIsError ? 'text-red-600' : 'text-green-600'}>
-              {messageDialogIsError ? 'Erreur' : 'Succès'}
-            </DialogTitle>
-            <DialogDescription className="text-slate-700 whitespace-pre-line">
-              {errorMessage}
+      {/* Add employee dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl sm:max-w-2xl" dir="rtl">
+          <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">إضافة موظف جديد</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              أدخل بيانات الموظف الجديد
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setErrorDialogOpen(false)}>
-              Fermer
-            </Button>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <form onSubmit={handleSubmit} className="space-y-4 text-right">
+              {/* Required fields first */}
+              <div className="space-y-1.5">
+                <Label htmlFor="add_nom" className="text-sm font-medium text-slate-700">
+                  النسب <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="add_nom"
+                  value={formData.nom}
+                  onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
+                  required
+                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
+                  placeholder="أدخل النسب..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_prenom" className="text-sm font-medium text-slate-700">
+                  الاسم <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="add_prenom"
+                  value={formData.prenom}
+                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
+                  required
+                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
+                  placeholder="أدخل الاسم..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_ppr" className="text-sm font-medium text-slate-700">
+                  رقم التأجير <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="add_ppr"
+                  value={formData.ppr}
+                  onChange={(e) => setFormData({ ...formData, ppr: e.target.value })}
+                  required
+                  className="h-10 rounded-xl border-slate-300 text-right text-sm"
+                  placeholder="أدخل رقم التأجير..."
+                />
+              </div>
+              {/* Optional fields */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">اللقب</Label>
+                <Select value={formData.titre_id} onValueChange={(v) => setFormData({ ...formData, titre_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر اللقب (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {titres.map((t) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>{t.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">فئة الموظف</Label>
+                <Select value={formData.categorie_personnel_id} onValueChange={(v) => setFormData({ ...formData, categorie_personnel_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر الفئة (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">التخصص</Label>
+                <Select value={formData.specialite_id} onValueChange={(v) => setFormData({ ...formData, specialite_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر التخصص (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {specialites.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">الدرجة</Label>
+                <Select value={formData.grade_id} onValueChange={(v) => setFormData({ ...formData, grade_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر الدرجة (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {grades.map((g) => (
+                      <SelectItem key={g.id} value={g.id.toString()}>{g.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المصلحة</Label>
+                <Select value={formData.service_id} onValueChange={(v) => setFormData({ ...formData, service_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر المصلحة (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {services.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-slate-700">المستشفى</Label>
+                <Select value={formData.hopital_id} onValueChange={(v) => setFormData({ ...formData, hopital_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                    <SelectValue placeholder="اختر المستشفى (اختياري)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hopitaux.map((h) => (
+                      <SelectItem key={h.id} value={h.id.toString()}>{h.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
+                >
+                  إضافة الموظف
+                </button>
+              </div>
+            </form>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">
-              Confirmer la suppression
-            </DialogTitle>
-            <DialogDescription className="text-slate-700 space-y-2">
+      {/* Import soldes dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl" dir="rtl">
+          <DialogHeader className="flex-shrink-0 border-b border-slate-100 px-6 pb-4 pt-6 text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">استيراد الأرصدة من Excel</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              اختر ملف Excel بصيغة .xlsx أو .xls لاستيراد أرصدة الرخص
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-5">
+            <form onSubmit={handleImportExcel} className="space-y-4 text-right">
+              <div className="space-y-1.5">
+                <Label htmlFor="excel-file" className="text-sm font-medium text-slate-700">
+                  ملف Excel (.xlsx أو .xls) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="excel-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  required
+                  disabled={importing}
+                  className="h-10 rounded-xl border-slate-300 text-sm"
+                />
+              </div>
+              {importResult && (
+                <div className="space-y-2">
+                  {importResult.summary?.importSansColonneSolde && (
+                    <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-900">
+                      لم يتم اكتشاف عمود رصيد — تم استيراد الموظفين بدون رصيد ابتدائي.
+                    </p>
+                  )}
+                  {importResult.summary?.warnings > 0 && (
+                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      {importResult.summary.warnings} تحذير (درجة أو تخصص غير معروف في بعض الصفوف).
+                    </p>
+                  )}
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+                    اكتمل الاستيراد. نجح: {importResult.summary.success}، أخطاء: {importResult.summary.errors}، تجاهل: {importResult.summary.skipped}.
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => { setImportDialogOpen(false); setImportFile(null); setImportResult(null) }}
+                  className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+                >
+                  إغلاق
+                </button>
+                <button
+                  type="submit"
+                  disabled={importing || !importFile}
+                  className="cursor-pointer inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {importing ? 'جاري الاستيراد...' : 'استيراد'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk add annual soldes dialog */}
+      <Dialog open={bulkAddSoldesDialogOpen} onOpenChange={(v) => { setBulkAddSoldesDialogOpen(v); if (!v) setBulkAddResult(null) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">إضافة الأرصدة السنوية</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-600">
+              إضافة أرصدة سنوية لجميع الموظفين
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleBulkAddAnnualSoldes} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">السنة</Label>
+              <Select value={bulkAddYear} onValueChange={setBulkAddYear} disabled={bulkAddLoading}>
+                <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm">
+                  <SelectValue placeholder="اختر السنة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const y = new Date().getFullYear() - 2 + i
+                    return (
+                      <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {bulkAddResult && (
+              bulkAddResult.summary.professeursTotal === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+                  لا يوجد موظفون. لم يتم إضافة أي رصيد.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 space-y-1">
+                  <p className="text-sm font-semibold text-emerald-800">اكتملت العملية</p>
+                  <p className="text-sm text-emerald-700">
+                    تم تحديث {bulkAddResult.summary.professeursMisAJour} موظف من أصل {bulkAddResult.summary.professeursTotal}.
+                  </p>
+                  <p className="text-sm text-emerald-700">
+                    تم إنشاء {bulkAddResult.summary.soldesCrees} رصيد، {bulkAddResult.summary.soldesIgnores} موجود مسبقاً.
+                  </p>
+                </div>
+              )
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-start">
+              <button
+                type="button"
+                onClick={() => setBulkAddSoldesDialogOpen(false)}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+              >
+                إغلاق
+              </button>
+              <button
+                type="submit"
+                disabled={bulkAddLoading}
+                className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {bulkAddLoading ? 'جاري الإضافة...' : 'إضافة للجميع'}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete single employee dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(v) => { if (!deleting) setDeleteDialogOpen(v) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تأكيد الحذف</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700 space-y-3">
               {professeurToDelete && (
                 <>
-                  <p>
-                    Êtes-vous sûr de vouloir supprimer le professeur{' '}
+                  <span className="block">
+                    هل أنت متأكد من حذف الموظف{' '}
                     <strong>
-                      {professeurToDelete.titre?.nom ? `${professeurToDelete.titre.nom} ` : ''}{professeurToDelete.prenom} {professeurToDelete.nom}
-                    </strong>{' '}
-                    {professeurToDelete.ppr ? `(PPR: ${professeurToDelete.ppr})` : '(sans PPR)'} ?
-                  </p>
+                      {professeurToDelete.titre?.nom ? `${professeurToDelete.titre.nom} ` : ''}
+                      {professeurToDelete.prenom} {professeurToDelete.nom}
+                    </strong>
+                    {professeurToDelete.ppr ? ` (${professeurToDelete.ppr})` : ''}؟
+                  </span>
                   {professeurToDelete._count?.conges > 0 && (
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <p className="text-amber-800 font-semibold">
-                        ⚠️ Attention : Ce professeur a {professeurToDelete._count.conges} congé(s) enregistré(s).
-                      </p>
-                      <p className="text-amber-700 text-sm mt-1">
-                        Tous les congés associés à ce professeur seront également supprimés de manière permanente.
-                      </p>
-                    </div>
+                    <span className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                      <strong>تنبيه:</strong> هذا الموظف لديه {professeurToDelete._count.conges} رخصة مسجلة. ستُحذف جميعها بشكل نهائي.
+                    </span>
                   )}
                   {professeurToDelete._count?.soldes > 0 && (
-                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <p className="text-amber-800 font-semibold">
-                        ⚠️ Ce professeur a {professeurToDelete._count.soldes} solde(s) de congé.
-                      </p>
-                      <p className="text-amber-700 text-sm mt-1">
-                        Tous les soldes seront également supprimés.
-                      </p>
-                    </div>
+                    <span className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                      <strong>تنبيه:</strong> هذا الموظف لديه {professeurToDelete._count.soldes} رصيد رخصة. ستُحذف جميعها.
+                    </span>
                   )}
-                  <p className="text-red-600 font-medium mt-3">
-                    Cette action est irréversible.
-                  </p>
+                  <span className="block text-sm font-medium text-red-600">هذا الإجراء لا يمكن التراجع عنه.</span>
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false)
-                setProfesseurToDelete(null)
-              }}
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button
+              type="button"
+              onClick={() => { setDeleteDialogOpen(false); setProfesseurToDelete(null) }}
               disabled={deleting}
-              className="w-full sm:w-auto"
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
             >
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
+              إلغاء
+            </button>
+            <button
+              type="button"
               onClick={handleDeleteProfesseur}
               disabled={deleting}
-              className="w-full sm:w-auto"
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              {deleting ? 'Suppression...' : 'Supprimer'}
-            </Button>
+              {deleting ? 'جاري الحذف...' : 'حذف'}
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Bulk delete dialog */}
       <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">
-              Confirmer la suppression multiple
-            </DialogTitle>
-            <DialogDescription className="text-slate-700 space-y-2">
-              <p>
-                Êtes-vous sûr de vouloir supprimer <strong>{selectedProfesseurs.size}</strong> professeur(s) sélectionné(s) ?
-              </p>
-              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                <p className="text-amber-800 font-semibold">
-                  ⚠️ Attention : Cette action supprimera également tous les congés et soldes associés à ces professeurs.
-                </p>
-                <p className="text-amber-700 text-sm mt-1">
-                  Cette action est irréversible et ne peut pas être annulée.
-                </p>
-              </div>
-
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">تأكيد الحذف المتعدد</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700 space-y-3">
+              <span className="block">
+                هل أنت متأكد من حذف <strong>{selectedProfesseurs.size}</strong> موظف محدد؟
+              </span>
+              <span className="block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                <strong>تنبيه:</strong> ستُحذف جميع الرخص والأرصدة المرتبطة بهؤلاء الموظفين. هذا الإجراء لا يمكن التراجع عنه.
+              </span>
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setBulkDeleteDialogOpen(false)
-              }}
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button
+              type="button"
+              onClick={() => setBulkDeleteDialogOpen(false)}
               disabled={deleting}
-              className="w-full sm:w-auto"
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
             >
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
+              إلغاء
+            </button>
+            <button
+              type="button"
               onClick={handleBulkDelete}
               disabled={deleting}
-              className="w-full sm:w-auto"
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              {deleting ? 'Suppression...' : `Supprimer ${selectedProfesseurs.size} professeur(s)`}
-            </Button>
+              {deleting ? 'جاري الحذف...' : `حذف ${selectedProfesseurs.size} موظف`}
+            </button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Error / success dialog */}
+      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className={`text-right text-lg font-bold ${messageDialogIsError ? 'text-red-600' : 'text-emerald-600'}`}>
+              {messageDialogIsError ? 'خطأ' : 'تم بنجاح'}
+            </DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700 whitespace-pre-line">
+              {errorMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-start pt-1">
+            <button
+              type="button"
+              onClick={() => setErrorDialogOpen(false)}
+              className="cursor-pointer inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              إغلاق
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
-
