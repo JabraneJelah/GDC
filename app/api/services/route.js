@@ -49,7 +49,7 @@ export async function POST(request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Ce service existe déjà' },
+        { error: 'هذه المصلحة موجودة مسبقاً' },
         { status: 400 }
       )
     }
