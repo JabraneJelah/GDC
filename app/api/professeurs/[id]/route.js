@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // GET - Détails d'un professeur
 export async function GET(request, { params }) {
@@ -81,6 +82,8 @@ export async function PUT(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     // Handle both sync and async params (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params
@@ -268,6 +271,8 @@ export async function DELETE(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     // Handle both sync and async params (Next.js 15+)
     const resolvedParams = params instanceof Promise ? await params : params

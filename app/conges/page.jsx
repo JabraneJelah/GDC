@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -87,6 +88,9 @@ function getProfLabel(conge) {
 }
 
 export default function CongesPage() {
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
+
   const [conges, setConges] = useState([])
   const [professeurs, setProfesseurs] = useState([])
   const [typesConge, setTypesConge] = useState([])
@@ -950,14 +954,16 @@ export default function CongesPage() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => { resetForm(); setProfesseurSearch(''); setOpen(true) }}
-            className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
-          >
-            <Plus className="size-4" />
-            إضافة رخصة
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => { resetForm(); setProfesseurSearch(''); setOpen(true) }}
+              className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
+            >
+              <Plus className="size-4" />
+              إضافة رخصة
+            </button>
+          )}
         </div>
       </section>
 
@@ -1153,23 +1159,27 @@ export default function CongesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(conge)}
-                          className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
-                        >
-                          تعديل
-                        </button>
-                        <span className="text-slate-200">|</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(conge)}
-                          className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
-                        >
-                          حذف
-                        </button>
-                      </div>
+                      {readOnly ? (
+                        <div className="text-center text-xs text-slate-400">—</div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(conge)}
+                            className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                          >
+                            تعديل
+                          </button>
+                          <span className="text-slate-200">|</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(conge)}
+                            className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))

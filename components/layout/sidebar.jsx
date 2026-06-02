@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import {
   LayoutDashboard,
   Users,
@@ -35,6 +36,8 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
   const pathname = usePathname()
   const router = useRouter()
   const [isReferentielOpen, setIsReferentielOpen] = useState(false)
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -56,10 +59,10 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
     if (isCollapsed) setIsReferentielOpen(false)
   }, [isCollapsed])
 
-  const menuItems = [
+  const allMenuItems = [
     { href: '/dashboard', label: 'لوحة القيادة', icon: LayoutDashboard },
     { href: '/professeurs', label: 'الأساتذة', icon: GraduationCap },
-    { href: '/utilisateurs', label: 'إدارة المستخدمين', icon: Users },
+    { href: '/utilisateurs', label: 'إدارة المستخدمين', icon: Users, adminOnly: true },
     { href: '/conges', label: 'إدارة العطل', icon: Calendar },
     { href: '/dossiers-explicatifs', label: 'الملفات التوضيحية', icon: FileText },
     { href: '/document-templates', label: 'نماذج الوثائق', icon: FileText },
@@ -76,10 +79,18 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
         { href: '/hopitaux', label: 'المستشفيات' },
         { href: '/jours-feries', label: 'العطل الرسمية' },
         { href: '/types-fautes', label: 'أنواع المخالفات' },
-        { href: '/parametrage', label: 'الإعدادات' },
+        { href: '/parametrage', label: 'الإعدادات', adminOnly: true },
       ],
     },
   ]
+
+  const menuItems = allMenuItems
+    .filter((item) => !(readOnly && item.adminOnly))
+    .map((item) =>
+      item.children
+        ? { ...item, children: item.children.filter((c) => !(readOnly && c.adminOnly)) }
+        : item
+    )
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/')
   const isReferentielActive = menuItems

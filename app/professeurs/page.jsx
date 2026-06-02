@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { Input } from '@/components/ui/input'
 import {
   Dialog,
@@ -24,6 +25,9 @@ import { Users, Plus, Upload, FileSpreadsheet, Trash2, CalendarPlus, Download, E
 const ITEMS_PER_PAGE = 8
 
 export default function ProfesseursPage() {
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
+
   const [professeurs, setProfesseurs] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -414,55 +418,59 @@ export default function ProfesseursPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* إضافة الأرصدة السنوية */}
-            <button
-              type="button"
-              onClick={() => { setBulkAddResult(null); setBulkAddSoldesDialogOpen(true) }}
-              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <CalendarPlus className="size-3.5" />
-              إضافة الأرصدة السنوية
-            </button>
-            {/* تصدير الأرصدة */}
-            <button
-              type="button"
-              onClick={handleExportSoldes}
-              disabled={exportLoading}
-              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Download className="size-3.5" />
-              {exportLoading ? 'جاري التصدير...' : 'تصدير الأرصدة'}
-            </button>
-            {/* استيراد الأرصدة */}
-            <button
-              type="button"
-              onClick={() => { setImportFile(null); setImportResult(null); setImportDialogOpen(true) }}
-              className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <Upload className="size-3.5" />
-              استيراد الأرصدة
-            </button>
-            {/* حذف المحدد */}
-            {selectedProfesseurs.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setBulkDeleteDialogOpen(true)}
-                disabled={deleting}
-                className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2 className="size-3.5" />
-                حذف المحدد ({selectedProfesseurs.size})
-              </button>
+            {!readOnly && (
+              <>
+                {/* إضافة الأرصدة السنوية */}
+                <button
+                  type="button"
+                  onClick={() => { setBulkAddResult(null); setBulkAddSoldesDialogOpen(true) }}
+                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <CalendarPlus className="size-3.5" />
+                  إضافة الأرصدة السنوية
+                </button>
+                {/* تصدير الأرصدة */}
+                <button
+                  type="button"
+                  onClick={handleExportSoldes}
+                  disabled={exportLoading}
+                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="size-3.5" />
+                  {exportLoading ? 'جاري التصدير...' : 'تصدير الأرصدة'}
+                </button>
+                {/* استيراد الأرصدة */}
+                <button
+                  type="button"
+                  onClick={() => { setImportFile(null); setImportResult(null); setImportDialogOpen(true) }}
+                  className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Upload className="size-3.5" />
+                  استيراد الأرصدة
+                </button>
+                {/* حذف المحدد */}
+                {selectedProfesseurs.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkDeleteDialogOpen(true)}
+                    disabled={deleting}
+                    className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 className="size-3.5" />
+                    حذف المحدد ({selectedProfesseurs.size})
+                  </button>
+                )}
+                {/* إضافة موظف */}
+                <button
+                  type="button"
+                  onClick={() => setOpen(true)}
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  <Plus className="size-4" />
+                  إضافة موظف
+                </button>
+              </>
             )}
-            {/* إضافة موظف */}
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-            >
-              <Plus className="size-4" />
-              إضافة موظف
-            </button>
           </div>
         </div>
       </section>

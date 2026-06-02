@@ -44,27 +44,43 @@ export default function ParametragePage() {
 
   if (!settings) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-400">
-        {error ?? 'جارٍ التحميل...'}
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <span className="size-10 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+        <p className="text-sm text-gray-500">{error ?? 'جاري التحميل...'}</p>
       </div>
     )
   }
 
   return (
-    <div dir="rtl" className="mx-auto max-w-2xl space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1174BC]/10">
-          <Settings className="h-5 w-5 text-[#1174BC]" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">الإعدادات</h1>
-          <p className="text-sm text-slate-500">إعدادات التطبيق العامة</p>
+    <div dir="rtl" className="space-y-4">
+
+      {/* Header card */}
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="text-right">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950">الإعدادات</h1>
+            <p className="mt-0.5 text-sm text-slate-500">إعدادات التطبيق العامة</p>
+          </div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1174BC]/10">
+            <Settings className="h-5 w-5 text-[#1174BC]" />
+          </div>
         </div>
       </div>
 
-      {/* Card */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Feedback messages */}
+      {saved && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-right text-sm text-green-700">
+          تم حفظ الإعدادات بنجاح
+        </div>
+      )}
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Settings card */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-6 py-4">
           <h2 className="font-semibold text-slate-800">إعدادات التقويم</h2>
           <p className="mt-0.5 text-sm text-slate-500">
@@ -86,23 +102,15 @@ export default function ParametragePage() {
             description="هذا الخيار يمنع الاختيار في التقويم فقط، ولا يغير طريقة احتساب مدة الرخصة."
           />
         </div>
-      </div>
 
-      {error && (
-        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
-      )}
-
-      <div className="flex items-center justify-between">
-        {saved && (
-          <span className="text-sm text-green-600">تم حفظ الإعدادات بنجاح</span>
-        )}
-        <div className="mr-auto">
-          <Button onClick={handleSave} disabled={saving} className="gap-2 bg-[#1174BC] hover:bg-[#0e62a3]">
+        <div className="flex items-center justify-start border-t border-slate-100 px-6 py-4">
+          <Button onClick={handleSave} disabled={saving} className="cursor-pointer gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed">
             <Save className="h-4 w-4" />
-            {saving ? 'جارٍ الحفظ...' : 'حفظ الإعدادات'}
+            {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
           </Button>
         </div>
       </div>
+
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur, VALID_ROLES } from '@/lib/roles'
 import bcrypt from 'bcryptjs'
 
 export async function PUT(request, { params }) {
@@ -17,8 +18,11 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'ID invalide' }, { status: 400 })
     }
 
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const body = await request.json()
-    const { username, nom_complet, actif, reset_password } = body
+    const { username, nom_complet, actif, reset_password, role } = body
 
     // Vérifier unicité username si modifié (insensible à la casse)
     if (username) {
@@ -39,6 +43,7 @@ export async function PUT(request, { params }) {
       username: username || undefined,
       nom_complet: nom_complet || undefined,
       actif: typeof actif === 'boolean' ? actif : undefined,
+      role: VALID_ROLES.includes(role) ? role : undefined,
     }
 
     if (reset_password) {

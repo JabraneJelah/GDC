@@ -4,6 +4,7 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 export const runtime = 'nodejs'
 
@@ -45,6 +46,8 @@ export async function POST(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id
@@ -131,6 +134,8 @@ export async function DELETE(_request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id

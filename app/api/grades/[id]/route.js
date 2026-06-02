@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // PUT - Mettre à jour un grade
 export async function PUT(request, { params }) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = parseInt(resolvedParams?.id)
 
     if (!id || isNaN(id)) {
       return NextResponse.json(
-        { error: 'ID invalide' },
+        { error: 'معرف غير صالح' },
         { status: 400 }
       )
     }
@@ -34,7 +37,7 @@ export async function PUT(request, { params }) {
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Grade non trouvé' },
+        { error: 'الدرجة غير موجودة' },
         { status: 404 }
       )
     }
@@ -49,7 +52,7 @@ export async function PUT(request, { params }) {
 
       if (nomExists) {
         return NextResponse.json(
-          { error: 'Ce nom de grade existe déjà' },
+          { error: 'هذه الدرجة موجودة مسبقاً' },
           { status: 400 }
         )
       }
@@ -64,7 +67,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('Erreur lors de la mise à jour du grade:', error)
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: 'خطأ في الخادم' },
       { status: 500 }
     )
   }
@@ -75,15 +78,17 @@ export async function DELETE(request, { params }) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = parseInt(resolvedParams?.id)
 
     if (!id || isNaN(id)) {
       return NextResponse.json(
-        { error: 'ID invalide' },
+        { error: 'معرف غير صالح' },
         { status: 400 }
       )
     }
@@ -99,7 +104,7 @@ export async function DELETE(request, { params }) {
 
     if (!existing) {
       return NextResponse.json(
-        { error: 'Grade non trouvé' },
+        { error: 'الدرجة غير موجودة' },
         { status: 404 }
       )
     }
@@ -107,7 +112,7 @@ export async function DELETE(request, { params }) {
     if (existing._count.professeurs > 0) {
       return NextResponse.json(
         {
-          error: `Ce grade est utilisé par ${existing._count.professeurs} professeur(s) et ne peut pas être supprimé`,
+          error: `هذه الدرجة مستعملة من طرف ${existing._count.professeurs} أستاذ ولا يمكن حذفها`,
         },
         { status: 400 }
       )
@@ -117,11 +122,11 @@ export async function DELETE(request, { params }) {
       where: { id },
     })
 
-    return NextResponse.json({ message: 'Grade supprimé avec succès' })
+    return NextResponse.json({ message: 'تم حذف الدرجة بنجاح' })
   } catch (error) {
     console.error('Erreur lors de la suppression du grade:', error)
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      { error: 'خطأ في الخادم' },
       { status: 500 }
     )
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 async function generateDossierReference() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -77,6 +78,8 @@ export async function POST(request) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorise' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const body = await request.json()
     const {

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 const VALID_FORMATS = ['DOCX', 'PDF']
 
@@ -33,6 +35,13 @@ export async function GET() {
 // POST - Créer un nouveau template de document
 export async function POST(request) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const body = await request.json()
     const {
       identifiant,

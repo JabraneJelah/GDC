@@ -3,6 +3,8 @@ import { mkdir, writeFile } from 'fs/promises'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 const VALID_USAGES = [
   'LETTRE_EXPLICATIVE',
@@ -44,6 +46,13 @@ function buildSafeFileName(originalName) {
 
 export async function POST(request) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const formData = await request.formData()
     const file = formData.get('file')
     const nom = getStringValue(formData, 'nom')

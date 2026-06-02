@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // PUT - Mettre à jour un titre
 export async function PUT(request, { params }) {
@@ -9,6 +10,8 @@ export async function PUT(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = parseInt(resolvedParams?.id)
@@ -77,6 +80,8 @@ export async function DELETE(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = parseInt(resolvedParams?.id)

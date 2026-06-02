@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur, VALID_ROLES } from '@/lib/roles'
 
 // GET - Liste des utilisateurs RH
 export async function GET() {
@@ -30,8 +31,11 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const body = await request.json()
-    const { username, nom_complet } = body
+    const { username, nom_complet, role } = body
 
     if (!username || !nom_complet) {
       return NextResponse.json(
@@ -39,6 +43,8 @@ export async function POST(request) {
         { status: 400 }
       )
     }
+
+    const assignedRole = VALID_ROLES.includes(role) ? role : 'UTILISATEUR_RH'
 
     const existing = await prisma.utilisateurRH.findFirst({
       where: {
@@ -61,6 +67,7 @@ export async function POST(request) {
         username,
         mot_de_passe: hashedPassword,
         nom_complet,
+        role: assignedRole,
         actif: true,
       },
     })

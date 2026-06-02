@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 function normalizeDayStart(value) {
   const d = new Date(value)
@@ -16,6 +17,8 @@ export async function PUT(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id
@@ -106,6 +109,8 @@ export async function DELETE(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id

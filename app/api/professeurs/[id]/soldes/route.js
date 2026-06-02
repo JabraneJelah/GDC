@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 import { getExpireLe } from '@/lib/solde-expiration'
 
 // GET - Liste des soldes d'un professeur
@@ -53,6 +54,8 @@ export async function POST(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const professeurId = resolvedParams?.id

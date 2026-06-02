@@ -16,6 +16,7 @@ export async function GET() {
         id: true,
         username: true,
         nom_complet: true,
+        role: true,
       },
     })
 

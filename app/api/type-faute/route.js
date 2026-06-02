@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // GET - Liste des types de faute
 export async function GET() {
@@ -21,6 +23,13 @@ export async function GET() {
 // POST - Créer un nouveau type de faute
 export async function POST(request) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const body = await request.json()
     const { code, nom, description, actif } = body
 

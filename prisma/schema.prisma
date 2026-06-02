@@ -69,6 +69,7 @@ model UtilisateurRH {
   username     String?  @unique
   mot_de_passe String // Hash bcrypt
   nom_complet  String
+  role         String   @default("UTILISATEUR_RH")
   actif        Boolean  @default(true)
   cree_le      DateTime @default(now())
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // GET - Liste des spécialités
 export async function GET() {
@@ -31,6 +32,8 @@ export async function POST(request) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const body = await request.json()
     const { nom } = body
@@ -49,7 +52,7 @@ export async function POST(request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Cette spécialité existe déjà' },
+        { error: 'هذا التخصص موجود مسبقاً' },
         { status: 400 }
       )
     }

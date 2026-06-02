@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import path from 'path'
 import { getExtraFieldsForCode } from '@/lib/dossiers-explicatifs/extraFields'
@@ -130,6 +131,8 @@ export async function POST(request, { params }) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorise' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id

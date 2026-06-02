@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +17,9 @@ import { Layers, Plus, Search, X } from 'lucide-react'
 const ITEMS_PER_PAGE = 10
 
 export default function ServicesPage() {
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
+
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -178,14 +182,16 @@ export default function ServicesPage() {
               <h1 className="text-2xl font-bold tracking-tight text-slate-950">المصالح</h1>
               <p className="mt-0.5 text-sm text-slate-500">تدبير مصالح المؤسسة</p>
             </div>
-            <Button
-              type="button"
-              onClick={openAddDialog}
-              className="shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <Plus className="size-4" />
-              إضافة مصلحة
-            </Button>
+            {!readOnly && (
+              <Button
+                type="button"
+                onClick={openAddDialog}
+                className="shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Plus className="size-4" />
+                إضافة مصلحة
+              </Button>
+            )}
           </div>
           <div className="mt-4 flex items-center gap-6">
             <div>
@@ -286,25 +292,29 @@ export default function ServicesPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-sm">
-                        <div className="flex items-center justify-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => openEditDialog(service)}
-                            disabled={actionLoading}
-                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            تعديل
-                          </button>
-                          <span className="text-slate-200">|</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(service)}
-                            disabled={actionLoading}
-                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            حذف
-                          </button>
-                        </div>
+                        {readOnly ? (
+                          <div className="text-center text-xs text-slate-400">—</div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => openEditDialog(service)}
+                              disabled={actionLoading}
+                              className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              تعديل
+                            </button>
+                            <span className="text-slate-200">|</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(service)}
+                              disabled={actionLoading}
+                              className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              حذف
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))

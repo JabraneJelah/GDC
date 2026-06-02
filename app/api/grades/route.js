@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 // GET - Liste des grades
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
     }
 
     const grades = await prisma.grade.findMany({
@@ -17,7 +18,7 @@ export async function GET() {
     return NextResponse.json(grades)
   } catch (error) {
     console.error('Erreur lors de la récupération des grades:', error)
-    const errorMessage = error.message || 'Erreur serveur'
+    const errorMessage = error.message || 'خطأ في الخادم'
     return NextResponse.json(
       { error: errorMessage, details: process.env.NODE_ENV === 'development' ? error.stack : undefined },
       { status: 500 }
@@ -30,15 +31,17 @@ export async function POST(request) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const body = await request.json()
     const { nom } = body
 
     if (!nom) {
       return NextResponse.json(
-        { error: 'Le nom est obligatoire' },
+        { error: 'اسم الدرجة إجباري' },
         { status: 400 }
       )
     }
@@ -50,7 +53,7 @@ export async function POST(request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Ce grade existe déjà' },
+        { error: 'هذه الدرجة موجودة مسبقاً' },
         { status: 400 }
       )
     }
@@ -63,7 +66,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Erreur lors de la création du grade:', error)
     // Provide more detailed error message for debugging
-    const errorMessage = error.message || 'Erreur serveur'
+    const errorMessage = error.message || 'خطأ في الخادم'
     return NextResponse.json(
       { error: errorMessage, details: process.env.NODE_ENV === 'development' ? error.stack : undefined },
       { status: 500 }

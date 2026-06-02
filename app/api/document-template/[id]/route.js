@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 const VALID_USAGES = ['LETTRE_EXPLICATIVE', 'BORDEREAU_NOTIFICATION', 'AVERTISSEMENT', 'RETENUE', 'PROCEDURE_DISCIPLINAIRE']
 
@@ -10,6 +12,13 @@ function parseTypeFauteId(value) {
 
 export async function PUT(request, { params }) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id
 
@@ -163,6 +172,13 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(_request, { params }) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
     const resolvedParams = params instanceof Promise ? await params : params
     const id = resolvedParams?.id
 

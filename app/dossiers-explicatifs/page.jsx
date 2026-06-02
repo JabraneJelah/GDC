@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageShell } from '@/components/layout/PageShell'
@@ -116,6 +117,9 @@ function formatDate(value) {
 
 export default function DossiersExplicatifsPage() {
   const router = useRouter()
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
+
   const [dossiers, setDossiers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -298,14 +302,16 @@ export default function DossiersExplicatifsPage() {
                 </div>
               )}
             </div>
-            <Button
-              type="button"
-              className="gap-2 sm:w-auto"
-              onClick={() => router.push('/dossiers-explicatifs/nouveau')}
-            >
-              <Plus className="size-4" />
-              إنشاء ملف جديد
-            </Button>
+            {!readOnly && (
+              <Button
+                type="button"
+                className="gap-2 sm:w-auto"
+                onClick={() => router.push('/dossiers-explicatifs/nouveau')}
+              >
+                <Plus className="size-4" />
+                إنشاء ملف جديد
+              </Button>
+            )}
           </div>
         </section>
 

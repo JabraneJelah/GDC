@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 import { getAppSettings, saveAppSettings } from '@/lib/app-settings'
 
 export async function GET() {
@@ -15,6 +16,8 @@ export async function PUT(request) {
   if (!currentUser) {
     return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
   }
+  const deny = rejectIfLecteur(currentUser)
+  if (deny) return deny
   const body = await request.json()
   const updated = saveAppSettings(body)
   return NextResponse.json(updated)

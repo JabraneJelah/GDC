@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { getCurrentUser } from '@/lib/auth'
+import { rejectIfLecteur } from '@/lib/roles'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +16,8 @@ export async function POST(request) {
     if (!currentUser) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
 
     const formData = await request.formData()
     const file = formData.get('file')

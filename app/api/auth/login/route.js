@@ -99,6 +99,7 @@ export async function POST(request) {
     const token = generateToken({
       userId: utilisateur.id,
       username: utilisateur.username,
+      role: utilisateur.role ?? 'UTILISATEUR_RH',
     })
     console.log("TOKEN GENERATED successfully for user:", utilisateur.username)
 

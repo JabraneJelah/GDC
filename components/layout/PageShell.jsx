@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/footer'
+import { UserProvider } from '@/components/UserContext'
 
 export function PageShell({ children }) {
   const pathname = usePathname()
@@ -16,6 +17,7 @@ export function PageShell({ children }) {
   }, [pathname])
 
   return (
+    <UserProvider>
     <div className="flex min-h-screen flex-col">
       {/* Full-width fixed header */}
       <Header onMobileMenuOpen={() => setIsMobileOpen(true)} />
@@ -48,5 +50,6 @@ export function PageShell({ children }) {
         />
       </div>
     </div>
+    </UserProvider>
   )
 }
