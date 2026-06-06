@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Bell, Settings, Menu } from 'lucide-react'
 
 function getInitials(name) {
@@ -67,9 +68,13 @@ export function Header({ onMobileMenuOpen }) {
         >
           <Settings className="size-4" />
         </button>
-        <div className="mr-2 flex size-9 select-none items-center justify-center rounded-full bg-white text-sm font-semibold text-[#1174BC] shadow-sm">
+        <Link
+          href="/profile"
+          title="الملف الشخصي"
+          className="mr-2 flex size-9 cursor-pointer select-none items-center justify-center rounded-full bg-white text-sm font-semibold text-[#1174BC] shadow-sm transition-opacity hover:opacity-80"
+        >
           {user ? getInitials(user.nom_complet || user.username) : '—'}
-        </div>
+        </Link>
       </div>
     </header>
   )

@@ -26,6 +26,8 @@ import {
 import {
   getDossierStatusLabel,
   getStatusColor,
+  getListStatusLabel,
+  getListStatusColor,
 } from '@/frontend/src/lib/dossierStatus'
 import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
 import {
@@ -597,8 +599,8 @@ export default function DossiersExplicatifsPage() {
                           }
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right">
-                          <StatusBadge variant={getStatusColor(dossier.statut)}>
-                            {getDossierStatusLabel(dossier.statut)}
+                          <StatusBadge variant={getListStatusColor(dossier.statut)}>
+                            {getListStatusLabel(dossier.statut)}
                           </StatusBadge>
                         </TableCell>
                         <TableCell className="px-4 py-3 text-right text-sm text-slate-700">

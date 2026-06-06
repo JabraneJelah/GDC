@@ -5,7 +5,7 @@ import { rejectIfLecteur } from '@/lib/roles'
 import { getExpireLe } from '@/lib/solde-expiration'
 import * as XLSX from 'xlsx'
 
-/** Correspondance tolérante (insensible à la casse / accents) pour grade ou spécialité */
+/** Correspondance tolérante (insensible à la casse / accents) pour grade, spécialité, etc. */
 function matchReferentielName(input, candidates) {
   if (!input || !candidates?.length) return null
   const raw = input.toString().trim()
@@ -13,7 +13,7 @@ function matchReferentielName(input, candidates) {
     s
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[̀-ͯ]/g, '')
       .replace(/\./g, '')
       .replace(/\s+/g, ' ')
       .trim()
@@ -25,7 +25,7 @@ function matchReferentielName(input, candidates) {
   return null
 }
 
-/** Message court et compréhensible pour l'utilisateur (pas de détails techniques backend) */
+/** Message court et compréhensible pour l'utilisateur */
 function messageErreurUtilisateur(err) {
   const msg = err?.message || String(err)
   if (/prisma|invocation|ECONNREFUSED|database|connect/i.test(msg)) {
@@ -55,13 +55,9 @@ export async function POST(request) {
     const file = formData.get('file')
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'Aucun fichier fourni' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 })
     }
 
-    // Vérifier le type de fichier
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
       return NextResponse.json(
         { error: 'Le fichier doit être un fichier Excel (.xlsx ou .xls)' },
@@ -69,16 +65,12 @@ export async function POST(request) {
       )
     }
 
-    // Lire le fichier
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, cellNF: false, cellText: false })
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
-    
-    // Lire les données en mode range pour avoir toutes les cellules
+
     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1')
-    
-    // Convertir en tableau 2D
     const data = []
     for (let R = range.s.r; R <= range.e.r; ++R) {
       const row = []
@@ -91,54 +83,51 @@ export async function POST(request) {
     }
 
     if (data.length < 1) {
-      return NextResponse.json(
-        { error: 'Le fichier Excel est vide' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Le fichier Excel est vide' }, { status: 400 })
     }
 
-    // Trouver la ligne d'en-têtes (chercher la première ligne qui contient "nom" ou "prénom")
-    let headerRowIndex = -1
-    let headerRow = null
-    
     const normalizeHeader = (h) => {
       if (!h) return ''
       return h.toString()
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Enlever les accents
-        .replace(/\s+/g, '') // Enlever les espaces
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, '')
         .trim()
     }
-    
-    // Chercher la ligne d'en-têtes dans les 30 premières lignes (fichiers avec lignes vides en tête)
+
+    // Find header row (first 30 rows, looking for nom + prenom)
+    let headerRowIndex = -1
+    let headerRow = null
+
     for (let i = 0; i < Math.min(30, data.length); i++) {
       const row = data[i]
       if (!row || !Array.isArray(row)) continue
-      
-      // Ignorer les lignes complètement vides
       const hasAnyValue = row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '')
       if (!hasAnyValue) continue
-      
-      // Vérifier si cette ligne contient "nom" et "prénom"
+
       const hasNom = row.some(cell => {
-        const normalized = normalizeHeader(cell)
-        return normalized === 'nom' || (normalized.includes('nom') && !normalized.includes('prenom'))
+        const n = normalizeHeader(cell)
+        const raw = cell?.toString().trim() ?? ''
+        return n === 'nom' ||
+          (n.includes('nom') && !n.includes('prenom') && !n.includes('prénom')) ||
+          raw === 'النسب' || raw.includes('النسب')
       })
-      
+
       const hasPrenom = row.some(cell => {
-        const normalized = normalizeHeader(cell)
-        return normalized === 'prenom' || normalized === 'prénom' || normalized.includes('prenom') || normalized.includes('prénom')
+        const n = normalizeHeader(cell)
+        const raw = cell?.toString().trim() ?? ''
+        return n === 'prenom' || n === 'prénom' || n.includes('prenom') || n.includes('prénom') ||
+          n.includes('firstname') || raw === 'الاسم' || raw.includes('الاسم')
       })
-      
+
       if (hasNom && hasPrenom) {
         headerRowIndex = i
         headerRow = row
         break
       }
     }
-    
-    // Si pas trouvé, utiliser la première ligne non vide
+
     if (headerRowIndex === -1) {
       for (let i = 0; i < data.length; i++) {
         const row = data[i]
@@ -149,32 +138,28 @@ export async function POST(request) {
         }
       }
     }
-    
+
     if (!headerRow || headerRowIndex === -1) {
       return NextResponse.json(
-        { 
+        {
           error: 'Impossible de trouver la ligne d\'en-têtes dans le fichier Excel. Vérifiez que votre fichier contient des colonnes "Nom" et "Prénom".',
           debug: {
             totalRows: data.length,
             firstFewRows: data.slice(0, 5).map((row, idx) => ({
               rowIndex: idx,
-              values: row?.map(cell => String(cell || '')).slice(0, 10) || []
-            }))
-          }
+              values: row?.map(cell => String(cell || '')).slice(0, 10) || [],
+            })),
+          },
         },
         { status: 400 }
       )
     }
 
-    // Nettoyer les données: enlever les lignes vides après les en-têtes
-    const cleanedData = []
-    cleanedData.push(headerRow) // Ajouter la ligne d'en-têtes
-    
-    // Ajouter les lignes de données (après la ligne d'en-têtes)
+    // Clean data
+    const cleanedData = [headerRow]
     for (let i = headerRowIndex + 1; i < data.length; i++) {
       const row = data[i]
       if (!row || !Array.isArray(row)) continue
-      // Garder seulement les lignes qui ont au moins une valeur non vide
       if (row.some(cell => cell !== null && cell !== undefined && cell !== '' && String(cell).trim() !== '')) {
         cleanedData.push(row)
       }
@@ -182,34 +167,24 @@ export async function POST(request) {
 
     if (cleanedData.length < 2) {
       return NextResponse.json(
-        { 
+        {
           error: 'Le fichier Excel ne contient pas de données valides',
-          debug: {
-            totalRows: data.length,
-            headerRowIndex,
-            headerRow: headerRow?.map(h => String(h || '')),
-          }
+          debug: { totalRows: data.length, headerRowIndex, headerRow: headerRow?.map(h => String(h || '')) },
         },
         { status: 400 }
       )
     }
 
-    // Récupérer les types de congé
+    // ── Type de congé setup (unchanged) ───────────────────────────────────────
     const typesConge = await prisma.typeConge.findMany()
     const typeCongeMap = {}
-    // Mapping des jours totaux par type de congé (par défaut)
-    const joursTotalParType = {
-      'administratif': 22, // 22 jours par an pour congé administratif
-      'exceptionnel': 10,  // 10 jours par an pour congé exceptionnel
-    }
+    const joursTotalParType = { 'administratif': 22, 'exceptionnel': 10 }
     typesConge.forEach((type) => {
       const typeNomLower = type.nom.toLowerCase()
-      // Mapping flexible pour "Administratif" -> "Congé Administratif"
       if (typeNomLower.includes('administratif')) {
         typeCongeMap['administratif'] = type.id
-        typeCongeMap['administrative'] = type.id // Variante anglaise
+        typeCongeMap['administrative'] = type.id
       }
-      // Mapping flexible pour "Exceptionnel" / "Excepcionel" (gérer les fautes d'orthographe)
       if (typeNomLower.includes('exceptionnel') || typeNomLower.includes('excepcionel')) {
         typeCongeMap['exceptionnel'] = type.id
         typeCongeMap['excepcionel'] = type.id
@@ -220,7 +195,7 @@ export async function POST(request) {
         }
       }
       typeCongeMap[typeNomLower] = type.id
-      const typeNomNoAccent = typeNomLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const typeNomNoAccent = typeNomLower.normalize('NFD').replace(/[̀-ͯ]/g, '')
       typeCongeMap[typeNomNoAccent] = type.id
       if (typeNomNoAccent.includes('exceptionnel') || typeNomNoAccent.includes('excepcionel')) {
         typeCongeMap['exceptionnel'] = type.id
@@ -228,7 +203,6 @@ export async function POST(request) {
       }
     })
 
-    // Si "Exceptionnel" n'a pas de type en base mais qu'on a 2 types (ex: Administratif + un autre), utiliser l'autre pour Exceptionnel
     if (!typeCongeMap['exceptionnel'] && typesConge.length >= 2) {
       const typeExceptionnel = typesConge.find((t) => {
         const n = t.nom.toLowerCase()
@@ -240,7 +214,6 @@ export async function POST(request) {
       }
     }
 
-    // Si toujours pas de type "Exceptionnel", le créer automatiquement pour que l'import fonctionne
     if (!typeCongeMap['exceptionnel']) {
       const existing = await prisma.typeConge.findFirst({
         where: {
@@ -263,106 +236,136 @@ export async function POST(request) {
       }
     }
 
-    // Debug: logger les types de congé trouvés
     console.log('Types de congé disponibles:', typesConge.map(t => t.nom))
     console.log('TypeCongeMap:', typeCongeMap)
-    
-    // Debug: afficher toutes les colonnes trouvées
+
+    // ── Column index detection ────────────────────────────────────────────────
     const foundColumns = headerRow.map((h, idx) => ({
       index: idx,
       original: h ? String(h).trim() : '',
       normalized: normalizeHeader(h),
     }))
-    
-    // Recherche flexible pour "Nom" (peut être "Nom", "NOM", "nom", "NOM DE FAMILLE", etc.)
+
     const nomIndex = headerRow.findIndex((h) => {
-      const normalized = normalizeHeader(h)
-      return normalized === 'nom' || 
-             (normalized.includes('nom') && !normalized.includes('prenom') && !normalized.includes('prénom'))
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n === 'nom' ||
+        (n.includes('nom') && !n.includes('prenom') && !n.includes('prénom')) ||
+        raw === 'النسب' || raw.includes('النسب')
     })
-    
-    // Recherche flexible pour "Prénom" (peut être "Prénom", "Prenom", "PRENOM", "Prénom", etc.)
+
     const prenomIndex = headerRow.findIndex((h) => {
-      const normalized = normalizeHeader(h)
-      return normalized === 'prenom' || 
-             normalized === 'prénom' || 
-             normalized.includes('prenom') || 
-             normalized.includes('prénom') ||
-             normalized === 'prenom' ||
-             normalized.includes('firstname')
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n === 'prenom' || n === 'prénom' || n.includes('prenom') || n.includes('prénom') ||
+        n.includes('firstname') || raw === 'الاسم' || raw.includes('الاسم')
     })
-    
-    const gradeIndex = headerRow.findIndex((h) =>
-      normalizeHeader(h).includes('grade')
-    )
-    const specialiteIndex = headerRow.findIndex((h) => 
-      normalizeHeader(h).includes('specialite') || normalizeHeader(h).includes('spécialité')
-    )
-    const serviceIndex = headerRow.findIndex((h) => {
-      const normalized = normalizeHeader(h)
-      return normalized.includes('service') || normalized.includes('département') || normalized.includes('departement')
-    })
-    const pprIndex = headerRow.findIndex((h) => 
+
+    const pprIndex = headerRow.findIndex((h) =>
       normalizeHeader(h) === 'ppr' || normalizeHeader(h).includes('ppr')
     )
 
+    const cinIndex = headerRow.findIndex((h) =>
+      normalizeHeader(h) === 'cin' || normalizeHeader(h).includes('cin')
+    )
+
+    const telephoneIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      return n === 'gsm' || n === 'telephone' || n === 'tel' || n.includes('gsm') || n.includes('portable')
+    })
+
+    const gradeIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('grade') || raw === 'الدرجة' || raw.includes('الدرجة')
+    })
+
+    const specialiteIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('specialite') || n.includes('spécialité') || n.includes('specialite') ||
+        raw === 'تخصص' || raw.includes('تخصص')
+    })
+
+    const serviceIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('service') || n.includes('département') || n.includes('departement') ||
+        n.includes('affectation') || raw === 'المصلحة' || raw.includes('المصلحة')
+    })
+
+    const hopitalIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('hopital') || n.includes('hôpital') ||
+        raw === 'مستشفى' || raw.includes('مستشفى') || raw.toUpperCase().includes('HOPITAL')
+    })
+
     if (nomIndex === -1 || prenomIndex === -1) {
       return NextResponse.json(
-        { 
+        {
           error: 'Les colonnes "Nom" et "Prénom" sont requises',
           foundColumns: foundColumns.map(c => c.original),
-          details: {
-            nomFound: nomIndex !== -1,
-            prenomFound: prenomIndex !== -1,
-            nomIndex,
-            prenomIndex,
-            allColumns: foundColumns,
-          }
+          details: { nomFound: nomIndex !== -1, prenomFound: prenomIndex !== -1, nomIndex, prenomIndex, allColumns: foundColumns },
         },
         { status: 400 }
       )
     }
 
-    // Helper: retrouver l'id du type "exceptionnel" ou "administratif" depuis la base
+    // ── Detect unsupported columns (reported in summary but not imported) ─────
+    const UNSUPPORTED_PATTERNS = [
+      { key: 'sexe', label: 'Sexe' },
+      { key: 'مكانالازدياد', label: 'مكان الازدياد' },
+      { key: 'العنوان', label: 'العنوان' },
+      { key: 'adresse', label: 'Adresse' },
+      { key: 'المدينة', label: 'المدينة' },
+      { key: 'ville', label: 'Ville' },
+      { key: 'fonction', label: 'Fonction' },
+    ]
+    const ignoredUnsupportedColumns = []
+    headerRow.forEach((h) => {
+      if (!h) return
+      const n = normalizeHeader(h)
+      const raw = h.toString().trim()
+      for (const p of UNSUPPORTED_PATTERNS) {
+        if (n.includes(p.key) || raw.includes(p.label)) {
+          if (!ignoredUnsupportedColumns.includes(raw)) {
+            ignoredUnsupportedColumns.push(raw)
+          }
+          break
+        }
+      }
+    })
+
+    // ── Solde column detection (unchanged) ───────────────────────────────────
     const getTypeIdByKeyword = (keyword) => {
       const k = keyword.toLowerCase()
       const found = typesConge.find((t) => t.nom.toLowerCase().includes(k))
       return found ? found.id : null
     }
 
-    // Trouver les colonnes de soldes (format: "Type Année" ou "TypeAnnee")
     const soldeColumns = []
     headerRow.forEach((header, index) => {
       if (!header) return
-      // Remplacer espaces insécables et caractères spéciaux par un espace normal
-      const headerStr = header.toString().replace(/\s+/g, ' ').replace(/\u00A0/g, ' ').trim()
+      const headerStr = header.toString().replace(/\s+/g, ' ').replace(/ /g, ' ').trim()
       if (!headerStr) return
-      
-      // Normaliser l'en-tête pour la recherche (sans espaces pour TypeAnnee)
+
       const headerNormalized = normalizeHeader(headerStr)
-      
-      // Chercher les patterns comme "Administratif 2024", "Exceptionnel 2025", etc.
-      // Pattern 1: "Type Année" avec un ou plusieurs espaces (y compris espaces insécables)
+
       let match = headerStr.match(/(administratif|exceptionnel|excepcionel|administrative)\s+(\d{4})/i)
-      
-      // Pattern 2: "TypeAnnee" sans espace (ex: "Administratif2024", "Exceptionnel2025")
       if (!match) {
         match = headerNormalized.match(/(administratif|exceptionnel|excepcionel|administrative)(\d{4})/)
       }
-      
-      // Pattern 3: type puis n'importe quoi puis 4 chiffres
       if (!match) {
         const normalizedMatch = headerNormalized.match(/(administratif|exceptionnel|excepcionel|administrative).*?(\d{4})/)
-        if (normalizedMatch) {
-          match = [normalizedMatch[0], normalizedMatch[1], normalizedMatch[2]]
-        }
+        if (normalizedMatch) match = [normalizedMatch[0], normalizedMatch[1], normalizedMatch[2]]
       }
-      
+
       if (match) {
         const typeRaw = match[1].toLowerCase()
-        const type = typeRaw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const type = typeRaw.normalize('NFD').replace(/[̀-ͯ]/g, '')
         const annee = parseInt(match[2], 10)
-        
+
         let typeCongeId = typeCongeMap[type] || typeCongeMap[typeRaw]
         if (!typeCongeId && (type === 'exceptionnel' || typeRaw === 'exceptionnel')) {
           typeCongeId = typeCongeMap['exceptionnel'] || typeCongeMap['excepcionel']
@@ -370,7 +373,6 @@ export async function POST(request) {
         if (!typeCongeId && (type === 'excepcionel' || typeRaw === 'excepcionel')) {
           typeCongeId = typeCongeMap['excepcionel'] || typeCongeMap['exceptionnel']
         }
-        // Fallback: chercher dans la base par mot-clé si le map n'a pas le type (ex: "Exceptionnel" dans le nom du type)
         if (!typeCongeId) {
           if (typeRaw.includes('exceptionnel') || typeRaw.includes('excepcionel')) {
             typeCongeId = getTypeIdByKeyword('exceptionnel') || getTypeIdByKeyword('excepcionel')
@@ -378,7 +380,7 @@ export async function POST(request) {
             typeCongeId = getTypeIdByKeyword('administratif') || getTypeIdByKeyword('administrative')
           }
         }
-        
+
         if (typeCongeId && annee >= 2000 && annee <= 2100) {
           soldeColumns.push({
             index,
@@ -388,22 +390,19 @@ export async function POST(request) {
             header: headerStr,
           })
         } else if (annee >= 2000 && annee <= 2100) {
-          console.log(`Type de congé non trouvé pour: "${typeRaw}" (header: "${headerStr}"). Types en base: ${typesConge.map(t => t.nom).join(', ')}`)
+          console.log(`Type de congé non trouvé pour: "${typeRaw}" (header: "${headerStr}")`)
         }
       }
     })
-    
-    // Debug: logger les colonnes de solde trouvées
+
     console.log('Colonnes de solde trouvées:', soldeColumns.map(c => ({ header: c.header, type: c.type, annee: c.annee })))
 
     const importSansColonneSolde = soldeColumns.length === 0
     if (importSansColonneSolde) {
-      console.log(
-        'Import Excel: aucune colonne de solde détectée — import des professeurs uniquement (sans solde initial).'
-      )
+      console.log('Import Excel: aucune colonne de solde détectée — import des professeurs uniquement.')
     }
 
-    // Traiter les données
+    // ── Result tracking ───────────────────────────────────────────────────────
     const results = {
       success: [],
       errors: [],
@@ -411,79 +410,79 @@ export async function POST(request) {
       warnings: [],
     }
 
-    // Récupérer tous les professeurs pour le matching
+    // ── Fetch reference data ─────────────────────────────────────────────────
     let professeurs = await prisma.professeur.findMany({
       select: {
         id: true,
         nom: true,
         prenom: true,
         ppr: true,
+        cin: true,
+        telephone: true,
         service_id: true,
+        hopital_id: true,
+        grade_id: true,
+        specialite_id: true,
       },
     })
 
-    // Récupérer les options pour créer des professeurs (champs obligatoires + optionnels)
-    const [grades, specialites, categories, titres, services] = await Promise.all([
+    const [grades, specialites, categories, titres, services, hopitaux] = await Promise.all([
       prisma.grade.findMany(),
       prisma.specialite.findMany(),
       prisma.categoriePersonnel.findMany(),
       prisma.titre.findMany(),
       prisma.service.findMany(),
+      prisma.hopital.findMany(),
     ])
     const defaultSpecialiteId = specialites.length > 0 ? specialites[0].id : null
     const defaultCategorieId = categories.length > 0 ? categories[0].id : null
     const defaultTitreId = titres.length > 0 ? titres[0].id : null
 
-    // Fonction pour trouver un professeur par nom et prénom ou PPR
-    const findProfesseur = (nom, prenom, pprValue) => {
-      const nomNormalized = nom?.toString().trim().toLowerCase() || ''
-      const prenomNormalized = prenom?.toString().trim().toLowerCase() || ''
-      const pprNormalized = pprValue?.toString().trim() || ''
-      
-      // D'abord chercher par PPR si fourni
-      if (pprNormalized) {
-        const byPpr = professeurs.find((p) => p.ppr === pprNormalized)
-        if (byPpr) return byPpr
+    // ── findProfesseur: PPR → CIN → name (with dupe check) ───────────────────
+    const findProfesseur = (nom, prenom, pprValue, cinValue) => {
+      const nomNorm = nom?.toString().trim().toLowerCase() || ''
+      const prenomNorm = prenom?.toString().trim().toLowerCase() || ''
+      const pprNorm = pprValue?.toString().trim() || ''
+      const cinNorm = cinValue?.toString().trim().toLowerCase() || ''
+
+      if (pprNorm) {
+        const byPpr = professeurs.find((p) => p.ppr === pprNorm)
+        if (byPpr) return { prof: byPpr, matchType: 'ppr' }
       }
-      
-      // Sinon chercher par nom et prénom
-      return professeurs.find((p) => {
-        const pNom = p.nom?.toString().trim().toLowerCase() || ''
-        const pPrenom = p.prenom?.toString().trim().toLowerCase() || ''
-        return pNom === nomNormalized && pPrenom === prenomNormalized
-      })
+
+      if (cinNorm) {
+        const byCin = professeurs.find((p) => p.cin && p.cin.trim().toLowerCase() === cinNorm)
+        if (byCin) return { prof: byCin, matchType: 'cin' }
+      }
+
+      if (nomNorm && prenomNorm) {
+        const byName = professeurs.filter((p) => {
+          const pNom = p.nom?.trim().toLowerCase() || ''
+          const pPrenom = p.prenom?.trim().toLowerCase() || ''
+          return pNom === nomNorm && pPrenom === prenomNorm
+        })
+        if (byName.length === 1) return { prof: byName[0], matchType: 'name' }
+        if (byName.length > 1) return { prof: null, matchType: 'ambiguous' }
+      }
+
+      return { prof: null, matchType: null }
     }
 
-    // Fonction pour créer un professeur
-    const createProfesseur = async (
-      nom,
-      prenom,
-      pprValue,
-      gradeValue,
-      specialiteValue,
-      serviceValue,
-      rowNumForLog
-    ) => {
-      const ppr =
-        pprValue != null && String(pprValue).trim() !== ''
-          ? String(pprValue).trim()
-          : null
+    // ── createProfesseur ──────────────────────────────────────────────────────
+    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, rowNumForLog) => {
+      const ppr = pprValue != null && String(pprValue).trim() !== '' ? String(pprValue).trim() : null
 
       if (ppr && professeurs.some((p) => p.ppr === ppr)) {
         throw new Error(`Le PPR ${ppr} existe déjà`)
       }
 
-      // Grade / spécialité : correspondance tolérante
       let gradeId = null
       if (gradeValue != null && String(gradeValue).trim() !== '') {
         const grade = matchReferentielName(gradeValue, grades)
         if (grade) {
           gradeId = grade.id
         } else {
-          results.warnings.push({
-            row: rowNumForLog,
-            message: `Grade non reconnu : « ${String(gradeValue).trim()} » (ignoré)`,
-          })
+          results.warnings.push({ row: rowNumForLog, message: `Grade non reconnu : « ${String(gradeValue).trim()} » (ignoré)` })
         }
       }
 
@@ -493,10 +492,7 @@ export async function POST(request) {
         if (specialite) {
           specialiteId = specialite.id
         } else {
-          results.warnings.push({
-            row: rowNumForLog,
-            message: `Spécialité non reconnue : « ${String(specialiteValue).trim()} » — utilisation de la spécialité par défaut`,
-          })
+          results.warnings.push({ row: rowNumForLog, message: `Spécialité non reconnue : « ${String(specialiteValue).trim()} » — utilisation de la spécialité par défaut` })
         }
       }
 
@@ -506,12 +502,22 @@ export async function POST(request) {
         if (service) {
           serviceId = service.id
         } else {
-          results.warnings.push({
-            row: rowNumForLog,
-            message: `Service non reconnu : « ${String(serviceValue).trim()} » (ignoré)`,
-          })
+          results.warnings.push({ row: rowNumForLog, message: `Service non reconnu : « ${String(serviceValue).trim()} » (ignoré)` })
         }
       }
+
+      let hopitalId = null
+      if (hopitalValue != null && String(hopitalValue).trim() !== '') {
+        const hopital = matchReferentielName(hopitalValue, hopitaux)
+        if (hopital) {
+          hopitalId = hopital.id
+        } else {
+          results.warnings.push({ row: rowNumForLog, message: `Hôpital non reconnu : « ${String(hopitalValue).trim()} » (ignoré)` })
+        }
+      }
+
+      const cin = cinValue != null && String(cinValue).trim() !== '' ? String(cinValue).trim() : null
+      const telephone = telephoneValue != null && String(telephoneValue).trim() !== '' ? String(telephoneValue).trim() : null
 
       if (!defaultSpecialiteId || !defaultCategorieId || !defaultTitreId) {
         throw new Error(
@@ -528,23 +534,85 @@ export async function POST(request) {
         titre_id: defaultTitreId,
         ...(gradeId !== null && { grade_id: gradeId }),
         ...(serviceId !== null && { service_id: serviceId }),
+        ...(hopitalId !== null && { hopital_id: hopitalId }),
+        ...(cin !== null && { cin }),
+        ...(telephone !== null && { telephone }),
       }
 
       const newProfesseur = await prisma.professeur.create({ data })
-      
-      // Ajouter au cache local
+
       professeurs.push({
         id: newProfesseur.id,
         nom: newProfesseur.nom,
         prenom: newProfesseur.prenom,
         ppr: newProfesseur.ppr ?? null,
+        cin: newProfesseur.cin ?? null,
+        telephone: newProfesseur.telephone ?? null,
         service_id: newProfesseur.service_id ?? null,
+        hopital_id: newProfesseur.hopital_id ?? null,
+        grade_id: newProfesseur.grade_id ?? null,
+        specialite_id: newProfesseur.specialite_id ?? null,
       })
 
       return newProfesseur
     }
 
-    // Traiter chaque ligne (en commençant à l'index 1 pour sauter l'en-tête)
+    // ── updateExistingProfesseur: fill only empty fields ──────────────────────
+    const updateExistingProfesseur = async (professeur, { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue }, rowNumForLog) => {
+      const cached = professeurs.find((p) => p.id === professeur.id)
+      const fieldsToUpdate = {}
+      const updatedFields = []
+
+      if (cinValue?.trim() && !cached?.cin) {
+        fieldsToUpdate.cin = cinValue.trim()
+        updatedFields.push('CIN')
+      }
+
+      if (telephoneValue?.trim() && !cached?.telephone) {
+        fieldsToUpdate.telephone = telephoneValue.trim()
+        updatedFields.push('téléphone')
+      }
+
+      if (gradeValue?.trim() && !cached?.grade_id) {
+        const grade = matchReferentielName(gradeValue, grades)
+        if (grade) {
+          fieldsToUpdate.grade_id = grade.id
+          updatedFields.push(`grade (${grade.nom})`)
+        } else {
+          results.warnings.push({ row: rowNumForLog, message: `Grade non reconnu : « ${gradeValue.trim()} » (ignoré)` })
+        }
+      }
+
+      if (hopitalValue?.trim() && !cached?.hopital_id) {
+        const hopital = matchReferentielName(hopitalValue, hopitaux)
+        if (hopital) {
+          fieldsToUpdate.hopital_id = hopital.id
+          updatedFields.push(`hôpital (${hopital.nom})`)
+        } else {
+          results.warnings.push({ row: rowNumForLog, message: `Hôpital non reconnu : « ${hopitalValue.trim()} » (ignoré)` })
+        }
+      }
+
+      if (serviceValue?.trim() && !cached?.service_id) {
+        const service = matchReferentielName(serviceValue, services)
+        if (service) {
+          fieldsToUpdate.service_id = service.id
+          updatedFields.push(`service (${service.nom})`)
+        } else {
+          results.warnings.push({ row: rowNumForLog, message: `Service non reconnu : « ${serviceValue.trim()} » (ignoré)` })
+        }
+      }
+
+      if (Object.keys(fieldsToUpdate).length === 0) return null
+
+      await prisma.professeur.update({ where: { id: professeur.id }, data: fieldsToUpdate })
+
+      if (cached) Object.assign(cached, fieldsToUpdate)
+
+      return updatedFields
+    }
+
+    // ── Row processing ────────────────────────────────────────────────────────
     for (let i = 1; i < cleanedData.length; i++) {
       const row = cleanedData[i]
       if (!row || row.length === 0) continue
@@ -552,26 +620,38 @@ export async function POST(request) {
       const nom = row[nomIndex]?.toString().trim()
       const prenom = row[prenomIndex]?.toString().trim()
       const pprValue = pprIndex !== -1 ? row[pprIndex]?.toString().trim() : null
+      const cinValue = cinIndex !== -1 ? row[cinIndex]?.toString().trim() : null
+      const telephoneValue = telephoneIndex !== -1 ? row[telephoneIndex]?.toString().trim() : null
       const gradeValue = gradeIndex !== -1 ? row[gradeIndex]?.toString().trim() : null
       const specialiteValue = specialiteIndex !== -1 ? row[specialiteIndex]?.toString().trim() : null
       const serviceValue = serviceIndex !== -1 ? row[serviceIndex]?.toString().trim() : null
+      const hopitalValue = hopitalIndex !== -1 ? row[hopitalIndex]?.toString().trim() : null
 
       if (!nom || !prenom) {
-        results.skipped.push({
-          row: i + 1,
-          reason: 'Nom ou prénom manquant',
-          nom,
-          prenom,
-        })
+        results.skipped.push({ row: i + 1, reason: 'Nom ou prénom manquant', nom, prenom })
         continue
       }
 
-      let professeur = findProfesseur(nom, prenom, pprValue)
+      const { prof: foundProf, matchType } = findProfesseur(nom, prenom, pprValue, cinValue)
 
-      // Si le professeur n'existe pas, le créer automatiquement
+      if (matchType === 'ambiguous') {
+        results.warnings.push({
+          row: i + 1,
+          message: `Plusieurs employés correspondent au nom « ${prenom} ${nom} » sans PPR ni CIN — ligne ignorée`,
+        })
+        results.skipped.push({ row: i + 1, reason: 'Correspondance ambiguë (doublons de nom)', nom, prenom })
+        continue
+      }
+
+      let professeur = foundProf
+
       if (!professeur) {
+        // Create new employee
         try {
-          professeur = await createProfesseur(nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, i + 1)
+          professeur = await createProfesseur(
+            nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue,
+            hopitalValue, cinValue, telephoneValue, i + 1
+          )
           results.success.push({
             row: i + 1,
             action: 'professeur_created',
@@ -587,33 +667,38 @@ export async function POST(request) {
           })
           continue
         }
-      } else if (serviceValue != null && String(serviceValue).trim() !== '') {
-        // Si le professeur existe déjà, compléter le service uniquement si vide
+      } else {
+        // Update existing employee: fill empty fields only
+        if (matchType === 'name') {
+          results.warnings.push({
+            row: i + 1,
+            message: `Employé « ${prenom} ${nom} » trouvé par nom uniquement (pas de PPR ni CIN) — utilisation avec prudence`,
+          })
+        }
+
         try {
-          const service = matchReferentielName(serviceValue, services)
-          if (service) {
-            const cached = professeurs.find((p) => p.id === professeur.id)
-            const currentServiceId = cached?.service_id ?? null
-            if (!currentServiceId) {
-              await prisma.professeur.update({
-                where: { id: professeur.id },
-                data: { service_id: service.id },
-              })
-              if (cached) cached.service_id = service.id
-              results.success.push({
-                row: i + 1,
-                action: 'service_set',
-                professeur: `${prenom} ${nom}`,
-                service: service.nom,
-              })
-            }
+          const updatedFields = await updateExistingProfesseur(
+            professeur,
+            { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue },
+            i + 1
+          )
+          if (updatedFields && updatedFields.length > 0) {
+            results.success.push({
+              row: i + 1,
+              action: 'employee_updated',
+              professeur: `${prenom} ${nom}`,
+              updatedFields,
+            })
           }
-        } catch (_) {
-          // ne pas bloquer l'import si la mise à jour du service échoue
+        } catch (error) {
+          results.warnings.push({
+            row: i + 1,
+            message: `Mise à jour des champs de l'employé : ${messageErreurUtilisateur(error)}`,
+          })
         }
       }
 
-      // Traiter chaque colonne de solde
+      // ── Process solde columns ─────────────────────────────────────────────
       for (const soldeCol of soldeColumns) {
         const joursValue = row[soldeCol.index]
         const jours = parseInt(joursValue, 10)
@@ -629,16 +714,11 @@ export async function POST(request) {
           continue
         }
 
-        if (jours === 0) {
-          // Ignorer les soldes à zéro
-          continue
-        }
+        if (jours === 0) continue
 
         try {
-          // Calculer la date d'expiration : 1 an pour exceptionnel, 2 ans pour administratif
           const expireLe = getExpireLe(soldeCol.annee, soldeCol.type || 'administratif')
 
-          // Vérifier si un solde existe déjà
           const existingSolde = await prisma.soldeConge.findUnique({
             where: {
               professeur_id_annee_type_conge_id: {
@@ -649,44 +729,32 @@ export async function POST(request) {
             },
           })
 
-          // Déterminer les jours totaux selon le type de congé
-          // La valeur Excel représente les jours RESTANTS, pas les jours totaux
-          let joursTotal = joursTotalParType[soldeCol.type] || 22 // Par défaut 22 si type non trouvé
+          let joursTotal = joursTotalParType[soldeCol.type] || 22
 
           if (existingSolde) {
-            // Mettre à jour le solde existant
-            // Conserver les jours totaux existants, mettre à jour seulement les jours restants
             await prisma.soldeConge.update({
               where: { id: existingSolde.id },
-              data: {
-                jours_restants: jours, // Seulement les jours restants depuis l'Excel
-                expire_le: expireLe,
-                // Ne pas modifier jours_total, garder la valeur existante
-              },
+              data: { jours_restants: jours, expire_le: expireLe },
             })
-
             results.success.push({
               row: i + 1,
               action: 'updated',
               professeur: `${prenom} ${nom}`,
               solde: soldeCol.header,
               jours_restants: jours,
-              jours_total: existingSolde.jours_total, // Afficher les jours totaux conservés
+              jours_total: existingSolde.jours_total,
             })
           } else {
-            // Créer un nouveau solde
-            // Utiliser les jours totaux par défaut selon le type, et les jours restants depuis l'Excel
             await prisma.soldeConge.create({
               data: {
                 professeur_id: professeur.id,
                 annee: soldeCol.annee,
-                jours_total: joursTotal, // Jours totaux selon le type de congé
-                jours_restants: jours, // Jours restants depuis l'Excel
+                jours_total: joursTotal,
+                jours_restants: jours,
                 expire_le: expireLe,
                 type_conge_id: soldeCol.typeCongeId,
               },
             })
-
             results.success.push({
               row: i + 1,
               action: 'created',
@@ -715,9 +783,10 @@ export async function POST(request) {
         success: results.success.length,
         errors: results.errors.length,
         skipped: results.skipped.length,
+        warnings: results.warnings.length,
         soldeColumnsDetected: soldeColumns.length,
         importSansColonneSolde,
-        warnings: results.warnings.length,
+        ignoredUnsupportedColumns: ignoredUnsupportedColumns.length > 0 ? ignoredUnsupportedColumns : undefined,
       },
       details: results,
     })
@@ -726,10 +795,6 @@ export async function POST(request) {
     const message = /prisma|invocation|ECONNREFUSED|database|connect/i.test(error.message || '')
       ? 'Impossible d\'accéder à la base de données. Vérifiez qu\'elle est démarrée. Le fichier doit au minimum contenir les colonnes Nom et Prénom (colonnes de solde optionnelles).'
       : messageErreurUtilisateur(error)
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-

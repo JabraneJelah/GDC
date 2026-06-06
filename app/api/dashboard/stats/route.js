@@ -21,6 +21,10 @@ export async function GET() {
       congesCetteAnnee,
       congesParType,
       typesConge,
+      totalDossiers,
+      dossierEnAttente,
+      dossierAArchiver,
+      dossierEnEvaluation,
     ] = await Promise.all([
       prisma.professeur.count(),
       prisma.conge.count(),
@@ -38,6 +42,16 @@ export async function GET() {
         _count: true,
       }),
       prisma.typeConge.findMany(),
+      prisma.dossierExplicatif.count(),
+      prisma.dossierExplicatif.count({
+        where: { statut: { in: ['EN_ATTENTE_REPONSE', 'REPONSE_RECUE', 'REPONSE_NON_CONVAINCANTE'] } },
+      }),
+      prisma.dossierExplicatif.count({
+        where: { statut: 'A_ARCHIVER' },
+      }),
+      prisma.dossierExplicatif.count({
+        where: { statut: 'EN_EVALUATION' },
+      }),
     ])
     const congesParTypeNom = congesParType.map((item) => {
       const type = typesConge.find((t) => t.id === item.type_conge_id)
@@ -53,6 +67,10 @@ export async function GET() {
       totalUtilisateursRH,
       congesCetteAnnee,
       congesParType: congesParTypeNom,
+      totalDossiers,
+      dossierEnAttente,
+      dossierAArchiver,
+      dossierEnEvaluation,
     })
   } catch (error) {
     console.error('Erreur lors de la récupération des statistiques:', error)

@@ -77,6 +77,18 @@ const parseDecisionDoc = (value) => {
 
 const HISTORIQUE_CONGES_PAGE_SIZE = 8
 
+function DetailField({ label, value, ltr }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      {ltr
+        ? <p className="mt-0.5 text-sm font-medium text-slate-800 text-center" dir="ltr">{value || '—'}</p>
+        : <p className="mt-0.5 text-sm font-medium text-slate-800">{value || '—'}</p>
+      }
+    </div>
+  )
+}
+
 export default function ProfesseurDetailsPage() {
   const params = useParams()
   const [professeur, setProfesseur] = useState(null)
@@ -405,25 +417,8 @@ export default function ProfesseurDetailsPage() {
               <h1 className="text-2xl font-bold text-slate-950">{fullName}</h1>
             </div>
             {professeur.ppr && (
-              <p className="text-sm text-slate-500">رقم التأجير: <span className="font-semibold text-slate-700">{professeur.ppr}</span></p>
+              <p className="text-sm text-slate-500">رقم التأجير: <span className="font-semibold text-slate-700" dir="ltr">{professeur.ppr}</span></p>
             )}
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-              {professeur.specialite?.nom && (
-                <span><span className="text-slate-400">التخصص:</span> <span className="font-medium text-slate-800">{professeur.specialite.nom}</span></span>
-              )}
-              {professeur.grade?.nom && (
-                <span><span className="text-slate-400">الدرجة:</span> <span className="font-medium text-slate-800">{professeur.grade.nom}</span></span>
-              )}
-              {professeur.service?.nom && (
-                <span><span className="text-slate-400">المصلحة:</span> <span className="font-medium text-slate-800">{professeur.service.nom}</span></span>
-              )}
-              {professeur.hopital?.nom && (
-                <span><span className="text-slate-400">المستشفى:</span> <span className="font-medium text-slate-800">{professeur.hopital.nom}</span></span>
-              )}
-              {professeur.categorie_personnel?.nom && (
-                <span><span className="text-slate-400">الفئة المهنية:</span> <span className="font-medium text-slate-800">{professeur.categorie_personnel.nom}</span></span>
-              )}
-            </div>
           </div>
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -445,6 +440,24 @@ export default function ProfesseurDetailsPage() {
           </div>
         </div>
       </section>
+
+      {/* Unified employee info card */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+          <h2 className="text-sm font-semibold text-slate-800">معلومات الموظف</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 p-5 sm:grid-cols-3">
+          <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
+          <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} />
+          <DetailField label="الهاتف (GSM)" value={professeur.telephone} ltr />
+          <DetailField label="التخصص" value={professeur.specialite?.nom} />
+          <DetailField label="الدرجة" value={professeur.grade?.nom} />
+          <DetailField label="المصلحة" value={professeur.service?.nom} />
+          <DetailField label="المستشفى" value={professeur.hopital?.nom} />
+          <DetailField label="الفئة المهنية" value={professeur.categorie_personnel?.nom} />
+          <DetailField label="اللقب" value={professeur.titre?.nom} />
+        </div>
+      </div>
 
       {/* Soldes section */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

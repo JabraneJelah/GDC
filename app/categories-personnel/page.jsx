@@ -1,55 +1,49 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
-import { Pagination } from '@/components/ui/pagination'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Briefcase, Plus, Search, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
 export default function CategoriesPersonnelPage() {
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
+
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [categoryToDelete, setCategoryToDelete] = useState(null)
-  const [editingCategory, setEditingCategory] = useState(null)
+  const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [formData, setFormData] = useState({
-    nom: '',
-  })
+  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE)
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
+  const [open, setOpen] = useState(false)
+  const [editingCategorie, setEditingCategorie] = useState(null)
+  const [formData, setFormData] = useState({ nom: '' })
+  const [formError, setFormError] = useState('')
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [categorieToDelete, setCategorieToDelete] = useState(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const [errorMessage, setErrorMessage] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+
+  useEffect(() => { fetchCategories() }, [])
 
   const fetchCategories = async () => {
     try {
       const response = await fetch('/api/categories-personnel')
-      if (response.ok) {
-        const data = await response.json()
-        setCategories(data)
-      }
+      if (response.ok) setCategories(await response.json())
     } catch (error) {
       console.error('Erreur lors du chargement des catégories:', error)
     } finally {
@@ -57,244 +51,373 @@ export default function CategoriesPersonnelPage() {
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const url = editingCategory
-        ? `/api/categories-personnel/${editingCategory.id}`
-        : '/api/categories-personnel'
-      const method = editingCategory ? 'PUT' : 'POST'
+  const filteredCategories = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return categories
+    return categories.filter((c) => c.nom?.toLowerCase().includes(q))
+  }, [categories, search])
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
+  const totalFiltered = filteredCategories.length
+  const startIndex = (currentPage - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalFiltered)
+  const paginatedCategories = filteredCategories.slice(startIndex, endIndex)
 
-      if (response.ok) {
-        setOpen(false)
-        setEditingCategory(null)
-        setFormData({ nom: '' })
-        setCurrentPage(1)
-        fetchCategories()
-      } else {
-        const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la sauvegarde')
-        setErrorDialogOpen(true)
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la sauvegarde')
-      setErrorDialogOpen(true)
-    }
-  }
-
-  const handleEdit = (category) => {
-    setEditingCategory(category)
-    setFormData({ nom: category.nom })
+  const openAddDialog = () => {
+    setEditingCategorie(null)
+    setFormData({ nom: '' })
+    setFormError('')
+    setErrorMessage('')
+    setSuccessMessage('')
     setOpen(true)
   }
 
-  const handleDeleteClick = (category) => {
-    setCategoryToDelete(category)
-    setDeleteDialogOpen(true)
+  const openEditDialog = (categorie) => {
+    setEditingCategorie(categorie)
+    setFormData({ nom: categorie.nom })
+    setFormError('')
+    setErrorMessage('')
+    setSuccessMessage('')
+    setOpen(true)
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!categoryToDelete) return
-
-    try {
-      const response = await fetch(`/api/categories-personnel/${categoryToDelete.id}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        setCurrentPage(1)
-        setDeleteDialogOpen(false)
-        setCategoryToDelete(null)
-        fetchCategories()
-      } else {
-        const data = await response.json()
-        setErrorMessage(data.error || 'Erreur lors de la suppression')
-        setErrorDialogOpen(true)
-        setDeleteDialogOpen(false)
-        setCategoryToDelete(null)
-      }
-    } catch (error) {
-      console.error('Erreur:', error)
-      setErrorMessage('Erreur lors de la suppression')
-      setErrorDialogOpen(true)
-      setDeleteDialogOpen(false)
-      setCategoryToDelete(null)
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen)
+    if (!isOpen) {
+      setEditingCategorie(null)
+      setFormData({ nom: '' })
+      setFormError('')
     }
   }
 
-  const handleOpenChange = (open) => {
-    setOpen(open)
-    if (!open) {
-      setEditingCategory(null)
-      setFormData({ nom: '' })
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!formData.nom.trim()) {
+      setFormError('المرجو إدخال اسم الفئة')
+      return
+    }
+    setFormError('')
+    setActionLoading(true)
+    try {
+      const url = editingCategorie ? `/api/categories-personnel/${editingCategorie.id}` : '/api/categories-personnel'
+      const method = editingCategorie ? 'PUT' : 'POST'
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      if (response.ok) {
+        setSuccessMessage(editingCategorie ? 'تم تحديث الفئة بنجاح' : 'تمت إضافة الفئة بنجاح')
+        setOpen(false)
+        setEditingCategorie(null)
+        setFormData({ nom: '' })
+        setCurrentPage(1)
+        await fetchCategories()
+      } else {
+        const data = await response.json().catch(() => null)
+        setFormError(data?.error || 'تعذر حفظ الفئة')
+      }
+    } catch {
+      setFormError('تعذر حفظ الفئة')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDeleteClick = (categorie) => {
+    setCategorieToDelete(categorie)
+    setDeleteDialogOpen(true)
+    setErrorMessage('')
+    setSuccessMessage('')
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!categorieToDelete) return
+    setActionLoading(true)
+    try {
+      const response = await fetch(`/api/categories-personnel/${categorieToDelete.id}`, { method: 'DELETE' })
+      if (response.ok) {
+        setSuccessMessage('تم حذف الفئة بنجاح')
+        setDeleteDialogOpen(false)
+        setCategorieToDelete(null)
+        setCurrentPage(1)
+        await fetchCategories()
+      } else {
+        const data = await response.json().catch(() => null)
+        setErrorMessage(data?.error || 'تعذر حذف الفئة')
+        setDeleteDialogOpen(false)
+        setCategorieToDelete(null)
+      }
+    } catch {
+      setErrorMessage('تعذر حذف الفئة')
+      setDeleteDialogOpen(false)
+      setCategorieToDelete(null)
+    } finally {
+      setActionLoading(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        Chargement...
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
+        <span className="size-10 animate-spin rounded-full border-[3px] border-gray-200 border-t-blue-600" />
+        <p className="text-sm text-gray-500">جاري التحميل...</p>
       </div>
     )
   }
 
-  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedCategories = categories.slice(startIndex, endIndex)
-
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-700">Catégories de Personnel</h1>
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">Nouvelle Catégorie</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingCategory ? 'Modifier la Catégorie' : 'Nouvelle Catégorie de Personnel'}
-              </DialogTitle>
-              <DialogDescription>
-                {editingCategory
-                  ? 'Modifier les informations de la catégorie'
-                  : 'Créer une nouvelle catégorie de personnel'}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="nom">Nom *</Label>
-                <Input
-                  id="nom"
-                  value={formData.nom}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nom: e.target.value })
-                  }
-                  placeholder="Ex: Professeur, Assistant, etc."
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                {editingCategory ? 'Modifier' : 'Créer'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-4" dir="rtl">
+
+      {/* Header card */}
+      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <div className="flex items-start justify-between gap-4">
+          <div className="text-right">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950">الفئات المهنية</h1>
+            <p className="mt-0.5 text-sm text-slate-500">تدبير الفئات المهنية للموظفين</p>
+          </div>
+          {!readOnly && (
+            <Button
+              type="button"
+              onClick={openAddDialog}
+              className="shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Plus className="size-4" />
+              إضافة فئة
+            </Button>
+          )}
+        </div>
+        <div className="mt-4 flex items-center gap-6">
+          <div>
+            <p className="text-xs text-slate-500">الإجمالي</p>
+            <p className="text-xl font-bold text-slate-900" dir="ltr">{categories.length}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white">
-        <Table>
-          <TableHeader className="bg-slate-100">
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="bg-white [&>tr]:bg-white [&>tr:nth-child(odd)]:bg-white [&>tr:nth-child(even)]:bg-white">
-            {categories.length === 0 ? (
-              <TableRow className="bg-white">
-                <TableCell colSpan={3} className="text-center">
-                  Aucune catégorie trouvée
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedCategories.map((category) => (
-                <TableRow key={category.id} className="bg-white hover:bg-slate-50">
-                  <TableCell>{category.id}</TableCell>
-                  <TableCell className="font-medium">{category.nom}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => handleEdit(category)}
-                        title="Modifier"
-                        className="h-7 w-7 p-0"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="xs"
-                        onClick={() => handleDeleteClick(category)}
-                        title="Supprimer"
-                        className="h-7 w-7 p-0"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-        {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+      {/* Feedback messages */}
+      {successMessage && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-right text-sm text-green-700">
+          {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Search bar */}
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+            <Input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
+              placeholder="البحث عن فئة..."
+              className="h-9 rounded-xl border-slate-300 bg-white pr-9 text-right text-sm placeholder:text-slate-400 focus-visible:ring-blue-500"
+            />
+          </div>
+          {search && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setCurrentPage(1) }}
+              className="cursor-pointer flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        {search && (
+          <p className="mt-2 text-xs text-slate-500">
+            عرض <span className="font-semibold text-slate-800">{filteredCategories.length}</span> نتيجة
+          </p>
         )}
       </div>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la suppression</DialogTitle>
-            <DialogDescription>
-              Êtes-vous sûr de vouloir supprimer la catégorie "{categoryToDelete?.nom}" ? Cette action est irréversible.
+      {/* Table card */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[400px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                <th scope="col" className="px-5 py-3 text-right text-sm font-semibold text-slate-700">اسم الفئة</th>
+                <th scope="col" className="w-32 px-5 py-3 text-center text-sm font-semibold text-slate-700">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paginatedCategories.length === 0 ? (
+                <tr>
+                  <td colSpan={2} className="px-6 py-14 text-center">
+                    <div className="mx-auto flex max-w-xs flex-col items-center gap-3">
+                      <Briefcase className="size-9 text-slate-300" strokeWidth={1.5} />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-slate-600">
+                          {search ? 'لا توجد فئات مطابقة للبحث' : 'لا توجد فئات حالياً'}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {search ? 'جرب تعديل كلمة البحث' : 'أضف فئة جديدة للبدء'}
+                        </p>
+                      </div>
+                      {search && (
+                        <Button variant="outline" size="sm" onClick={() => { setSearch(''); setCurrentPage(1) }} className="mt-1 gap-1.5">
+                          <X className="size-3.5" />
+                          مسح البحث
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedCategories.map((categorie) => (
+                  <tr key={categorie.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
+                    <td className="px-5 py-3 text-right">
+                      <span className="block max-w-sm truncate text-sm font-semibold text-slate-900" title={categorie.nom}>
+                        {categorie.nom}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm">
+                      {readOnly ? (
+                        <div className="text-center text-xs text-slate-400">—</div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => openEditDialog(categorie)}
+                            disabled={actionLoading}
+                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            تعديل
+                          </button>
+                          <span className="text-slate-200">|</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(categorie)}
+                            disabled={actionLoading}
+                            className="cursor-pointer rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Card footer */}
+        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+          <span className="text-sm text-slate-500" dir="ltr">
+            {totalFiltered > 0 ? `${startIndex + 1}-${endIndex} من ${totalFiltered}` : '0 من 0'}
+          </span>
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span>عدد المدخلات في كل صفحة:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
+              className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-sm text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Add / Edit dialog */}
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="border-b border-slate-100 pb-4 text-right">
+            <DialogTitle className="text-xl font-bold text-slate-950">
+              {editingCategorie ? 'تعديل الفئة' : 'إضافة فئة'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              {editingCategorie ? 'تعديل اسم الفئة المهنية المحددة' : 'إضافة فئة مهنية جديدة إلى قائمة الفئات'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false)
-                setCategoryToDelete(null)
-              }}
-              className="w-full sm:w-auto"
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {formError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700">
+                {formError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="categorie-nom" className="block text-sm font-semibold text-slate-700">
+                اسم الفئة <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="categorie-nom"
+                value={formData.nom}
+                onChange={(e) => { setFormData({ nom: e.target.value }); setFormError('') }}
+                placeholder="مثال: أطر، أعوان، تقنيون..."
+                className="h-10 rounded-xl border-slate-300 bg-white text-right text-slate-900 placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:ring-blue-500/30"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={actionLoading}
+                className="w-full cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed sm:w-auto"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                disabled={actionLoading}
+                className="w-full cursor-pointer bg-blue-600 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed sm:w-auto"
+              >
+                {actionLoading ? 'جاري الحفظ...' : editingCategorie ? 'تحديث الفئة' : 'إضافة الفئة'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={(isOpen) => {
+        if (!actionLoading) { setDeleteDialogOpen(isOpen); if (!isOpen) setCategorieToDelete(null) }
+      }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-xl font-bold text-slate-900">حذف الفئة</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              هل أنت متأكد من حذف فئة{' '}
+              <span className="font-semibold text-slate-800">&quot;{categorieToDelete?.nom}&quot;</span>؟
+              {' '}هذا الإجراء لا يمكن التراجع عنه.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-start">
+            <button
+              type="button"
+              onClick={() => { setDeleteDialogOpen(false); setCategorieToDelete(null) }}
+              disabled={actionLoading}
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              Annuler
-            </Button>
-            <Button
-              variant="destructive"
+              إلغاء
+            </button>
+            <button
+              type="button"
               onClick={handleDeleteConfirm}
-              className="w-full sm:w-auto"
+              disabled={actionLoading}
+              className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              Supprimer
-            </Button>
+              {actionLoading ? 'جاري الحذف...' : 'حذف الفئة'}
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Erreur</DialogTitle>
-            <DialogDescription className="text-slate-700 whitespace-pre-line">
-              {errorMessage}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setErrorDialogOpen(false)}>
-              Fermer
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
-

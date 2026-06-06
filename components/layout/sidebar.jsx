@@ -261,56 +261,24 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
           {/* Footer actions */}
           <div className="shrink-0 border-t border-slate-200 p-3 space-y-0.5">
             {isCollapsed ? (
-              <>
-                <NavTooltip label="الملف الشخصي">
-                  <Link
-                    href="/profile"
-                    className={`flex items-center justify-center rounded-lg p-2.5 transition-colors ${
-                      pathname === '/profile'
-                        ? 'bg-[#1174BC]/10 text-[#1174BC]'
-                        : 'text-slate-600 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
-                    }`}
-                  >
-                    <User className="h-5 w-5 shrink-0" />
-                  </Link>
-                </NavTooltip>
-                <NavTooltip label="تسجيل الخروج">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center justify-center rounded-lg p-2.5 text-slate-600 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
-                  >
-                    <LogOut className="h-5 w-5 shrink-0" />
-                  </button>
-                </NavTooltip>
-              </>
-            ) : (
-              <>
-                <Link href="/profile" className="block">
-                  <div
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
-                      pathname === '/profile'
-                        ? 'bg-[#1174BC]/10 text-[#1174BC]'
-                        : 'text-slate-800 hover:bg-[#1174BC]/10 hover:text-[#1174BC]'
-                    }`}
-                  >
-                    <User
-                      className={`h-5 w-5 shrink-0 ${
-                        pathname === '/profile' ? 'text-[#1174BC]' : 'text-current'
-                      }`}
-                    />
-                    <span>الملف الشخصي</span>
-                  </div>
-                </Link>
+              <NavTooltip label="تسجيل الخروج">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
+                  className="flex w-full items-center justify-center rounded-lg p-2.5 text-slate-600 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
                 >
-                  <LogOut className="h-5 w-5 shrink-0 text-current" />
-                  <span>تسجيل الخروج</span>
+                  <LogOut className="h-5 w-5 shrink-0" />
                 </button>
-              </>
+              </NavTooltip>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-[#1174BC]/10 hover:text-[#1174BC]"
+              >
+                <LogOut className="h-5 w-5 shrink-0 text-current" />
+                <span>تسجيل الخروج</span>
+              </button>
             )}
           </div>
         </div>

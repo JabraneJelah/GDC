@@ -48,3 +48,44 @@ export function getNextActionLabel(status: string): string | null {
 export function getStatusColor(status: string): DossierStatusColor {
   return DOSSIER_STATUS_COLORS[status as DossierStatus] ?? "neutral"
 }
+
+// Simplified labels for list/table views only — does not affect timeline or detail pages
+const DOSSIER_LIST_STATUS_LABELS: Record<string, string> = {
+  ENREGISTRE: "تم تسجيل الملف",
+  BROUILLON: "قيد المعالجة",
+  DOCUMENTS_INITIAUX_GENERES: "قيد المعالجة",
+  NOTIFIE: "قيد المعالجة",
+  EN_ATTENTE_REPONSE: "قيد المعالجة",
+  REPONSE_RECUE: "قيد المعالجة",
+  REPONSE_CONVAINCANTE: "قيد المعالجة",
+  REPONSE_NON_CONVAINCANTE: "قيد المعالجة",
+  PROCEDURE_SUIVANTE_GENEREE: "قيد المعالجة",
+  EN_EVALUATION: "قيد المعالجة",
+  CLOTURE: "مغلق",
+  A_ARCHIVER: "مغلق",
+  ARCHIVE: "مؤرشف",
+}
+
+const DOSSIER_LIST_STATUS_COLORS: Record<string, DossierStatusColor> = {
+  ENREGISTRE: "neutral",
+  BROUILLON: "warning",
+  DOCUMENTS_INITIAUX_GENERES: "warning",
+  NOTIFIE: "warning",
+  EN_ATTENTE_REPONSE: "warning",
+  REPONSE_RECUE: "warning",
+  REPONSE_CONVAINCANTE: "warning",
+  REPONSE_NON_CONVAINCANTE: "warning",
+  PROCEDURE_SUIVANTE_GENEREE: "warning",
+  EN_EVALUATION: "warning",
+  CLOTURE: "neutral",
+  A_ARCHIVER: "neutral",
+  ARCHIVE: "neutral",
+}
+
+export function getListStatusLabel(status: string): string {
+  return DOSSIER_LIST_STATUS_LABELS[status] ?? status
+}
+
+export function getListStatusColor(status: string): DossierStatusColor {
+  return DOSSIER_LIST_STATUS_COLORS[status] ?? "neutral"
+}

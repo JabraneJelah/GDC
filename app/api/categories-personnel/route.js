@@ -52,7 +52,7 @@ export async function POST(request) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Cette catégorie existe déjà' },
+        { error: 'هذه الفئة موجودة مسبقاً' },
         { status: 400 }
       )
     }
