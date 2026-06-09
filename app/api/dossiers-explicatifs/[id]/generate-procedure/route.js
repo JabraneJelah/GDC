@@ -62,6 +62,8 @@ function buildTemplateData(dossier) {
     date_heure_faute: formatDateTime(dossier.date_faute),
     type_faute: dossier.type_faute?.nom || '',
     details: dossier.details || '',
+    cin: dossier.professeur?.cin || '',
+    adresse: dossier.professeur?.adresse || '',
     ...buildExtraData(dossier),
   }
 }
@@ -177,6 +179,12 @@ export async function POST(request, { params }) {
         donnees_supplementaires: true,
         type_faute: {
           select: { nom: true, code: true },
+        },
+        professeur: {
+          select: {
+            cin: true,
+            adresse: true,
+          },
         },
       },
     })

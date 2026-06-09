@@ -29,6 +29,7 @@ import {
 import {
   getExtraFieldsForCode,
   getMissingRequiredFields,
+  getBlockingMessageForCode,
 } from '@/lib/dossiers-explicatifs/extraFields'
 import { AppCard } from '@/components/dossiers-explicatifs/AppCard'
 import { WorkflowStepper } from '@/components/dossiers-explicatifs/WorkflowStepper'
@@ -110,6 +111,7 @@ const typeFauteArabicLabels = {
   NON_RESPECT_ETHIQUE: 'عدم الالتزام بآداب المهنة',
   TENUE_PROFESSIONNELLE: 'الهندام المهني',
   ABANDON_POSTE: 'التخلي عن الوظيفة',
+  CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
 }
 
 const actionConfirmations = {
@@ -892,6 +894,8 @@ export default function DossierExplicatifDetailPage() {
       const missingRequired = getMissingRequiredFields(dossier.type_faute?.code, dossier.donnees_supplementaires)
       const hasAllRequired = missingRequired.length === 0
       const isFinalDossier = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
+      const extraFieldsBlockingMessage = getBlockingMessageForCode(dossier.type_faute?.code)
+        || 'يرجى إكمال المعطيات الإضافية قبل إنشاء الوثائق.'
 
       return (
         <div className="space-y-4">
@@ -985,7 +989,7 @@ export default function DossierExplicatifDetailPage() {
               </p>
             ) : !hasAllRequired ? (
               <p className="text-xs text-amber-700">
-                يرجى إكمال المعطيات الإضافية قبل إنشاء الوثائق.
+                {extraFieldsBlockingMessage}
               </p>
             ) : null}
           </div>

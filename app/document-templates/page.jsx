@@ -68,6 +68,7 @@ const typeFauteArabicLabels = {
   NON_RESPECT_ETHIQUE: 'عدم الالتزام بآداب المهنة',
   TENUE_PROFESSIONNELLE: 'الهندام المهني',
   ABANDON_POSTE: 'التخلي عن الوظيفة',
+  CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
 }
 
 
@@ -111,6 +112,7 @@ export default function DocumentTemplatesPage() {
   const [search, setSearch] = useState('')
   const [filterTypeFauteId, setFilterTypeFauteId] = useState('')
   const [filterUsage, setFilterUsage] = useState('')
+  const [filterActif, setFilterActif] = useState('active')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
@@ -174,26 +176,30 @@ export default function DocumentTemplatesPage() {
   const filteredTemplates = useMemo(() => {
     const q = search.trim().toLowerCase()
     return templates.filter((t) => {
+      if (filterActif === 'active' && t.actif === false) return false
+      if (filterActif === 'inactive' && t.actif !== false) return false
       if (q && ![t.nom, t.identifiant, getTypeFauteLabel(t.type_faute), getUsageLabel(t.usage)]
         .some((v) => v && v.toLowerCase().includes(q))) return false
       if (filterTypeFauteId && String(t.type_faute?.id) !== filterTypeFauteId) return false
       if (filterUsage && t.usage !== filterUsage) return false
       return true
     })
-  }, [templates, search, filterTypeFauteId, filterUsage])
+  }, [templates, search, filterTypeFauteId, filterUsage, filterActif])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (search.trim()) count++
     if (filterTypeFauteId) count++
     if (filterUsage) count++
+    if (filterActif !== 'active') count++
     return count
-  }, [search, filterTypeFauteId, filterUsage])
+  }, [search, filterTypeFauteId, filterUsage, filterActif])
 
   const resetFilters = () => {
     setSearch('')
     setFilterTypeFauteId('')
     setFilterUsage('')
+    setFilterActif('active')
     setCurrentPage(1)
   }
 
@@ -464,7 +470,7 @@ export default function DocumentTemplatesPage() {
           {filtersOpen && (
             <div className="border-t border-slate-100 px-5 pb-5 pt-4 sm:px-6">
               <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Search */}
                   <div className="space-y-1.5">
                     <label className="block text-right text-xs font-semibold text-slate-600">بحث عام</label>
@@ -515,6 +521,24 @@ export default function DocumentTemplatesPage() {
                         {Object.entries(usageLabels).map(([value, label]) => (
                           <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* الحالة */}
+                  <div className="space-y-1.5">
+                    <label className="block text-right text-xs font-semibold text-slate-600">الحالة</label>
+                    <Select
+                      value={filterActif}
+                      onValueChange={(v) => { setFilterActif(v); setCurrentPage(1) }}
+                    >
+                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">النماذج النشطة</SelectItem>
+                        <SelectItem value="inactive">النماذج غير النشطة</SelectItem>
+                        <SelectItem value="__all__">الكل</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -577,10 +601,16 @@ export default function DocumentTemplatesPage() {
                         <FileText className="size-9 text-slate-300" strokeWidth={1.5} />
                         <div className="space-y-1">
                           <p className="text-sm font-medium text-slate-600">
-                            {activeFilterCount > 0 ? 'لا توجد نماذج مطابقة لمعايير التصفية' : 'لا توجد نماذج حاليا'}
+                            {activeFilterCount > 0 || filterActif !== '__all__'
+                              ? 'لا توجد نماذج مطابقة لمعايير التصفية'
+                              : 'لا توجد نماذج حاليا'}
                           </p>
                           <p className="text-xs text-slate-400">
-                            {activeFilterCount > 0 ? 'جرب تعديل معايير البحث أو إعادة التعيين' : 'أضف نموذج DOCX لربطه بنوع مخالفة'}
+                            {filterActif === 'active' && search === '' && !filterTypeFauteId && !filterUsage
+                              ? 'لا توجد نماذج نشطة حاليا — يمكنك تفعيل نماذج موجودة أو إضافة نموذج جديد'
+                              : activeFilterCount > 0 || filterActif !== '__all__'
+                                ? 'جرب تعديل معايير البحث أو إعادة التعيين'
+                                : 'أضف نموذج DOCX لربطه بنوع مخالفة'}
                           </p>
                         </div>
                         {activeFilterCount > 0 && (

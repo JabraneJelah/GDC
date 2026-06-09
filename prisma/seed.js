@@ -89,6 +89,12 @@ const TYPES_FAUTE = [
     description: 'Abandon du poste ou interruption non autorisée du service.',
     actif: true,
   },
+  {
+    code: 'CERTIFICAT_MEDICAL_HORS_DELAI',
+    nom: 'الإدلاء بشهادة طبية خارج الآجال',
+    description: 'Présentation d\'un certificat médical hors des délais réglementaires.',
+    actif: true,
+  },
 ]
 
 function buildTemplatePath(identifiant, formatSource) {
