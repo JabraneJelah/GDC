@@ -301,6 +301,30 @@ export async function POST(request) {
         raw === 'مستشفى' || raw.includes('مستشفى') || raw.toUpperCase().includes('HOPITAL')
     })
 
+    const adresseIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('adresse') || raw === 'العنوان' || raw.includes('العنوان')
+    })
+
+    const sexeIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n === 'sexe' || n.includes('sexe') || raw === 'الجنس' || raw.includes('الجنس')
+    })
+
+    const lieuNaissanceIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n.includes('lieunaissance') || n.includes('lieu') || raw === 'مكان الازدياد' || raw.includes('مكان الازدياد') || raw.includes('مكانالازدياد')
+    })
+
+    const villeIndex = headerRow.findIndex((h) => {
+      const n = normalizeHeader(h)
+      const raw = h?.toString().trim() ?? ''
+      return n === 'ville' || n.includes('ville') || raw === 'المدينة' || raw.includes('المدينة')
+    })
+
     if (nomIndex === -1 || prenomIndex === -1) {
       return NextResponse.json(
         {
@@ -314,12 +338,6 @@ export async function POST(request) {
 
     // ── Detect unsupported columns (reported in summary but not imported) ─────
     const UNSUPPORTED_PATTERNS = [
-      { key: 'sexe', label: 'Sexe' },
-      { key: 'مكانالازدياد', label: 'مكان الازدياد' },
-      { key: 'العنوان', label: 'العنوان' },
-      { key: 'adresse', label: 'Adresse' },
-      { key: 'المدينة', label: 'المدينة' },
-      { key: 'ville', label: 'Ville' },
       { key: 'fonction', label: 'Fonction' },
     ]
     const ignoredUnsupportedColumns = []
@@ -469,7 +487,7 @@ export async function POST(request) {
     }
 
     // ── createProfesseur ──────────────────────────────────────────────────────
-    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, rowNumForLog) => {
+    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, rowNumForLog) => {
       const ppr = pprValue != null && String(pprValue).trim() !== '' ? String(pprValue).trim() : null
 
       if (ppr && professeurs.some((p) => p.ppr === ppr)) {
@@ -518,6 +536,10 @@ export async function POST(request) {
 
       const cin = cinValue != null && String(cinValue).trim() !== '' ? String(cinValue).trim() : null
       const telephone = telephoneValue != null && String(telephoneValue).trim() !== '' ? String(telephoneValue).trim() : null
+      const adresse = adresseValue != null && String(adresseValue).trim() !== '' ? String(adresseValue).trim() : null
+      const sexe = sexeValue != null && String(sexeValue).trim() !== '' ? String(sexeValue).trim() : null
+      const lieu_naissance = lieuNaissanceValue != null && String(lieuNaissanceValue).trim() !== '' ? String(lieuNaissanceValue).trim() : null
+      const ville = villeValue != null && String(villeValue).trim() !== '' ? String(villeValue).trim() : null
 
       if (!defaultSpecialiteId || !defaultCategorieId || !defaultTitreId) {
         throw new Error(
@@ -537,6 +559,10 @@ export async function POST(request) {
         ...(hopitalId !== null && { hopital_id: hopitalId }),
         ...(cin !== null && { cin }),
         ...(telephone !== null && { telephone }),
+        ...(adresse !== null && { adresse }),
+        ...(sexe !== null && { sexe }),
+        ...(lieu_naissance !== null && { lieu_naissance }),
+        ...(ville !== null && { ville }),
       }
 
       const newProfesseur = await prisma.professeur.create({ data })
@@ -548,6 +574,10 @@ export async function POST(request) {
         ppr: newProfesseur.ppr ?? null,
         cin: newProfesseur.cin ?? null,
         telephone: newProfesseur.telephone ?? null,
+        adresse: newProfesseur.adresse ?? null,
+        sexe: newProfesseur.sexe ?? null,
+        lieu_naissance: newProfesseur.lieu_naissance ?? null,
+        ville: newProfesseur.ville ?? null,
         service_id: newProfesseur.service_id ?? null,
         hopital_id: newProfesseur.hopital_id ?? null,
         grade_id: newProfesseur.grade_id ?? null,
@@ -558,7 +588,7 @@ export async function POST(request) {
     }
 
     // ── updateExistingProfesseur: fill only empty fields ──────────────────────
-    const updateExistingProfesseur = async (professeur, { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue }, rowNumForLog) => {
+    const updateExistingProfesseur = async (professeur, { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue }, rowNumForLog) => {
       const cached = professeurs.find((p) => p.id === professeur.id)
       const fieldsToUpdate = {}
       const updatedFields = []
@@ -571,6 +601,26 @@ export async function POST(request) {
       if (telephoneValue?.trim() && !cached?.telephone) {
         fieldsToUpdate.telephone = telephoneValue.trim()
         updatedFields.push('téléphone')
+      }
+
+      if (adresseValue?.trim() && !cached?.adresse) {
+        fieldsToUpdate.adresse = adresseValue.trim()
+        updatedFields.push('adresse')
+      }
+
+      if (sexeValue?.trim() && !cached?.sexe) {
+        fieldsToUpdate.sexe = sexeValue.trim()
+        updatedFields.push('sexe')
+      }
+
+      if (lieuNaissanceValue?.trim() && !cached?.lieu_naissance) {
+        fieldsToUpdate.lieu_naissance = lieuNaissanceValue.trim()
+        updatedFields.push('lieu de naissance')
+      }
+
+      if (villeValue?.trim() && !cached?.ville) {
+        fieldsToUpdate.ville = villeValue.trim()
+        updatedFields.push('ville')
       }
 
       if (gradeValue?.trim() && !cached?.grade_id) {
@@ -626,6 +676,10 @@ export async function POST(request) {
       const specialiteValue = specialiteIndex !== -1 ? row[specialiteIndex]?.toString().trim() : null
       const serviceValue = serviceIndex !== -1 ? row[serviceIndex]?.toString().trim() : null
       const hopitalValue = hopitalIndex !== -1 ? row[hopitalIndex]?.toString().trim() : null
+      const adresseValue = adresseIndex !== -1 ? row[adresseIndex]?.toString().trim() : null
+      const sexeValue = sexeIndex !== -1 ? row[sexeIndex]?.toString().trim() : null
+      const lieuNaissanceValue = lieuNaissanceIndex !== -1 ? row[lieuNaissanceIndex]?.toString().trim() : null
+      const villeValue = villeIndex !== -1 ? row[villeIndex]?.toString().trim() : null
 
       if (!nom || !prenom) {
         results.skipped.push({ row: i + 1, reason: 'Nom ou prénom manquant', nom, prenom })
@@ -650,7 +704,7 @@ export async function POST(request) {
         try {
           professeur = await createProfesseur(
             nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue,
-            hopitalValue, cinValue, telephoneValue, i + 1
+            hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, i + 1
           )
           results.success.push({
             row: i + 1,
@@ -679,7 +733,7 @@ export async function POST(request) {
         try {
           const updatedFields = await updateExistingProfesseur(
             professeur,
-            { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue },
+            { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue },
             i + 1
           )
           if (updatedFields && updatedFields.length > 0) {

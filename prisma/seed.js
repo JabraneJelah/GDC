@@ -95,6 +95,12 @@ const TYPES_FAUTE = [
     description: 'Présentation d\'un certificat médical hors des délais réglementaires.',
     actif: true,
   },
+  {
+    code: 'CONGE_MALADIE_NON_JUSTIFIE',
+    nom: 'عطلة مرضية غير مبررة',
+    description: 'Congé maladie non justifié par un certificat médical valide.',
+    actif: true,
+  },
 ]
 
 function buildTemplatePath(identifiant, formatSource) {

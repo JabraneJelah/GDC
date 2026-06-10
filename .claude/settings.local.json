@@ -13,7 +13,13 @@
       "Bash(dir \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\\\\public\\\\assests\")",
       "Bash(findstr template *)",
       "Bash(xargs grep -l \"template\\\\|Template\")",
-      "Bash(xargs grep -l \"donnees_supplementaires\\\\|AZS\\\\|CERTIFICAT\")"
+      "Bash(xargs grep -l \"donnees_supplementaires\\\\|AZS\\\\|CERTIFICAT\")",
+      "Bash(Select-String -Pattern \"error|Error|failed|Failed|warning\")",
+      "Bash(Select-Object -First 30)",
+      "PowerShell(cd \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\"; $result = npm run build 2>&1; $exitCode = $LASTEXITCODE; $result | Select-Object -Last 20; Write-Host \"Exit code: $exitCode\")",
+      "PowerShell(New-Item -ItemType Directory -Path \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\\\\prisma\\\\migrations\\\\20260610000000_add_employee_personal_fields\" -Force)",
+      "PowerShell(Start-Sleep -Seconds 15; cd \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\"; npm run build 2>&1 | Select-Object -Last 15; Write-Host \"Exit: $LASTEXITCODE\")",
+      "PowerShell(cd \"c:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\"; npm run build 2>&1 | Select-Object -Last 15; Write-Host \"Exit: $LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\STI\\Desktop\\GDC-main\\components"

@@ -112,6 +112,8 @@ const typeFauteArabicLabels = {
   TENUE_PROFESSIONNELLE: 'الهندام المهني',
   ABANDON_POSTE: 'التخلي عن الوظيفة',
   CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
+  AZS: 'عطلة مرضية غير مبررة',
+  CONGE_MALADIE_NON_JUSTIFIE: 'عطلة مرضية غير مبررة',
 }
 
 const actionConfirmations = {

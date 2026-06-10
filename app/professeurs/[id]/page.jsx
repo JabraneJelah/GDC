@@ -81,10 +81,9 @@ function DetailField({ label, value, ltr }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      {ltr
-        ? <p className="mt-0.5 text-sm font-medium text-slate-800 text-center" dir="ltr">{value || '—'}</p>
-        : <p className="mt-0.5 text-sm font-medium text-slate-800">{value || '—'}</p>
-      }
+      <p className="mt-0.5 text-sm font-medium text-slate-800 break-words" dir={ltr ? 'ltr' : undefined}>
+        {value || '—'}
+      </p>
     </div>
   )
 }
@@ -124,6 +123,10 @@ export default function ProfesseurDetailsPage() {
     nom: '',
     prenom: '',
     ppr: '',
+    adresse: '',
+    sexe: '',
+    lieu_naissance: '',
+    ville: '',
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
@@ -188,6 +191,10 @@ export default function ProfesseurDetailsPage() {
           nom: data.nom || '',
           prenom: data.prenom || '',
           ppr: data.ppr || '',
+          adresse: data.adresse || '',
+          sexe: data.sexe || '',
+          lieu_naissance: data.lieu_naissance || '',
+          ville: data.ville || '',
           specialite_id: data.specialite_id?.toString() || '',
           categorie_personnel_id: data.categorie_personnel_id?.toString() || '',
           titre_id: data.titre_id?.toString() || '',
@@ -446,16 +453,45 @@ export default function ProfesseurDetailsPage() {
         <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
           <h2 className="text-sm font-semibold text-slate-800">معلومات الموظف</h2>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 p-5 sm:grid-cols-3">
-          <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
-          <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} />
-          <DetailField label="الهاتف (GSM)" value={professeur.telephone} ltr />
-          <DetailField label="التخصص" value={professeur.specialite?.nom} />
-          <DetailField label="الدرجة" value={professeur.grade?.nom} />
-          <DetailField label="المصلحة" value={professeur.service?.nom} />
-          <DetailField label="المستشفى" value={professeur.hopital?.nom} />
-          <DetailField label="الفئة المهنية" value={professeur.categorie_personnel?.nom} />
-          <DetailField label="اللقب" value={professeur.titre?.nom} />
+        <div className="divide-y divide-slate-100">
+
+          {/* الهوية */}
+          <div className="px-5 py-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-blue-500">الهوية</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <DetailField label="الاسم الكامل" value={fullName} />
+              <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
+              <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} ltr />
+              <DetailField label="الجنس" value={professeur.sexe} />
+            </div>
+          </div>
+
+          {/* المعلومات المهنية */}
+          <div className="px-5 py-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-blue-500">المعلومات المهنية</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <DetailField label="الدرجة" value={professeur.grade?.nom} />
+              <DetailField label="التخصص" value={professeur.specialite?.nom} />
+              <DetailField label="المصلحة" value={professeur.service?.nom} />
+              <DetailField label="المستشفى" value={professeur.hopital?.nom} />
+              <DetailField label="الفئة المهنية" value={professeur.categorie_personnel?.nom} />
+              {professeur.titre?.nom && <DetailField label="اللقب" value={professeur.titre.nom} />}
+            </div>
+          </div>
+
+          {/* معلومات الاتصال */}
+          <div className="px-5 py-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-blue-500">معلومات الاتصال</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <DetailField label="الهاتف (GSM)" value={professeur.telephone} ltr />
+              <DetailField label="المدينة" value={professeur.ville} />
+              <DetailField label="مكان الازدياد" value={professeur.lieu_naissance} />
+              <div className="sm:col-span-3">
+                <DetailField label="العنوان" value={professeur.adresse} />
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -767,6 +803,22 @@ export default function ProfesseurDetailsPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="edit_ppr" className="text-sm font-medium text-slate-700">رقم التأجير <span className="text-red-500">*</span></Label>
                 <Input id="edit_ppr" value={formData.ppr} onChange={(e) => setFormData({ ...formData, ppr: e.target.value })} required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_adresse" className="text-sm font-medium text-slate-700">العنوان</Label>
+                <textarea id="edit_adresse" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} rows={2} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="العنوان الكامل (اختياري)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_sexe" className="text-sm font-medium text-slate-700">الجنس</Label>
+                <Input id="edit_sexe" value={formData.sexe} onChange={(e) => setFormData({ ...formData, sexe: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="ذكر / أنثى (اختياري)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_lieu_naissance" className="text-sm font-medium text-slate-700">مكان الازدياد</Label>
+                <Input id="edit_lieu_naissance" value={formData.lieu_naissance} onChange={(e) => setFormData({ ...formData, lieu_naissance: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="مكان الازدياد (اختياري)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_ville" className="text-sm font-medium text-slate-700">المدينة</Label>
+                <Input id="edit_ville" value={formData.ville} onChange={(e) => setFormData({ ...formData, ville: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="المدينة (اختياري)" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-700">اللقب</Label>

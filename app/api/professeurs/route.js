@@ -72,6 +72,11 @@ export async function GET(request) {
         nom: true,
         prenom: true,
         ppr: true,
+        cin: true,
+        adresse: true,
+        sexe: true,
+        lieu_naissance: true,
+        ville: true,
         telephone: true,
         _count: {
           select: { 
@@ -161,6 +166,10 @@ export async function POST(request) {
       prenom,
       ppr,
       cin,
+      adresse,
+      sexe,
+      lieu_naissance,
+      ville,
       specialite_id,
       categorie_personnel_id,
       titre_id,
@@ -280,6 +289,10 @@ export async function POST(request) {
       prenom,
       ppr: pprTrim,
       cin: cin != null && String(cin).trim() !== '' ? String(cin).trim() : null,
+      adresse: adresse != null && String(adresse).trim() !== '' ? String(adresse).trim() : null,
+      sexe: sexe != null && String(sexe).trim() !== '' ? String(sexe).trim() : null,
+      lieu_naissance: lieu_naissance != null && String(lieu_naissance).trim() !== '' ? String(lieu_naissance).trim() : null,
+      ville: ville != null && String(ville).trim() !== '' ? String(ville).trim() : null,
       telephone: telephone || null,
     }
 

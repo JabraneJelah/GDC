@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageShell } from '@/components/layout/PageShell'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { InfoGrid } from '@/components/dossiers-explicatifs/InfoGrid'
+import { Search, User } from 'lucide-react'
 
 const initialFormData = {
   type_faute_id: '',
@@ -181,29 +180,23 @@ export default function NouveauDossierExplicatifPage() {
 
   return (
     <PageShell>
-      <div className="space-y-6" dir="rtl">
+      <div className="w-full space-y-6" dir="rtl">
 
         {/* Page header */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1 text-right">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-                إنشاء ملف توضيحي جديد
-              </h1>
-              <p className="text-sm leading-relaxed text-slate-500">
-                اختيار الموظف ثم إدخال معلومات المخالفة
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full text-slate-600 sm:w-auto"
-              onClick={() => router.push('/dossiers-explicatifs')}
-            >
-              رجوع
-            </Button>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5 text-right">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-950">إنشاء ملف توضيحي جديد</h1>
+            <p className="text-sm text-slate-500">اختيار الموظف ثم إدخال معلومات المخالفة</p>
           </div>
-        </section>
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0 text-slate-600"
+            onClick={() => router.push('/dossiers-explicatifs')}
+          >
+            رجوع
+          </Button>
+        </div>
 
         {/* Feedback */}
         {successMessage ? (
@@ -218,240 +211,245 @@ export default function NouveauDossierExplicatifPage() {
           </div>
         ) : null}
 
-        {/* Two-column form */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* ── Section 1: Employee search ── */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2.5 border-b border-slate-100 px-5 py-4">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              1
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">اختيار الموظف</h2>
+              <p className="text-xs text-slate-500">ابحث بالاسم أو رقم التأجير ثم اختر السجل المناسب</p>
+            </div>
+          </div>
 
-          {/* Section 1 — Employee selection (right in RTL) */}
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                  1
-                </span>
-                <CardTitle className="text-right text-lg font-semibold text-slate-900">
-                  اختيار الموظف
-                </CardTitle>
-              </div>
-              <p className="pt-1 text-right text-sm text-slate-500">
-                ابحث عن الموظف بالاسم أو رقم التأجير ثم اختر السجل المناسب
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-5 pt-5">
-              {!selectedProfesseur ? (
-                <div className="space-y-3">
-                  <Label
-                    htmlFor="professeur-search"
-                    className="block text-right text-sm font-medium text-slate-700"
-                  >
-                    البحث عن الموظف
-                  </Label>
+          <div className="p-5">
+            {!selectedProfesseur ? (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                   <Input
                     id="professeur-search"
                     value={professeurSearch}
                     onChange={(event) => setProfesseurSearch(event.target.value)}
                     placeholder="البحث عن الموظف (الاسم، رقم التأجير...)"
-                    className="h-11 rounded-xl border-slate-300 bg-white text-right text-slate-800 placeholder:text-slate-400 focus-visible:ring-blue-500"
+                    className="h-11 rounded-xl border-slate-300 bg-white pr-10 text-right text-slate-800 placeholder:text-slate-400 focus-visible:ring-blue-500"
                     autoComplete="off"
                   />
-                  {formErrors.professeur_id ? (
-                    <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      {formErrors.professeur_id}
-                    </p>
-                  ) : null}
-
-                  <div className="max-h-72 space-y-2 overflow-auto">
-                    {filteredProfesseurs.length > 0 ? (
-                      filteredProfesseurs.map((professeur) => (
-                        <button
-                          key={professeur.id}
-                          type="button"
-                          onClick={() => handleSelectProfesseur(professeur)}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-right transition-all hover:border-blue-400 hover:bg-blue-50"
-                        >
-                          <span className="block font-semibold text-slate-900">
-                            {getProfesseurName(professeur) || '-'}
-                          </span>
-                          <span className="mt-0.5 block text-sm text-slate-500">
-                            {professeur.ppr || '-'} · {professeur.grade?.nom || '-'} · {professeur.service?.nom || '-'}
-                          </span>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-                        لا توجد نتائج
-                      </div>
-                    )}
-                  </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-blue-700">
-                      <span className="size-1.5 rounded-full bg-blue-500" />
-                      تم اختيار الموظف
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-slate-600"
-                      onClick={() => {
-                        setSelectedProfesseur(null)
-                        setProfesseurSearch('')
-                      }}
-                    >
-                      تغيير الموظف
-                    </Button>
-                  </div>
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                    <InfoGrid
-                      items={[
-                        { label: 'الاسم الكامل', value: getProfesseurName(selectedProfesseur) || '-' },
-                        { label: 'رقم التأجير', value: selectedProfesseur.ppr || '-' },
-                        { label: 'الدرجة', value: selectedProfesseur.grade?.nom || '-' },
-                        { label: 'المصلحة', value: selectedProfesseur.service?.nom || '-' },
-                        { label: 'المستشفى', value: selectedProfesseur.hopital?.nom },
-                        { label: 'التخصص', value: selectedProfesseur.specialite?.nom },
-                      ]}
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Section 2 — Violation info (left in RTL) */}
-          <Card className="rounded-2xl border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2.5">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
-                  2
-                </span>
-                <CardTitle className="text-right text-lg font-semibold text-slate-900">
-                  معلومات المخالفة
-                </CardTitle>
+                {formErrors.professeur_id ? (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {formErrors.professeur_id}
+                  </p>
+                ) : null}
+
+                <div className="max-h-80 space-y-1.5 overflow-auto">
+                  {filteredProfesseurs.length > 0 ? (
+                    filteredProfesseurs.map((professeur) => (
+                      <button
+                        key={professeur.id}
+                        type="button"
+                        onClick={() => handleSelectProfesseur(professeur)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-right transition-all hover:border-blue-400 hover:bg-blue-50"
+                      >
+                        <span className="block font-semibold text-slate-900">
+                          {getProfesseurName(professeur) || '-'}
+                        </span>
+                        <span className="mt-0.5 block text-sm text-slate-500">
+                          {professeur.ppr || '-'} · {professeur.grade?.nom || '-'} · {professeur.service?.nom || '-'}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
+                      لا توجد نتائج
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="pt-1 text-right text-sm text-slate-500">
-                أدخل المعطيات الخاصة بالملف بعد التأكد من الموظف المختار
-              </p>
-            </CardHeader>
-            <CardContent className="pt-5">
-              {!selectedProfesseur && (
-                <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-right text-sm text-amber-700">
-                  يرجى اختيار الموظف أولاً لإدخال معلومات المخالفة
-                </div>
-              )}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="type_faute_id"
-                    className="block text-right text-sm font-medium text-slate-700"
-                  >
-                    نوع المخالفة <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={formData.type_faute_id}
-                    onValueChange={(value) => handleFormChange('type_faute_id', value)}
-                    disabled={!selectedProfesseur}
-                  >
-                    <SelectTrigger
-                      id="type_faute_id"
-                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
-                    >
-                      <SelectValue placeholder="اختر نوع المخالفة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {typesFaute.map((typeFaute) => (
-                        <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
-                          {typeFaute.nom || typeFaute.libelle || typeFaute.code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.type_faute_id ? (
-                    <p className="text-sm text-red-600">{formErrors.type_faute_id}</p>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="date_faute"
-                      className="block text-right text-sm font-medium text-slate-700"
-                    >
-                      تاريخ المخالفة <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="date_faute"
-                      type="date"
-                      value={formData.date_faute}
-                      onChange={(event) => handleFormChange('date_faute', event.target.value)}
-                      disabled={!selectedProfesseur}
-                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
-                    />
-                    {formErrors.date_faute ? (
-                      <p className="text-sm text-red-600">{formErrors.date_faute}</p>
-                    ) : null}
+            ) : (
+              /* Compact selected state — stays inside Section 1 */
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                    <User className="size-4 text-blue-600" />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="heure_faute"
-                      className="block text-right text-sm font-medium text-slate-700"
-                    >
-                      وقت المخالفة
-                    </Label>
-                    <Input
-                      id="heure_faute"
-                      type="time"
-                      value={formData.heure_faute}
-                      onChange={(event) => handleFormChange('heure_faute', event.target.value)}
-                      disabled={!selectedProfesseur}
-                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
-                    />
+                  <div>
+                    <p className="font-semibold text-slate-900">{getProfesseurName(selectedProfesseur)}</p>
+                    <p className="text-sm text-slate-500">
+                      {selectedProfesseur.ppr || '-'} · {selectedProfesseur.grade?.nom || '-'}
+                    </p>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="details"
-                    className="block text-right text-sm font-medium text-slate-700"
-                  >
-                    تفاصيل إضافية
-                  </Label>
-                  <textarea
-                    id="details"
-                    value={formData.details}
-                    onChange={(event) => handleFormChange('details', event.target.value)}
-                    placeholder="ملاحظات أو تفاصيل إضافية حول المخالفة..."
-                    disabled={!selectedProfesseur}
-                    className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-right text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-                  />
-                </div>
-
-                <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push('/dossiers-explicatifs')}
-                    disabled={submitting}
-                    className="w-full text-slate-600 sm:w-auto"
-                  >
-                    إلغاء
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={submitting || !selectedProfesseur}
-                    className="w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 sm:w-auto"
-                  >
-                    {submitting ? 'جاري الحفظ...' : 'حفظ الملف'}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-slate-600"
+                  onClick={() => {
+                    setSelectedProfesseur(null)
+                    setProfesseurSearch('')
+                  }}
+                >
+                  تغيير
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* ── Section 2: Selected employee summary (only when selected) ── */}
+        {selectedProfesseur && (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/60 px-5 py-4" dir="rtl">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-600">الموظف المختار</p>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+              {[
+                { label: 'الاسم الكامل', value: getProfesseurName(selectedProfesseur) },
+                { label: 'رقم التأجير', value: selectedProfesseur.ppr || '-' },
+                { label: 'الدرجة', value: selectedProfesseur.grade?.nom || '-' },
+                { label: 'المصلحة', value: selectedProfesseur.service?.nom || '-' },
+              ].map((item) => (
+                <div key={item.label}>
+                  <dt className="text-xs text-slate-500">{item.label}</dt>
+                  <dd className="mt-0.5 text-sm font-semibold text-slate-900">{item.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* ── Section 3 + 4: Fault info + actions ── */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center gap-2.5 border-b border-slate-100 px-5 py-4">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              2
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">معلومات المخالفة</h2>
+              <p className="text-xs text-slate-500">أدخل المعطيات الخاصة بالمخالفة المسجّلة</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5 p-5">
+            {!selectedProfesseur && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-right text-sm text-amber-700">
+                يرجى اختيار الموظف أولاً لإدخال معلومات المخالفة
+              </div>
+            )}
+
+            {/* نوع المخالفة */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="type_faute_id"
+                className="block text-right text-sm font-medium text-slate-700"
+              >
+                نوع المخالفة <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.type_faute_id}
+                onValueChange={(value) => handleFormChange('type_faute_id', value)}
+                disabled={!selectedProfesseur}
+              >
+                <SelectTrigger
+                  id="type_faute_id"
+                  className="h-11 rounded-xl border-slate-300 bg-white text-right"
+                >
+                  <SelectValue placeholder="اختر نوع المخالفة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typesFaute.map((typeFaute) => (
+                    <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
+                      {typeFaute.nom || typeFaute.libelle || typeFaute.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formErrors.type_faute_id ? (
+                <p className="text-sm text-red-600">{formErrors.type_faute_id}</p>
+              ) : null}
+            </div>
+
+            {/* تاريخ + وقت */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label
+                  htmlFor="date_faute"
+                  className="block text-right text-sm font-medium text-slate-700"
+                >
+                  تاريخ المخالفة <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="date_faute"
+                  type="date"
+                  value={formData.date_faute}
+                  onChange={(event) => handleFormChange('date_faute', event.target.value)}
+                  disabled={!selectedProfesseur}
+                  className="h-11 rounded-xl border-slate-300 bg-white text-right"
+                />
+                {formErrors.date_faute ? (
+                  <p className="text-sm text-red-600">{formErrors.date_faute}</p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor="heure_faute"
+                  className="block text-right text-sm font-medium text-slate-700"
+                >
+                  وقت المخالفة
+                </Label>
+                <Input
+                  id="heure_faute"
+                  type="time"
+                  value={formData.heure_faute}
+                  onChange={(event) => handleFormChange('heure_faute', event.target.value)}
+                  disabled={!selectedProfesseur}
+                  className="h-11 rounded-xl border-slate-300 bg-white text-right"
+                />
+              </div>
+            </div>
+
+            {/* تفاصيل */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="details"
+                className="block text-right text-sm font-medium text-slate-700"
+              >
+                تفاصيل إضافية
+              </Label>
+              <textarea
+                id="details"
+                value={formData.details}
+                onChange={(event) => handleFormChange('details', event.target.value)}
+                placeholder="ملاحظات أو تفاصيل إضافية حول المخالفة..."
+                disabled={!selectedProfesseur}
+                className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-right text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dossiers-explicatifs')}
+                disabled={submitting}
+                className="w-full text-slate-600 sm:w-auto"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting || !selectedProfesseur}
+                className="w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 sm:w-auto"
+              >
+                {submitting ? 'جاري الحفظ...' : 'حفظ الملف'}
+              </Button>
+            </div>
+          </form>
+        </div>
+
       </div>
     </PageShell>
   )

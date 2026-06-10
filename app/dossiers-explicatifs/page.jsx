@@ -81,6 +81,9 @@ const typeFauteArabicLabels = {
   NON_RESPECT_ETHIQUE: 'عدم الالتزام بآداب المهنة',
   TENUE_PROFESSIONNELLE: 'الهندام المهني',
   ABANDON_POSTE: 'التخلي عن الوظيفة',
+  CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
+  AZS: 'عطلة مرضية غير مبررة',
+  CONGE_MALADIE_NON_JUSTIFIE: 'عطلة مرضية غير مبررة',
 }
 
 const typeFauteSeverity = {

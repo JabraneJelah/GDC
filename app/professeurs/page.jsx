@@ -68,6 +68,10 @@ export default function ProfesseursPage() {
     nom: '',
     prenom: '',
     ppr: '',
+    adresse: '',
+    sexe: '',
+    lieu_naissance: '',
+    ville: '',
     specialite_id: '',
     categorie_personnel_id: '',
     titre_id: '',
@@ -149,7 +153,7 @@ export default function ProfesseursPage() {
       })
       if (response.ok) {
         setOpen(false)
-        setFormData({ nom: '', prenom: '', ppr: '', specialite_id: '', categorie_personnel_id: '', titre_id: '', service_id: '', hopital_id: '', grade_id: '' })
+        setFormData({ nom: '', prenom: '', ppr: '', adresse: '', sexe: '', lieu_naissance: '', ville: '', specialite_id: '', categorie_personnel_id: '', titre_id: '', service_id: '', hopital_id: '', grade_id: '' })
         setCurrentPage(1)
         fetchProfesseurs()
       } else {
@@ -308,7 +312,7 @@ export default function ProfesseursPage() {
     } finally {
       setDeleting(false)
     }
-  }
+  } 
 
   const handleBulkAddAnnualSoldes = async (e) => {
     e.preventDefault()
@@ -782,6 +786,29 @@ export default function ProfesseursPage() {
                   className="h-10 rounded-xl border-slate-300 text-right text-sm"
                   placeholder="أدخل رقم التأجير..."
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_adresse" className="text-sm font-medium text-slate-700">العنوان</Label>
+                <textarea
+                  id="add_adresse"
+                  value={formData.adresse}
+                  onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="العنوان الكامل (اختياري)"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_sexe" className="text-sm font-medium text-slate-700">الجنس</Label>
+                <Input id="add_sexe" value={formData.sexe} onChange={(e) => setFormData({ ...formData, sexe: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="ذكر / أنثى (اختياري)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_lieu_naissance" className="text-sm font-medium text-slate-700">مكان الازدياد</Label>
+                <Input id="add_lieu_naissance" value={formData.lieu_naissance} onChange={(e) => setFormData({ ...formData, lieu_naissance: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="مكان الازدياد (اختياري)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="add_ville" className="text-sm font-medium text-slate-700">المدينة</Label>
+                <Input id="add_ville" value={formData.ville} onChange={(e) => setFormData({ ...formData, ville: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="المدينة (اختياري)" />
               </div>
               {/* Optional fields */}
               <div className="space-y-1.5">

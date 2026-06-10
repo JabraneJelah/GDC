@@ -101,6 +101,10 @@ export async function PUT(request, { params }) {
       nom,
       prenom,
       ppr,
+      adresse,
+      sexe,
+      lieu_naissance,
+      ville,
       specialite_id,
       categorie_personnel_id,
       titre_id,
@@ -149,6 +153,10 @@ export async function PUT(request, { params }) {
       prenom: prenom || existing.prenom,
       ...(newPpr !== undefined ? { ppr: newPpr } : {}),
       telephone: telephone !== undefined ? telephone : existing.telephone,
+      adresse: adresse !== undefined ? adresse : existing.adresse,
+      sexe: sexe !== undefined ? sexe : existing.sexe,
+      lieu_naissance: lieu_naissance !== undefined ? lieu_naissance : existing.lieu_naissance,
+      ville: ville !== undefined ? ville : existing.ville,
     }
 
     // Mettre à jour les IDs si fournis (ou les mettre à null si explicitement undefined)

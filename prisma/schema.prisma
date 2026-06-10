@@ -316,6 +316,9 @@ model Professeur {
   ppr                    String?  @unique // Numéro PPR unique (optionnel si inconnu à l’import)
   cin                    String?
   adresse                String?
+  sexe                   String?
+  lieu_naissance         String?
+  ville                  String?
   specialite_id          Int
   categorie_personnel_id Int
   titre_id               Int
