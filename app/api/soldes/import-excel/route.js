@@ -5,6 +5,14 @@ import { rejectIfLecteur } from '@/lib/roles'
 import { getExpireLe } from '@/lib/solde-expiration'
 import * as XLSX from 'xlsx'
 
+function normalizeSexe(raw) {
+  if (!raw) return null
+  const v = raw.toString().trim().toLowerCase()
+  if (['m', 'masculin', 'ذكر', 'homme', 'male'].includes(v)) return 'MASCULIN'
+  if (['f', 'féminin', 'feminin', 'أنثى', 'femme', 'female'].includes(v)) return 'FEMININ'
+  return null
+}
+
 /** Correspondance tolérante (insensible à la casse / accents) pour grade, spécialité, etc. */
 function matchReferentielName(input, candidates) {
   if (!input || !candidates?.length) return null
@@ -537,7 +545,7 @@ export async function POST(request) {
       const cin = cinValue != null && String(cinValue).trim() !== '' ? String(cinValue).trim() : null
       const telephone = telephoneValue != null && String(telephoneValue).trim() !== '' ? String(telephoneValue).trim() : null
       const adresse = adresseValue != null && String(adresseValue).trim() !== '' ? String(adresseValue).trim() : null
-      const sexe = sexeValue != null && String(sexeValue).trim() !== '' ? String(sexeValue).trim() : null
+      const sexe = normalizeSexe(sexeValue)
       const lieu_naissance = lieuNaissanceValue != null && String(lieuNaissanceValue).trim() !== '' ? String(lieuNaissanceValue).trim() : null
       const ville = villeValue != null && String(villeValue).trim() !== '' ? String(villeValue).trim() : null
 
@@ -609,8 +617,13 @@ export async function POST(request) {
       }
 
       if (sexeValue?.trim() && !cached?.sexe) {
-        fieldsToUpdate.sexe = sexeValue.trim()
-        updatedFields.push('sexe')
+        const normalizedSexe = normalizeSexe(sexeValue)
+        if (normalizedSexe) {
+          fieldsToUpdate.sexe = normalizedSexe
+          updatedFields.push('sexe')
+        } else {
+          results.warnings.push({ row: rowNumForLog, message: `Valeur de sexe non reconnue : « ${sexeValue.trim()} » (ignorée)` })
+        }
       }
 
       if (lieuNaissanceValue?.trim() && !cached?.lieu_naissance) {

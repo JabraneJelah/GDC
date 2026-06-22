@@ -462,7 +462,7 @@ export default function ProfesseurDetailsPage() {
               <DetailField label="الاسم الكامل" value={fullName} />
               <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
               <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} ltr />
-              <DetailField label="الجنس" value={professeur.sexe} />
+              <DetailField label="الجنس" value={professeur.sexe === 'MASCULIN' ? 'ذكر' : professeur.sexe === 'FEMININ' ? 'أنثى' : professeur.sexe} />
             </div>
           </div>
 
@@ -809,8 +809,14 @@ export default function ProfesseurDetailsPage() {
                 <textarea id="edit_adresse" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} rows={2} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="العنوان الكامل (اختياري)" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit_sexe" className="text-sm font-medium text-slate-700">الجنس</Label>
-                <Input id="edit_sexe" value={formData.sexe} onChange={(e) => setFormData({ ...formData, sexe: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="ذكر / أنثى (اختياري)" />
+                <Label className="text-sm font-medium text-slate-700">الجنس</Label>
+                <Select value={formData.sexe} onValueChange={(v) => setFormData({ ...formData, sexe: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر الجنس (اختياري)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MASCULIN">ذكر</SelectItem>
+                    <SelectItem value="FEMININ">أنثى</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit_lieu_naissance" className="text-sm font-medium text-slate-700">مكان الازدياد</Label>

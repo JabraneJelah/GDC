@@ -799,8 +799,14 @@ export default function ProfesseursPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="add_sexe" className="text-sm font-medium text-slate-700">الجنس</Label>
-                <Input id="add_sexe" value={formData.sexe} onChange={(e) => setFormData({ ...formData, sexe: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="ذكر / أنثى (اختياري)" />
+                <Label className="text-sm font-medium text-slate-700">الجنس</Label>
+                <Select value={formData.sexe} onValueChange={(v) => setFormData({ ...formData, sexe: v })}>
+                  <SelectTrigger className="h-10 rounded-xl border-slate-300 text-right text-sm"><SelectValue placeholder="اختر الجنس (اختياري)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MASCULIN">ذكر</SelectItem>
+                    <SelectItem value="FEMININ">أنثى</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="add_lieu_naissance" className="text-sm font-medium text-slate-700">مكان الازدياد</Label>
