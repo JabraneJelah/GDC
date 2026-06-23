@@ -60,8 +60,8 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
   }, [isCollapsed])
 
   const allMenuItems = [
-    { href: '/dashboard', label: 'لوحة القيادة', icon: LayoutDashboard },
-    { href: '/professeurs', label: 'الأساتذة', icon: GraduationCap },
+    { href: '/dashboard', label: 'الصفحة الرئيسية', icon: LayoutDashboard },
+    { href: '/professeurs', label: 'الموظفين', icon: GraduationCap },
     { href: '/utilisateurs', label: 'إدارة المستخدمين', icon: Users, adminOnly: true },
     { href: '/conges', label: 'إدارة العطل', icon: Calendar },
     { href: '/dossiers-explicatifs', label: 'الملفات التوضيحية', icon: FileText },

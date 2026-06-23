@@ -213,21 +213,36 @@ export async function POST(_request, { params }) {
       )
     }
 
-    const templates = await prisma.documentTemplate.findMany({
+    const templateSelect = {
+      id: true,
+      identifiant: true,
+      nom: true,
+      chemin_fichier: true,
+      usage: true,
+    }
+
+    // Prefer fault-specific templates; fall back to generic (type_faute_id = null) per usage.
+    let templates = await prisma.documentTemplate.findMany({
       where: {
         type_faute_id: dossier.type_faute_id,
         usage: { in: INITIAL_TEMPLATE_USAGES },
         actif: true,
       },
       orderBy: { cree_le: 'asc' },
-      select: {
-        id: true,
-        identifiant: true,
-        nom: true,
-        chemin_fichier: true,
-        usage: true,
-      },
+      select: templateSelect,
     })
+
+    if (templates.length === 0) {
+      templates = await prisma.documentTemplate.findMany({
+        where: {
+          type_faute_id: null,
+          usage: { in: INITIAL_TEMPLATE_USAGES },
+          actif: true,
+        },
+        orderBy: { cree_le: 'asc' },
+        select: templateSelect,
+      })
+    }
 
     if (templates.length === 0) {
       return NextResponse.json(

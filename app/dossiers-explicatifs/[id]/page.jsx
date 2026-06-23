@@ -874,19 +874,8 @@ export default function DossierExplicatifDetailPage() {
 
     if (dossier.statut === 'ARCHIVE') {
       return (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-right">
-            <Archive className="size-5 shrink-0 text-slate-500" />
-            <div>
-              <p className="font-semibold text-slate-700">هذا الملف مؤرشف</p>
-              {dossier.date_archivage ? (
-                <p className="mt-0.5 text-sm text-slate-500">تاريخ الأرشفة: {formatDate(dossier.date_archivage) || '-'}</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs font-medium text-slate-500">
-            🔒 وضع القراءة فقط — لا يمكن تنفيذ أي إجراء على هذا الملف
-          </div>
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs font-medium text-slate-500">
+           وضع القراءة فقط — تمت الأرشفة في {dossier.date_archivage ? formatDate(dossier.date_archivage) : '-'} — لا يمكن تنفيذ أي إجراء على هذا الملف
         </div>
       )
     }
@@ -1282,26 +1271,6 @@ export default function DossierExplicatifDetailPage() {
           return (
             <ContextPanel title="الأرشفة" statusColor="slate" statusLabel="في الانتظار">
               <p className="text-sm text-slate-500">الملف مغلق — يمكن أرشفته عند الجاهزية</p>
-            </ContextPanel>
-          )
-        }
-        if (dossier.statut === 'A_ARCHIVER') {
-          return (
-            <ContextPanel title="الأرشفة" statusColor="amber" statusLabel="في الانتظار">
-              <p className="text-sm text-slate-500">الملف في انتظار الأرشفة النهائية</p>
-            </ContextPanel>
-          )
-        }
-        if (dossier.statut === 'ARCHIVE') {
-          return (
-            <ContextPanel title="الأرشفة" statusColor="green" statusLabel="مؤرشف">
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                <Archive className="size-3.5 shrink-0 text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-500">تاريخ الأرشفة</p>
-                  <p className="text-sm font-semibold text-slate-700">{formatDate(dossier.date_archivage) || '-'}</p>
-                </div>
-              </div>
             </ContextPanel>
           )
         }

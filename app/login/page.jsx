@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Building2,
-  CalendarRange,
   Eye,
   EyeOff,
   Lock,
@@ -55,81 +54,53 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col font-sans md:flex-row">
-      {/* Branded panel */}
-      <aside className="relative flex min-h-[200px] shrink-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-slate-900 via-[#0c2847] to-slate-950 px-8 py-8 text-white md:min-h-screen md:w-[44%] lg:w-[40%] xl:max-w-xl xl:w-[38%]">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12]"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, rgba(255,255,255,0.4) 1px, transparent 1px),
-              linear-gradient(to bottom, rgba(255,255,255,0.4) 1px, transparent 1px)
-            `,
-            backgroundSize: '32px 32px',
-          }}
-        />
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full border border-white/[0.08]" />
-        <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full border border-white/[0.06]" />
+    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-4 py-8 font-sans" dir="rtl">
+      <div className="w-full max-w-[420px]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
 
-        <div className="relative z-10 flex flex-1 flex-col justify-center md:justify-start md:pt-8 lg:pt-14">
-
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-white sm:text-3xl lg:text-[1.75rem] xl:text-3xl">
-          Plateforme de gestion des congés
-          </h1>
-
-          <div className="mt-8 hidden items-center gap-3 text-slate-400 md:flex">
-
-
-          </div>
-        </div>
-
-        <p className="relative z-10 mt-6 text-xs text-slate-500 md:mt-0">
-          © 2026 — CHU
-        </p>
-      </aside>
-
-      {/* Form panel */}
-      <main className="flex flex-1 flex-col items-center justify-center bg-white px-5 py-10 sm:px-8 md:px-10 lg:px-14">
-        <div className="w-full max-w-[420px] rounded-2xl border border-slate-200/90 bg-white p-8 shadow-lg shadow-slate-200/40 sm:p-9">
-          <div className="mb-8 space-y-2">
-            <h2 className="text-xl font-semibold tracking-tight text-slate-800">
-              Connexion
-            </h2>
-            <p className="text-sm leading-relaxed text-slate-500">
-              Saisissez vos identifiants RH pour accéder à l&apos;application.
-            </p>
+          {/* Logo placeholder — replace src with actual logo path when available */}
+          <div className="mb-7 flex flex-col items-center gap-3">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+              <Building2 className="size-8 text-slate-400" />
+            </div>
+            <div className="text-center">
+              <h1 className="text-lg font-bold text-slate-900">نظام إدارة الموارد البشرية</h1>
+              <p className="mt-0.5 text-sm text-slate-500">سجّل دخولك للمتابعة</p>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium text-slate-700">
-                Nom d&apos;utilisateur
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username */}
+            <div className="space-y-1.5">
+              <Label htmlFor="username" className="block text-sm font-semibold text-slate-700">
+                اسم المستخدم
               </Label>
               <div className="relative">
                 <User
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                   aria-hidden
                 />
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Identifiant"
+                  placeholder="أدخل اسم المستخدم"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   autoComplete="username"
-                  className="h-11 border-slate-200 bg-slate-50/50 pl-10 transition-colors focus-visible:bg-white"
+                  className="h-11 border-slate-300 bg-slate-50/50 pr-10 text-right text-slate-900 placeholder:text-slate-400 transition-colors focus-visible:border-blue-500 focus-visible:bg-white focus-visible:ring-blue-500/30"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mot_de_passe" className="text-sm font-medium text-slate-700">
-                Mot de passe
+            {/* Password */}
+            <div className="space-y-1.5">
+              <Label htmlFor="mot_de_passe" className="block text-sm font-semibold text-slate-700">
+                كلمة المرور
               </Label>
               <div className="relative">
                 <Lock
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                   aria-hidden
                 />
                 <Input
@@ -140,13 +111,13 @@ export default function LoginPage() {
                   onChange={(e) => setMotDePasse(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="h-11 border-slate-200 bg-slate-50/50 pl-10 pr-11 transition-colors focus-visible:bg-white"
+                  className="h-11 border-slate-300 bg-slate-50/50 pr-10 pl-11 text-right text-slate-900 placeholder:text-slate-400 transition-colors focus-visible:border-blue-500 focus-visible:bg-white focus-visible:ring-blue-500/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" aria-hidden />
@@ -157,29 +128,31 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Error */}
             {error && (
               <div
                 role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-center text-sm text-red-800"
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-right text-sm text-red-700"
               >
                 {error}
               </div>
             )}
 
+            {/* Submit */}
             <Button
               type="submit"
               disabled={loading}
-              className="h-11 w-full bg-[#3B82F6] text-[15px] font-medium text-white shadow-sm transition-colors duration-200 hover:bg-[#2563EB] focus-visible:ring-blue-500/40 disabled:opacity-70"
+              className="mt-1 h-11 w-full bg-blue-600 text-[15px] font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:ring-blue-500/40 disabled:opacity-70"
             >
-              {loading ? 'Connexion en cours…' : 'Se connecter'}
+              {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
             </Button>
           </form>
 
-          <p className="mt-8 border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
-            © 2026 — CHU · Accès réservé au personnel autorisé
+          <p className="mt-7 border-t border-slate-100 pt-5 text-center text-xs text-slate-400">
+            © 2026 — CHU · الوصول مقتصر على المستخدمين المصرح لهم
           </p>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

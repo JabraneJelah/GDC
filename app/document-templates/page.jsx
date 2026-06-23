@@ -86,7 +86,7 @@ function getUsageLabel(usage) {
 }
 
 function getTypeFauteLabel(typeFaute) {
-  if (!typeFaute) return '—'
+  if (!typeFaute) return 'عام (كل الأنواع)'
   return typeFauteArabicLabels[typeFaute.code] || typeFaute.nom || '—'
 }
 
@@ -229,7 +229,7 @@ export default function DocumentTemplatesPage() {
     const errors = {}
     if (!formData.nom.trim()) errors.nom = 'المرجو إدخال اسم النموذج'
     if (!formData.identifiant.trim()) errors.identifiant = 'المرجو إدخال المعرف'
-    if (!formData.type_faute_id) errors.type_faute_id = 'المرجو اختيار نوع المخالفة'
+    if (!formData.type_faute_id) errors.type_faute_id = 'المرجو اختيار نوع المخالفة أو اختيار "عام"'
     if (!formData.usage) errors.usage = 'المرجو اختيار نوع الاستعمال'
     if (!formData.file) errors.file = 'المرجو اختيار ملف DOCX'
     if (formData.file && !formData.file.name.toLowerCase().endsWith('.docx')) {
@@ -243,7 +243,7 @@ export default function DocumentTemplatesPage() {
     const errors = {}
     if (!editFormData.nom.trim()) errors.nom = 'المرجو إدخال اسم النموذج'
     if (!editFormData.identifiant.trim()) errors.identifiant = 'المرجو إدخال المعرف'
-    if (!editFormData.type_faute_id) errors.type_faute_id = 'المرجو اختيار نوع المخالفة'
+    if (!editFormData.type_faute_id) errors.type_faute_id = 'المرجو اختيار نوع المخالفة أو اختيار "عام"'
     if (!editFormData.usage) errors.usage = 'المرجو اختيار نوع الاستعمال'
     setEditFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -262,10 +262,11 @@ export default function DocumentTemplatesPage() {
 
   const openEditDialog = (template) => {
     setEditingTemplate(template)
+    const rawId = template.type_faute_id ?? template.type_faute?.id
     setEditFormData({
       nom: template.nom || '',
       identifiant: template.identifiant || '',
-      type_faute_id: template.type_faute_id?.toString() || template.type_faute?.id?.toString() || '',
+      type_faute_id: rawId == null ? '__GENERIC__' : rawId.toString(),
       usage: template.usage || '',
       description: template.description || '',
       actif: template.actif !== false,
@@ -286,7 +287,8 @@ export default function DocumentTemplatesPage() {
       const payload = new FormData()
       payload.append('nom', formData.nom.trim())
       payload.append('identifiant', formData.identifiant.trim())
-      payload.append('type_faute_id', formData.type_faute_id)
+      // '__GENERIC__' means no specific fault type (generic template) → send empty string
+      payload.append('type_faute_id', formData.type_faute_id === '__GENERIC__' ? '' : formData.type_faute_id)
       payload.append('usage', formData.usage)
       payload.append('file', formData.file)
       if (formData.description.trim()) {
@@ -327,7 +329,8 @@ export default function DocumentTemplatesPage() {
         body: JSON.stringify({
           nom: editFormData.nom.trim(),
           identifiant: editFormData.identifiant.trim(),
-          type_faute_id: editFormData.type_faute_id,
+          // '__GENERIC__' means generic template (no specific fault type) → null
+          type_faute_id: editFormData.type_faute_id === '__GENERIC__' ? null : editFormData.type_faute_id,
           usage: editFormData.usage,
           description: editFormData.description.trim(),
           actif: editFormData.actif,
@@ -773,6 +776,7 @@ export default function DocumentTemplatesPage() {
                       <SelectValue placeholder="اختر نوع المخالفة" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__GENERIC__">عام – لكل أنواع المخالفات</SelectItem>
                       {typesFaute.map((typeFaute) => (
                         <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
                           {getTypeFauteLabel(typeFaute)}
@@ -923,6 +927,7 @@ export default function DocumentTemplatesPage() {
                       <SelectValue placeholder="اختر نوع المخالفة" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__GENERIC__">عام – لكل أنواع المخالفات</SelectItem>
                       {typesFaute.map((typeFaute) => (
                         <SelectItem key={typeFaute.id} value={typeFaute.id.toString()}>
                           {getTypeFauteLabel(typeFaute)}

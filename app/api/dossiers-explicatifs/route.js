@@ -123,6 +123,8 @@ export async function POST(request) {
           id: true,
           nom: true,
           prenom: true,
+          nom_ar: true,
+          prenom_ar: true,
           ppr: true,
           titre: {
             select: {
@@ -177,7 +179,9 @@ export async function POST(request) {
     }
 
     const reference = await generateDossierReference()
-    const nomComplet = `${professeur.prenom || ''} ${professeur.nom || ''}`.trim()
+    const nomComplet = (professeur.nom_ar && professeur.prenom_ar)
+      ? `${professeur.nom_ar} ${professeur.prenom_ar}`.trim()
+      : `${professeur.prenom || ''} ${professeur.nom || ''}`.trim()
     const profilSnapshot =
       professeur.grade?.nom ||
       professeur.titre?.nom ||

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\" -Force | Select-Object Name, @{N='Type'; E={if \\($_.PSIsContainer\\) {'Dir'} else {'File'}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\STI\\\\Desktop\\\\GDC-main\\\\app\\\\api\" -Recurse -Filter \"route.js\" -o Name)",
+      "Bash(sed -i \"s/\\\\xe2\\\\x80\\\\x98/'/g; s/\\\\xe2\\\\x80\\\\x99/'/g\" \"c:/Users/STI/Desktop/GDC-main/app/api/document-template/[id]/route.js\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\STI\\Desktop\\GDC-main\\app\\api\\document-template\\[id]"
+    ]
+  }
+}

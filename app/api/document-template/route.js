@@ -65,9 +65,17 @@ export async function POST(request) {
         ? (typeof version === 'number' ? version : parseInt(version, 10))
         : 1
 
-    if (!identifiant || !nom || !format_source || !chemin_fichier || type_faute_id == null || isNaN(type_faute_id)) {
+    if (!identifiant || !nom || !format_source || !chemin_fichier) {
       return NextResponse.json(
-        { error: "L'identifiant, le nom, le format, le chemin du fichier et le type de faute sont obligatoires" },
+        { error: "L'identifiant, le nom, le format et le chemin du fichier sont obligatoires" },
+        { status: 400 }
+      )
+    }
+
+    // type_faute_id is optional — null means generic (applies to all fault types)
+    if (type_faute_id !== null && isNaN(type_faute_id)) {
+      return NextResponse.json(
+        { error: 'Type de faute invalide' },
         { status: 400 }
       )
     }
@@ -86,15 +94,17 @@ export async function POST(request) {
       )
     }
 
-    const typeFaute = await prisma.typeFaute.findUnique({
-      where: { id: type_faute_id },
-    })
+    if (type_faute_id !== null) {
+      const typeFaute = await prisma.typeFaute.findUnique({
+        where: { id: type_faute_id },
+      })
 
-    if (!typeFaute) {
-      return NextResponse.json(
-        { error: 'Type de faute non trouvé' },
-        { status: 404 }
-      )
+      if (!typeFaute) {
+        return NextResponse.json(
+          { error: 'Type de faute non trouvé' },
+          { status: 404 }
+        )
+      }
     }
 
     if (cree_par_rh_id) {

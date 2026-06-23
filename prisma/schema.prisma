@@ -121,8 +121,8 @@ model DocumentTemplate {
   cree_le        DateTime               @default(now())
 
   // Relations
-  type_faute_id Int
-  type_faute    TypeFaute @relation(fields: [type_faute_id], references: [id], onDelete: Restrict)
+  type_faute_id Int?
+  type_faute    TypeFaute? @relation(fields: [type_faute_id], references: [id], onDelete: SetNull)
 
   cree_par_rh_id String?
   cree_par_rh    UtilisateurRH? @relation("DocumentTemplateCreeParRH", fields: [cree_par_rh_id], references: [id], onDelete: SetNull)
@@ -326,6 +326,8 @@ model Professeur {
   hopital_id             Int?
   grade_id               Int?
   telephone              String?
+  nom_ar                 String?
+  prenom_ar              String?
   cree_le                DateTime @default(now())
 
   // Relations

@@ -119,14 +119,14 @@ export async function POST(request) {
         const raw = cell?.toString().trim() ?? ''
         return n === 'nom' ||
           (n.includes('nom') && !n.includes('prenom') && !n.includes('prénom')) ||
-          raw === 'النسب' || raw.includes('النسب')
+          raw === 'النسب'
       })
 
       const hasPrenom = row.some(cell => {
         const n = normalizeHeader(cell)
         const raw = cell?.toString().trim() ?? ''
         return n === 'prenom' || n === 'prénom' || n.includes('prenom') || n.includes('prénom') ||
-          n.includes('firstname') || raw === 'الاسم' || raw.includes('الاسم')
+          n.includes('firstname') || raw === 'الاسم'
       })
 
       if (hasNom && hasPrenom) {
@@ -254,19 +254,20 @@ export async function POST(request) {
       normalized: normalizeHeader(h),
     }))
 
-    const nomIndex = headerRow.findIndex((h) => {
+    // Arabic exact-only headers — detected first so the primary nom/prenom detectors don't claim them
+    const nomArRaw = headerRow.findIndex((h) => h?.toString().trim() === 'النسب')
+    const prenomArRaw = headerRow.findIndex((h) => h?.toString().trim() === 'الاسم')
+
+    const nomIndex = headerRow.findIndex((h, idx) => {
       const n = normalizeHeader(h)
-      const raw = h?.toString().trim() ?? ''
-      return n === 'nom' ||
-        (n.includes('nom') && !n.includes('prenom') && !n.includes('prénom')) ||
-        raw === 'النسب' || raw.includes('النسب')
+      return (n === 'nom' || (n.includes('nom') && !n.includes('prenom') && !n.includes('prénom'))) &&
+        idx !== nomArRaw && idx !== prenomArRaw
     })
 
-    const prenomIndex = headerRow.findIndex((h) => {
+    const prenomIndex = headerRow.findIndex((h, idx) => {
       const n = normalizeHeader(h)
-      const raw = h?.toString().trim() ?? ''
-      return n === 'prenom' || n === 'prénom' || n.includes('prenom') || n.includes('prénom') ||
-        n.includes('firstname') || raw === 'الاسم' || raw.includes('الاسم')
+      return (n === 'prenom' || n === 'prénom' || n.includes('prenom') || n.includes('prénom') || n.includes('firstname')) &&
+        idx !== nomArRaw && idx !== prenomArRaw
     })
 
     const pprIndex = headerRow.findIndex((h) =>
@@ -332,6 +333,11 @@ export async function POST(request) {
       const raw = h?.toString().trim() ?? ''
       return n === 'ville' || n.includes('ville') || raw === 'المدينة' || raw.includes('المدينة')
     })
+
+    // Arabic name columns: use the exact-match indices detected before nomIndex/prenomIndex ran.
+    // Only valid as dedicated Arabic columns when they are separate from the primary French columns.
+    const nomArIndex = (nomArRaw !== -1 && nomArRaw !== nomIndex) ? nomArRaw : -1
+    const prenomArIndex = (prenomArRaw !== -1 && prenomArRaw !== prenomIndex) ? prenomArRaw : -1
 
     if (nomIndex === -1 || prenomIndex === -1) {
       return NextResponse.json(
@@ -442,6 +448,8 @@ export async function POST(request) {
         id: true,
         nom: true,
         prenom: true,
+        nom_ar: true,
+        prenom_ar: true,
         ppr: true,
         cin: true,
         telephone: true,
@@ -495,7 +503,7 @@ export async function POST(request) {
     }
 
     // ── createProfesseur ──────────────────────────────────────────────────────
-    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, rowNumForLog) => {
+    const createProfesseur = async (nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, nomArValue, prenomArValue, rowNumForLog) => {
       const ppr = pprValue != null && String(pprValue).trim() !== '' ? String(pprValue).trim() : null
 
       if (ppr && professeurs.some((p) => p.ppr === ppr)) {
@@ -555,6 +563,9 @@ export async function POST(request) {
         )
       }
 
+      const nom_ar = nomArValue != null && String(nomArValue).trim() !== '' ? String(nomArValue).trim() : null
+      const prenom_ar = prenomArValue != null && String(prenomArValue).trim() !== '' ? String(prenomArValue).trim() : null
+
       const data = {
         nom: nom.trim(),
         prenom: prenom.trim(),
@@ -562,6 +573,8 @@ export async function POST(request) {
         specialite_id: specialiteId,
         categorie_personnel_id: defaultCategorieId,
         titre_id: defaultTitreId,
+        ...(nom_ar !== null && { nom_ar }),
+        ...(prenom_ar !== null && { prenom_ar }),
         ...(gradeId !== null && { grade_id: gradeId }),
         ...(serviceId !== null && { service_id: serviceId }),
         ...(hopitalId !== null && { hopital_id: hopitalId }),
@@ -579,6 +592,8 @@ export async function POST(request) {
         id: newProfesseur.id,
         nom: newProfesseur.nom,
         prenom: newProfesseur.prenom,
+        nom_ar: newProfesseur.nom_ar ?? null,
+        prenom_ar: newProfesseur.prenom_ar ?? null,
         ppr: newProfesseur.ppr ?? null,
         cin: newProfesseur.cin ?? null,
         telephone: newProfesseur.telephone ?? null,
@@ -596,10 +611,20 @@ export async function POST(request) {
     }
 
     // ── updateExistingProfesseur: fill only empty fields ──────────────────────
-    const updateExistingProfesseur = async (professeur, { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue }, rowNumForLog) => {
+    const updateExistingProfesseur = async (professeur, { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, nomArValue, prenomArValue }, rowNumForLog) => {
       const cached = professeurs.find((p) => p.id === professeur.id)
       const fieldsToUpdate = {}
       const updatedFields = []
+
+      if (nomArValue?.trim() && !cached?.nom_ar) {
+        fieldsToUpdate.nom_ar = nomArValue.trim()
+        updatedFields.push('نسب (عربي)')
+      }
+
+      if (prenomArValue?.trim() && !cached?.prenom_ar) {
+        fieldsToUpdate.prenom_ar = prenomArValue.trim()
+        updatedFields.push('اسم (عربي)')
+      }
 
       if (cinValue?.trim() && !cached?.cin) {
         fieldsToUpdate.cin = cinValue.trim()
@@ -693,6 +718,8 @@ export async function POST(request) {
       const sexeValue = sexeIndex !== -1 ? row[sexeIndex]?.toString().trim() : null
       const lieuNaissanceValue = lieuNaissanceIndex !== -1 ? row[lieuNaissanceIndex]?.toString().trim() : null
       const villeValue = villeIndex !== -1 ? row[villeIndex]?.toString().trim() : null
+      const nomArValue = nomArIndex !== -1 ? row[nomArIndex]?.toString().trim() : null
+      const prenomArValue = prenomArIndex !== -1 ? row[prenomArIndex]?.toString().trim() : null
 
       if (!nom || !prenom) {
         results.skipped.push({ row: i + 1, reason: 'Nom ou prénom manquant', nom, prenom })
@@ -717,7 +744,8 @@ export async function POST(request) {
         try {
           professeur = await createProfesseur(
             nom, prenom, pprValue, gradeValue, specialiteValue, serviceValue,
-            hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, i + 1
+            hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue,
+            nomArValue, prenomArValue, i + 1
           )
           results.success.push({
             row: i + 1,
@@ -746,7 +774,7 @@ export async function POST(request) {
         try {
           const updatedFields = await updateExistingProfesseur(
             professeur,
-            { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue },
+            { gradeValue, specialiteValue, serviceValue, hopitalValue, cinValue, telephoneValue, adresseValue, sexeValue, lieuNaissanceValue, villeValue, nomArValue, prenomArValue },
             i + 1
           )
           if (updatedFields && updatedFields.length > 0) {

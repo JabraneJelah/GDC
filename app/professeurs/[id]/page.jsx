@@ -81,8 +81,8 @@ function DetailField({ label, value, ltr }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-0.5 text-sm font-medium text-slate-800 break-words" dir={ltr ? 'ltr' : undefined}>
-        {value || '—'}
+      <p className="mt-0.5 text-sm font-medium text-slate-800 break-words">
+        {ltr ? <span dir="ltr">{value || '—'}</span> : (value || '—')}
       </p>
     </div>
   )
@@ -122,6 +122,8 @@ export default function ProfesseurDetailsPage() {
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
+    nom_ar: '',
+    prenom_ar: '',
     ppr: '',
     adresse: '',
     sexe: '',
@@ -190,6 +192,8 @@ export default function ProfesseurDetailsPage() {
         setFormData({
           nom: data.nom || '',
           prenom: data.prenom || '',
+          nom_ar: data.nom_ar || '',
+          prenom_ar: data.prenom_ar || '',
           ppr: data.ppr || '',
           adresse: data.adresse || '',
           sexe: data.sexe || '',
@@ -402,6 +406,7 @@ export default function ProfesseurDetailsPage() {
   const showHistoriquePagination = congesList.length > HISTORIQUE_CONGES_PAGE_SIZE
 
   const fullName = `${professeur.titre?.nom ? `${professeur.titre.nom} ` : ''}${professeur.prenom} ${professeur.nom}`.trim()
+  const nameOnly = `${professeur.prenom} ${professeur.nom}`.trim()
 
   const totalSoldeDisponible = soldes
     .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
@@ -459,7 +464,9 @@ export default function ProfesseurDetailsPage() {
           <div className="px-5 py-4">
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-blue-500">الهوية</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-              <DetailField label="الاسم الكامل" value={fullName} />
+              <DetailField label="الاسم الكامل" value={nameOnly} />
+              <DetailField label="النسب" value={professeur.nom_ar} />
+              <DetailField label="الاسم" value={professeur.prenom_ar} />
               <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
               <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} ltr />
               <DetailField label="الجنس" value={professeur.sexe === 'MASCULIN' ? 'ذكر' : professeur.sexe === 'FEMININ' ? 'أنثى' : professeur.sexe} />
@@ -799,6 +806,14 @@ export default function ProfesseurDetailsPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="edit_prenom" className="text-sm font-medium text-slate-700">الاسم <span className="text-red-500">*</span></Label>
                 <Input id="edit_prenom" value={formData.prenom} onChange={(e) => setFormData({ ...formData, prenom: e.target.value })} required className="h-10 rounded-xl border-slate-300 text-right text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_nom_ar" className="text-sm font-medium text-slate-700">النسب (بالعربية)</Label>
+                <Input id="edit_nom_ar" value={formData.nom_ar} onChange={(e) => setFormData({ ...formData, nom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit_prenom_ar" className="text-sm font-medium text-slate-700">الاسم (بالعربية)</Label>
+                <Input id="edit_prenom_ar" value={formData.prenom_ar} onChange={(e) => setFormData({ ...formData, prenom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit_ppr" className="text-sm font-medium text-slate-700">رقم التأجير <span className="text-red-500">*</span></Label>

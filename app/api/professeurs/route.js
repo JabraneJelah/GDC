@@ -71,6 +71,8 @@ export async function GET(request) {
         id: true,
         nom: true,
         prenom: true,
+        nom_ar: true,
+        prenom_ar: true,
         ppr: true,
         cin: true,
         adresse: true,
@@ -164,6 +166,8 @@ export async function POST(request) {
     const {
       nom,
       prenom,
+      nom_ar,
+      prenom_ar,
       ppr,
       cin,
       adresse,
@@ -287,6 +291,8 @@ export async function POST(request) {
     const data = {
       nom,
       prenom,
+      nom_ar: nom_ar != null && String(nom_ar).trim() !== '' ? String(nom_ar).trim() : null,
+      prenom_ar: prenom_ar != null && String(prenom_ar).trim() !== '' ? String(prenom_ar).trim() : null,
       ppr: pprTrim,
       cin: cin != null && String(cin).trim() !== '' ? String(cin).trim() : null,
       adresse: adresse != null && String(adresse).trim() !== '' ? String(adresse).trim() : null,

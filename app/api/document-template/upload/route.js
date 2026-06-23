@@ -62,11 +62,12 @@ export async function POST(request) {
     const typeFauteIdRaw = getStringValue(formData, 'type_faute_id')
     const type_faute_id = typeFauteIdRaw ? parseInt(typeFauteIdRaw, 10) : null
 
-    if (!nom || !identifiant || !typeFauteIdRaw || !usage || !isUploadedFile(file)) {
+    if (!nom || !identifiant || !usage || !isUploadedFile(file)) {
       return jsonError('المرجو ملء الحقول المطلوبة وإرفاق ملف DOCX', 400)
     }
 
-    if (type_faute_id == null || isNaN(type_faute_id)) {
+    // type_faute_id is optional — empty string means generic (applies to all fault types)
+    if (typeFauteIdRaw && (type_faute_id === null || isNaN(type_faute_id))) {
       return jsonError('نوع المخالفة غير صالح', 400)
     }
 
@@ -79,9 +80,9 @@ export async function POST(request) {
     }
 
     const [typeFaute, existingIdentifiant, existingUsagePair] = await Promise.all([
-      prisma.typeFaute.findUnique({
-        where: { id: type_faute_id },
-      }),
+      type_faute_id !== null
+        ? prisma.typeFaute.findUnique({ where: { id: type_faute_id } })
+        : Promise.resolve(null),
       prisma.documentTemplate.findFirst({
         where: {
           identifiant: { equals: identifiant, mode: 'insensitive' },
@@ -93,7 +94,7 @@ export async function POST(request) {
       }),
     ])
 
-    if (!typeFaute) {
+    if (type_faute_id !== null && !typeFaute) {
       return jsonError('نوع المخالفة غير موجود', 404)
     }
 

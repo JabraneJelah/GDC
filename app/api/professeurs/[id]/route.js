@@ -100,6 +100,8 @@ export async function PUT(request, { params }) {
     const {
       nom,
       prenom,
+      nom_ar,
+      prenom_ar,
       ppr,
       adresse,
       sexe,
@@ -151,6 +153,8 @@ export async function PUT(request, { params }) {
     const updateData = {
       nom: nom || existing.nom,
       prenom: prenom || existing.prenom,
+      nom_ar: nom_ar !== undefined ? (nom_ar != null && String(nom_ar).trim() !== '' ? String(nom_ar).trim() : null) : existing.nom_ar,
+      prenom_ar: prenom_ar !== undefined ? (prenom_ar != null && String(prenom_ar).trim() !== '' ? String(prenom_ar).trim() : null) : existing.prenom_ar,
       ...(newPpr !== undefined ? { ppr: newPpr } : {}),
       telephone: telephone !== undefined ? telephone : existing.telephone,
       adresse: adresse !== undefined ? adresse : existing.adresse,

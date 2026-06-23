@@ -52,11 +52,21 @@ export async function PUT(request, { params }) {
 
     const nextNom = typeof nom === 'string' ? nom.trim() : ''
     const nextIdentifiant = typeof identifiant === 'string' ? identifiant.trim() : ''
-    const nextTypeFauteId = parseTypeFauteId(typeFauteIdRaw)
+    // null means generic (applies to all fault types); undefined/missing falls back
+    const nextTypeFauteId = 'type_faute_id' in body
+      ? (typeFauteIdRaw === null ? null : parseTypeFauteId(typeFauteIdRaw))
+      : existing.type_faute_id
 
-    if (!nextNom || !nextIdentifiant || nextTypeFauteId == null || Number.isNaN(nextTypeFauteId) || !usage) {
+    if (!nextNom || !nextIdentifiant || !usage) {
       return NextResponse.json(
-        { error: 'Le nom, l’identifiant, le type de faute et l’usage sont obligatoires' },
+        { error: "Le nom, l'identifiant et l'usage sont obligatoires" },
+        { status: 400 }
+      )
+    }
+
+    if (nextTypeFauteId !== null && Number.isNaN(nextTypeFauteId)) {
+      return NextResponse.json(
+        { error: 'Type de faute invalide' },
         { status: 400 }
       )
     }
@@ -68,15 +78,17 @@ export async function PUT(request, { params }) {
       )
     }
 
-    const typeFaute = await prisma.typeFaute.findUnique({
-      where: { id: nextTypeFauteId },
-    })
+    if (nextTypeFauteId !== null) {
+      const typeFaute = await prisma.typeFaute.findUnique({
+        where: { id: nextTypeFauteId },
+      })
 
-    if (!typeFaute) {
-      return NextResponse.json(
-        { error: 'Type de faute non trouvé' },
-        { status: 404 }
-      )
+      if (!typeFaute) {
+        return NextResponse.json(
+          { error: 'Type de faute non trouvé' },
+          { status: 404 }
+        )
+      }
     }
 
     // When reactivating (actif: false → true), check for active conflicts before
@@ -123,7 +135,7 @@ export async function PUT(request, { params }) {
     }
 
     const usagePairChanged =
-      Number(nextTypeFauteId) !== Number(existing.type_faute_id) || usage !== existing.usage
+      nextTypeFauteId !== existing.type_faute_id || usage !== existing.usage
 
     if (usagePairChanged) {
       const usagePairExists = await prisma.documentTemplate.findFirst({
