@@ -935,7 +935,6 @@ export default function CongesPage() {
               <CalendarCheck className="size-5 text-blue-600" />
               <h1 className="text-2xl font-semibold text-slate-950">إدارة الرخص</h1>
             </div>
-            <p className="text-sm text-slate-600">تدبير وتتبع رخص الموظفين وحساب أيام الغياب</p>
             <div className="flex items-center gap-4 pt-1 text-sm">
               <span className="flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-blue-500" />

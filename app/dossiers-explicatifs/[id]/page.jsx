@@ -179,7 +179,7 @@ function RegistrationSummary({ dossier, extraFieldsConfig }) {
   const baseItems = [
     { label: 'المرجع', value: dossier.reference, dir: 'ltr' },
     { label: 'الاسم الكامل', value: dossier.nom_complet },
-    { label: 'رقم التأجير', value: dossier.matricule },
+    { label: 'رقم التأجير', value: dossier.matricule, dir: 'ltr' },
     { label: 'المصلحة', value: dossier.professeur?.service?.nom || dossier.service },
     { label: 'الدرجة', value: dossier.professeur?.grade?.nom || dossier.profil },
     { label: 'نوع المخالفة', value: getTypeFauteLabel(dossier.type_faute) },
@@ -198,11 +198,10 @@ function RegistrationSummary({ dossier, extraFieldsConfig }) {
         {items.map((item) => (
           <div key={item.label} className="border-b border-slate-100 py-3 text-right last:border-b-0">
             <dt className="text-sm font-medium text-slate-700">{item.label}</dt>
-            <dd
-              dir={item.dir}
-              className={`mt-1 truncate text-sm text-slate-900 ${item.dir === 'ltr' ? 'text-right font-medium' : ''}`}
-            >
-              {item.value || '-'}
+            <dd className="mt-1 truncate text-sm text-slate-900">
+              {item.dir === 'ltr'
+                ? <span dir="ltr">{item.value || '-'}</span>
+                : (item.value || '-')}
             </dd>
           </div>
         ))}
@@ -1763,7 +1762,7 @@ export default function DossierExplicatifDetailPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-600">رقم التأجير</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-950" dir="ltr">{dossier.matricule || '—'}</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-950"><span dir="ltr">{dossier.matricule || '—'}</span></p>
             </div>
             <div>
               <p className="text-sm font-medium text-slate-600">المصلحة</p>
