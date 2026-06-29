@@ -21,6 +21,11 @@ import {
 import Link from 'next/link'
 import { Download, FileText, Pencil, Trash2, Plus, Upload, ArrowRight, Users } from 'lucide-react'
 import { Pagination } from '@/components/ui/pagination'
+import {
+  getListStatusLabel,
+  getListStatusColor,
+} from '@/frontend/src/lib/dossierStatus'
+import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
 
 function toCongesUploadApiUrl(fileUrl) {
   if (!fileUrl) return ''
@@ -76,6 +81,30 @@ const parseDecisionDoc = (value) => {
 }
 
 const HISTORIQUE_CONGES_PAGE_SIZE = 8
+const DOSSIERS_PAGE_SIZE = 5
+
+const typeFauteArabicLabels = {
+  RETARD: 'التأخر عن العمل',
+  ABSENCE_NON_JUSTIFIEE: 'الغياب غير المبرر',
+  DEPART_AVANT_HEURE: 'مغادرة العمل قبل الوقت',
+  NON_RESPECT_PAUSE: 'عدم احترام أوقات الاستراحة',
+  MAUVAISE_CONDUITE_PATIENTS: 'سوء التعامل مع المرضى',
+  NON_RESPECT_COLLEGUES: 'عدم احترام الرؤساء أو الزملاء',
+  ALTERCATION_TRAVAIL: 'الشجار داخل العمل',
+  NON_RESPECT_ETHIQUE: 'عدم الالتزام بآداب المهنة',
+  TENUE_PROFESSIONNELLE: 'الهندام المهني',
+  ABANDON_POSTE: 'التخلي عن الوظيفة',
+  CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
+  AZS: 'عطلة مرضية غير مبررة',
+  CONGE_MALADIE_NON_JUSTIFIE: 'عطلة مرضية غير مبررة',
+}
+
+function formatDossierDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('ar-MA')
+}
 
 function DetailField({ label, value, ltr }) {
   return (
@@ -114,6 +143,7 @@ export default function ProfesseurDetailsPage() {
   const [hopitaux, setHopitaux] = useState([])
   const [grades, setGrades] = useState([])
   const [historiqueCongesPage, setHistoriqueCongesPage] = useState(1)
+  const [dossierPage, setDossierPage] = useState(1)
   const decisionFileInputRef = useRef(null)
   const decisionTargetCongeIdRef = useRef(null)
   const [decisionBusyCongeId, setDecisionBusyCongeId] = useState(null)
@@ -397,6 +427,11 @@ export default function ProfesseurDetailsPage() {
     )
   }
 
+  const dossiersList = professeur.dossiers_explicatifs ?? []
+  const totalDossierPages = Math.ceil(dossiersList.length / DOSSIERS_PAGE_SIZE)
+  const dossierPageSafe = totalDossierPages === 0 ? 1 : Math.min(Math.max(1, dossierPage), totalDossierPages)
+  const paginatedDossiers = dossiersList.slice((dossierPageSafe - 1) * DOSSIERS_PAGE_SIZE, dossierPageSafe * DOSSIERS_PAGE_SIZE)
+
   const congesList = professeur.conges ?? []
   const totalHistoriquePages = Math.ceil(congesList.length / HISTORIQUE_CONGES_PAGE_SIZE)
   const historiquePageSafe =
@@ -465,8 +500,8 @@ export default function ProfesseurDetailsPage() {
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-blue-500">الهوية</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
               <DetailField label="الاسم الكامل" value={nameOnly} />
-              <DetailField label="النسب" value={professeur.nom_ar} />
-              <DetailField label="الاسم" value={professeur.prenom_ar} />
+              <DetailField label="النسب" value={professeur.prenom_ar} />
+              <DetailField label="الاسم" value={professeur.nom_ar} />
               <DetailField label="رقم التأجير (PPR)" value={professeur.ppr} ltr />
               <DetailField label="رقم بطاقة الهوية (CIN)" value={professeur.cin} ltr />
               <DetailField label="الجنس" value={professeur.sexe === 'MASCULIN' ? 'ذكر' : professeur.sexe === 'FEMININ' ? 'أنثى' : professeur.sexe} />
@@ -788,6 +823,69 @@ export default function ProfesseurDetailsPage() {
         />
       </section>
 
+      {/* Dossiers explicatifs section */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">الملفات التوضيحية</h2>
+            <span className="text-xs text-slate-500">{dossiersList.length} ملف</span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المرجع</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع المخالفة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الحالة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ التسجيل</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {dossiersList.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-12 text-center">
+                    <p className="text-sm text-slate-500">لا يوجد ملف توضيحي مسجل</p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedDossiers.map((d) => (
+                  <tr key={d.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
+                    <td className="px-4 py-3.5 text-right">
+                      <Link
+                        href={`/dossiers-explicatifs/${d.id}`}
+                        className="font-mono text-sm font-semibold text-blue-600 hover:underline"
+                        dir="ltr"
+                      >
+                        {d.reference}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-sm text-slate-700">
+                      {d.type_faute
+                        ? (typeFauteArabicLabels[d.type_faute.code] || d.type_faute.nom || '—')
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <StatusBadge variant={getListStatusColor(d.statut)}>
+                        {getListStatusLabel(d.statut)}
+                      </StatusBadge>
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-sm text-slate-700">
+                      {formatDossierDate(d.cree_le)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <Pagination
+          currentPage={dossierPageSafe}
+          totalPages={totalDossierPages}
+          onPageChange={setDossierPage}
+        />
+      </section>
+
       {/* Edit employee dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-slate-200 p-0 shadow-xl" dir="rtl">
@@ -809,11 +907,11 @@ export default function ProfesseurDetailsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit_nom_ar" className="text-sm font-medium text-slate-700">النسب (بالعربية)</Label>
-                <Input id="edit_nom_ar" value={formData.nom_ar} onChange={(e) => setFormData({ ...formData, nom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
+                <Input id="edit_nom_ar" value={formData.prenom_ar} onChange={(e) => setFormData({ ...formData, prenom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit_prenom_ar" className="text-sm font-medium text-slate-700">الاسم (بالعربية)</Label>
-                <Input id="edit_prenom_ar" value={formData.prenom_ar} onChange={(e) => setFormData({ ...formData, prenom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
+                <Input id="edit_prenom_ar" value={formData.nom_ar} onChange={(e) => setFormData({ ...formData, nom_ar: e.target.value })} className="h-10 rounded-xl border-slate-300 text-right text-sm" placeholder="اختياري" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit_ppr" className="text-sm font-medium text-slate-700">رقم التأجير <span className="text-red-500">*</span></Label>

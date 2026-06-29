@@ -129,7 +129,6 @@ export default function DashboardPage() {
       {/* Page header */}
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
         <h1 className="text-2xl font-bold tracking-tight text-slate-950">لوحة التحكم</h1>
-        <p className="mt-0.5 text-sm text-slate-500">وصول سريع إلى أهم وحدات تدبير الموارد البشرية</p>
       </div>
 
       {/* Module cards */}
@@ -164,14 +163,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* الملفات التأديبية */}
+        {/* الملفات التوضيحية */}
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50">
               <FileText className="size-5 text-violet-600" />
             </div>
             <div>
-              <p className="font-semibold text-slate-900">الملفات التأديبية</p>
+              <p className="font-semibold text-slate-900">الملفات التوضيحية</p>
               {stats && (
                 <p className="text-xs text-slate-500">
                   <span dir="ltr">{stats.totalDossiers}</span> ملف إجمالاً
@@ -180,9 +179,9 @@ export default function DashboardPage() {
             </div>
           </div>
           <p className="mb-4 text-sm text-slate-500">تتبع المساطر التأديبية ومعالجة الردود</p>
-          {stats && stats.dossierEnAttente > 0 && (
+          {stats && stats.dossierEnCours > 0 && (
             <div className="mb-3">
-              <StatBadge count={stats.dossierEnAttente} label="في الانتظار" color="amber" />
+              <StatBadge count={stats.dossierEnCours} label="ملف قيد المعالجة " color="amber" />
             </div>
           )}
           {!readOnly && (
@@ -213,7 +212,7 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          <p className="mb-4 text-sm text-slate-500">إدارة بيانات الموظفين وأرصدتهم</p>
+          <p className="mb-4 text-sm text-slate-500">إدارة بيانات الموظفين </p>
           <div className="mt-auto flex flex-col gap-2">
             <Link
               href="/professeurs"

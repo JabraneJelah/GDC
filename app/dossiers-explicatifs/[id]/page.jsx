@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ import { UploadField } from '@/components/dossiers-explicatifs/UploadField'
 import {
   Archive,
   ArrowRight,
+  Ban,
   Calendar,
   FileText,
   Download,
@@ -80,6 +82,7 @@ const statusStepIndex = {
   CLOTURE: 4,
   A_ARCHIVER: 4,
   ARCHIVE: 4,
+  ANNULE: 0,
 }
 
 const procedureLabels = {
@@ -286,6 +289,8 @@ function ContextPanel({ title, statusLabel, statusColor, children }) {
 export default function DossierExplicatifDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user } = useCurrentUser()
+  const readOnly = isLecteurRH(user)
   const dossierId = params?.id
   const [dossier, setDossier] = useState(null)
   const [templates, setTemplates] = useState([])
@@ -320,6 +325,11 @@ export default function DossierExplicatifDetailPage() {
   const [extraFieldsError, setExtraFieldsError] = useState('')
   const [extraFieldsSuccess, setExtraFieldsSuccess] = useState(false)
   const [extraFieldsEditMode, setExtraFieldsEditMode] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelMotif, setCancelMotif] = useState('')
+  const [downloadAllLoading, setDownloadAllLoading] = useState(false)
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
     if (!dossierId) return null
@@ -568,7 +578,7 @@ export default function DossierExplicatifDetailPage() {
       } else if (prevStatut === 'REPONSE_NON_CONVAINCANTE') {
         setSuccessModal({ title: 'تم إنشاء طلب استكمال المسطرة التأديبية', description: 'تم توليد الوثيقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
       } else if (prevStatut === 'REPONSE_CONVAINCANTE' || prevStatut === 'PROCEDURE_SUIVANTE_GENEREE') {
-        setSuccessModal({ title: 'تم إغلاق الملف بنجاح', description: 'تم إغلاق الملف التأديبي.', hasNextStep: true })
+        setSuccessModal({ title: 'تم إغلاق الملف بنجاح', description: 'تم إغلاق الملف التوضيحي.', hasNextStep: true })
       }
     } catch (actionErrorValue) {
       console.error('Erreur lors de l action du dossier explicatif:', actionErrorValue)
@@ -817,13 +827,70 @@ export default function DossierExplicatifDetailPage() {
       if (!res.ok) throw new Error(body?.error || 'archive failed')
       setArchiveConfirmOpen(false)
       await fetchDossier({ showLoading: false })
-      setSuccessModal({ title: 'تم أرشفة الملف بنجاح', description: 'تم أرشفة الملف التأديبي نهائياً.', hasNextStep: false })
+      setSuccessModal({ title: 'تم أرشفة الملف بنجاح', description: 'تم أرشفة الملف التوضيحي نهائياً.', hasNextStep: false })
     } catch (err) {
       setArchiveError(
         err.message?.includes('deja archive') ? 'هذا الملف مؤرشف مسبقا' : 'تعذر أرشفة الملف، حاول مرة أخرى'
       )
     } finally {
       setArchiveLoading(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!dossierId || cancelLoading) return
+    setCancelError('')
+    if (!cancelMotif.trim()) {
+      setCancelError('سبب الإلغاء مطلوب')
+      return
+    }
+    setCancelLoading(true)
+    try {
+      const payload = { motif_annulation: cancelMotif.trim() }
+      const res = await fetch(`/api/dossiers-explicatifs/${dossierId}/annuler`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const body = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(body?.error || 'cancel failed')
+      setCancelDialogOpen(false)
+      setCancelMotif('')
+      await fetchDossier({ showLoading: false })
+      setSuccessModal({ title: 'تم إلغاء الملف', description: 'تم تسجيل الإلغاء مع حفظ سجل التدقيق.', hasNextStep: false })
+    } catch (err) {
+      setCancelError(err.message || 'تعذر إلغاء الملف، حاول مرة أخرى')
+    } finally {
+      setCancelLoading(false)
+    }
+  }
+
+  const handleDownloadAll = async () => {
+    if (!dossier || downloadAllLoading) return
+    setDownloadAllLoading(true)
+    try {
+      const res = await fetch(`/api/dossiers-explicatifs/${dossier.id}/documents/download-all`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        setErrorModal({ title: 'تعذر تحميل الوثائق', description: body?.error || 'حدث خطأ غير متوقع' })
+        return
+      }
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="([^"]+)"/)
+      const filename = match?.[1] || `${dossier.reference}.zip`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setErrorModal({ title: 'تعذر تحميل الوثائق', description: 'حدث خطأ غير متوقع، المرجو المحاولة مرة أخرى' })
+    } finally {
+      setDownloadAllLoading(false)
     }
   }
 
@@ -858,15 +925,6 @@ export default function DossierExplicatifDetailPage() {
             </div>
           </div>
           {actionFeedback}
-          <Button
-            type="button"
-            onClick={() => { setArchiveError(''); setArchiveConfirmOpen(true) }}
-            disabled={archiveLoading}
-            className="w-full bg-amber-600 hover:bg-amber-700 sm:w-auto"
-          >
-            <Archive className="size-4 ml-1.5" />
-            {archiveLoading ? 'جاري الأرشفة...' : 'أرشفة الملف'}
-          </Button>
         </div>
       )
     }
@@ -875,6 +933,20 @@ export default function DossierExplicatifDetailPage() {
       return (
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs font-medium text-slate-500">
            وضع القراءة فقط — تمت الأرشفة في {dossier.date_archivage ? formatDate(dossier.date_archivage) : '-'} — لا يمكن تنفيذ أي إجراء على هذا الملف
+        </div>
+      )
+    }
+
+    if (dossier.statut === 'ANNULE') {
+      return (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-right">
+          <Ban className="mt-0.5 size-5 shrink-0 text-red-500" />
+          <div className="space-y-1">
+            <p className="font-semibold text-red-800">تم إلغاء هذا الملف</p>
+            {dossier.motif_annulation && (
+              <p className="text-sm text-red-700">السبب: {dossier.motif_annulation}</p>
+            )}
+          </div>
         </div>
       )
     }
@@ -1029,14 +1101,6 @@ export default function DossierExplicatifDetailPage() {
             سيطلب منك تأكيد إغلاق الملف قبل تنفيذ العملية
           </div>
           {actionFeedback}
-          <Button
-            type="button"
-            onClick={handlePrimaryActionClick}
-            disabled={actionLoading || !canRunCurrentAction}
-            className="w-full sm:w-auto"
-          >
-            {actionLoading ? 'جاري التنفيذ...' : 'إغلاق الملف'}
-          </Button>
         </div>
       )
     }
@@ -1733,7 +1797,7 @@ export default function DossierExplicatifDetailPage() {
           {/* Top row: label / badges / back button */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">الملف التأديبي</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">الملف التوضيحي</p>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                   <span dir="ltr">{dossier.reference}</span>
@@ -1743,15 +1807,52 @@ export default function DossierExplicatifDetailPage() {
                 </Badge>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 gap-2 border-slate-200 text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
-              onClick={() => router.push('/dossiers-explicatifs')}
-            >
-              <ArrowRight className="size-4" />
-              رجوع
-            </Button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {!readOnly && (dossier.statut === 'REPONSE_CONVAINCANTE' || dossier.statut === 'PROCEDURE_SUIVANTE_GENEREE') && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={actionLoading || !canRunCurrentAction}
+                  className="gap-2 border-green-200 text-green-700 transition-colors hover:bg-green-50 hover:text-green-800 sm:w-auto"
+                  onClick={handlePrimaryActionClick}
+                >
+                  <CheckCircle2 className="size-4" />
+                  إغلاق الملف
+                </Button>
+              )}
+              {!readOnly && dossier.statut === 'A_ARCHIVER' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={archiveLoading}
+                  className="gap-2 border-amber-200 text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 sm:w-auto"
+                  onClick={() => { setArchiveError(''); setArchiveConfirmOpen(true) }}
+                >
+                  <Archive className="size-4" />
+                  أرشفة الملف
+                </Button>
+              )}
+              {!readOnly && dossier.statut !== 'ARCHIVE' && dossier.statut !== 'ANNULE' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 border-red-200 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 sm:w-auto"
+                  onClick={() => { setCancelError(''); setCancelMotif(''); setCancelDialogOpen(true) }}
+                >
+                  <Ban className="size-4" />
+                  إلغاء الملف
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 border-slate-200 text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+                onClick={() => router.push('/dossiers-explicatifs')}
+              >
+                <ArrowRight className="size-4" />
+                رجوع
+              </Button>
+            </div>
           </div>
 
           {/* Identity grid */}
@@ -1797,7 +1898,12 @@ export default function DossierExplicatifDetailPage() {
         </AppCard>
 
         {/* Documents Table */}
-        <AppCard title="الوثائق المرتبطة بالملف" icon={FileText}>
+        <AppCard
+          title="الوثائق المرتبطة بالملف"
+          icon={FileText}
+          onIconClick={documents.length > 0 ? handleDownloadAll : undefined}
+          iconLoading={downloadAllLoading}
+        >
           <DocumentsTable documents={documents} dossierId={dossier.id} />
         </AppCard>
 
@@ -2024,6 +2130,60 @@ export default function DossierExplicatifDetailPage() {
                   className="w-full bg-amber-600 hover:bg-amber-700 sm:w-auto"
                 >
                   {archiveLoading ? 'جاري الأرشفة...' : 'تأكيد الأرشفة'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel dossier dialog */}
+        <Dialog open={cancelDialogOpen} onOpenChange={(open) => { if (!cancelLoading) { setCancelDialogOpen(open); if (!open) setCancelError('') } }}>
+          <DialogContent className="max-w-lg" dir="rtl">
+            <DialogHeader className="text-right">
+              <DialogTitle className="text-right">إلغاء الملف</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 text-right">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs text-slate-500">الملف</p>
+                <p className="mt-0.5 font-semibold text-slate-900" dir="ltr">{dossier?.reference}</p>
+                <p className="mt-0.5 text-sm text-slate-600">{dossier?.nom_complet}</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-right text-sm font-medium text-slate-700">
+                  سبب الإلغاء <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={cancelMotif}
+                  onChange={(e) => { setCancelMotif(e.target.value); setCancelError('') }}
+                  placeholder="أدخل سبب إلغاء الملف..."
+                  disabled={cancelLoading}
+                  className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-right text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+                />
+              </div>
+              {cancelError && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertTriangle className="size-4 shrink-0" />
+                  {cancelError}
+                </div>
+              )}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setCancelDialogOpen(false); setCancelError('') }}
+                  disabled={cancelLoading}
+                  className="w-full sm:w-auto"
+                >
+                  تراجع
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={cancelLoading || !cancelMotif.trim()}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white sm:w-auto"
+                >
+                  {cancelLoading ? 'جاري الإلغاء...' : 'تأكيد الإلغاء'}
                 </Button>
               </div>
             </div>

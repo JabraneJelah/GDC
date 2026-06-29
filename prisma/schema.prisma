@@ -28,6 +28,7 @@ enum StatutDossierExplicatif {
   CLOTURE
   A_ARCHIVER
   ARCHIVE
+  ANNULE
 }
 
 // Décision sur la réponse (termes métier imposés)
@@ -184,10 +185,14 @@ model DossierExplicatif {
 
   professeur Professeur? @relation("DossierProfesseur", fields: [professeur_id], references: [id], onDelete: SetNull)
 
+  motif_annulation String?
+
   documents  DossierDocument[]
   historique DossierHistory[]
 
   @@index([statut])
+  @@index([reference])
+  @@index([nom_complet])
   @@index([matricule])
   @@index([professeur_id])
   @@index([type_faute_id])
@@ -341,6 +346,11 @@ model Professeur {
   soldes               SoldeConge[]
   dossiers_explicatifs DossierExplicatif[] @relation("DossierProfesseur")
 
+  @@index([nom])
+  @@index([prenom])
+  @@index([nom_ar])
+  @@index([prenom_ar])
+  @@index([cin])
   @@map("professeurs")
 }
 

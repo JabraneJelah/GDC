@@ -3,11 +3,12 @@
 import { FileText, Download, CheckCircle2, Clock } from 'lucide-react'
 
 const categoryLabels = {
-  procedure_suivante:   'طلب استكمال المسطرة التأديبية',
-  lettre_explicative:   'رسالة توضيحية',
-  bordereau_notification: 'إشعار / جدول إرسال',
-  preuve_notification:  'وصل الاستلام',
-  reponse_agent:        'جواب المعني بالأمر',
+  procedure_suivante:       'طلب استكمال المسطرة التأديبية',
+  lettre_explicative:       'رسالة توضيحية',
+  bordereau_notification:   'إشعار / جدول إرسال',
+  preuve_notification:      'وصل الاستلام',
+  reponse_agent:            'جواب المعني بالأمر',
+  correspondance_service:   'مراسلة المصلحة',
 }
 
 const originLabels = {

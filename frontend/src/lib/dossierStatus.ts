@@ -9,6 +9,7 @@ export const DOSSIER_STATUS_LABELS = {
   CLOTURE: "تم إغلاق الملف",
   A_ARCHIVER: "في انتظار الأرشفة",
   ARCHIVE: "مؤرشف",
+  ANNULE: "ملغى",
 } as const
 
 export const DOSSIER_NEXT_ACTION_LABELS = {
@@ -32,6 +33,7 @@ export const DOSSIER_STATUS_COLORS = {
   CLOTURE: "success",
   A_ARCHIVER: "warning",
   ARCHIVE: "success",
+  ANNULE: "danger",
 } as const
 
 export type DossierStatus = keyof typeof DOSSIER_STATUS_LABELS
@@ -64,6 +66,7 @@ const DOSSIER_LIST_STATUS_LABELS: Record<string, string> = {
   CLOTURE: "مغلق",
   A_ARCHIVER: "مغلق",
   ARCHIVE: "مؤرشف",
+  ANNULE: "ملغى",
 }
 
 const DOSSIER_LIST_STATUS_COLORS: Record<string, DossierStatusColor> = {
@@ -80,6 +83,7 @@ const DOSSIER_LIST_STATUS_COLORS: Record<string, DossierStatusColor> = {
   CLOTURE: "neutral",
   A_ARCHIVER: "neutral",
   ARCHIVE: "neutral",
+  ANNULE: "danger",
 }
 
 export function getListStatusLabel(status: string): string {

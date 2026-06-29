@@ -41,7 +41,7 @@ export async function POST(request) {
     if (!utilisateur) {
       console.log("User not found:", username)
       return NextResponse.json(
-        { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
+        { error: 'اسم المستخدم أو كلمة المرور غير صحيحة' },
         { status: 401 }
       )
     }
@@ -72,7 +72,7 @@ export async function POST(request) {
     if (!isValid) {
       console.log("Invalid password for user:", username)
       return NextResponse.json(
-        { error: 'Nom d\'utilisateur ou mot de passe incorrect' },
+        { error: 'اسم المستخدم أو كلمة المرور غير صحيحة' },
         { status: 401 }
       )
     }

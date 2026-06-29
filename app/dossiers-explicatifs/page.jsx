@@ -6,15 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PageShell } from '@/components/layout/PageShell'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Pagination } from '@/components/ui/pagination'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -24,21 +16,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  getDossierStatusLabel,
-  getStatusColor,
   getListStatusLabel,
   getListStatusColor,
 } from '@/frontend/src/lib/dossierStatus'
+import { FilterBar } from '@/components/dossiers-explicatifs/FilterBar'
 import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
 import {
   AlertTriangle,
-  Archive,
-  ChevronDown,
-  ChevronUp,
   Eye,
   FolderOpen,
   Plus,
-  SlidersHorizontal,
   X,
 } from 'lucide-react'
 
@@ -58,6 +45,7 @@ const STATUS_OPTIONS = [
   { value: 'actifs', label: 'الملفات النشطة' },
   { value: 'a_archiver', label: 'في انتظار الأرشفة' },
   { value: 'archives', label: 'المؤرشفة' },
+  { value: 'annules', label: 'الملغاة' },
   { value: 'ENREGISTRE', label: 'مسجل' },
   { value: 'DOCUMENTS_INITIAUX_GENERES', label: 'الوثائق الأولية مولدة' },
   { value: 'NOTIFIE', label: 'تم الإشعار' },
@@ -68,6 +56,7 @@ const STATUS_OPTIONS = [
   { value: 'CLOTURE', label: 'مغلق' },
   { value: 'A_ARCHIVER', label: 'جاهز للأرشفة' },
   { value: 'ARCHIVE', label: 'مؤرشف' },
+  { value: 'ANNULE', label: 'ملغى' },
 ]
 
 const typeFauteArabicLabels = {
@@ -179,10 +168,11 @@ export default function DossiersExplicatifsPage() {
       if (filters.hopital && d.professeur?.hopital?.nom !== filters.hopital) return false
       if (filters.typeFauteId && String(d.type_faute?.id) !== filters.typeFauteId) return false
       const s = filters.status
-      if (s === 'actifs' && d.statut === 'ARCHIVE') return false
+      if (s === 'actifs' && (d.statut === 'ARCHIVE' || d.statut === 'ANNULE')) return false
       if (s === 'a_archiver' && d.statut !== 'A_ARCHIVER') return false
       if (s === 'archives' && d.statut !== 'ARCHIVE') return false
-      if (!['actifs', 'a_archiver', 'archives'].includes(s) && d.statut !== s) return false
+      if (s === 'annules' && d.statut !== 'ANNULE') return false
+      if (!['actifs', 'a_archiver', 'archives', 'annules'].includes(s) && d.statut !== s) return false
       const df = d.date_faute?.slice(0, 10)
       if (filters.dateFrom && df && df < filters.dateFrom) return false
       if (filters.dateTo && df && df > filters.dateTo) return false
@@ -204,10 +194,6 @@ export default function DossiersExplicatifsPage() {
     () => dossiers.filter((d) => d.statut === 'CLOTURE').length,
     [dossiers],
   )
-  const aArchiverCount = useMemo(
-    () => dossiers.filter((d) => d.statut === 'A_ARCHIVER').length,
-    [dossiers],
-  )
 
   const setFilter = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -218,24 +204,6 @@ export default function DossiersExplicatifsPage() {
     setFilters(DEFAULT_FILTERS)
     setCurrentPage(1)
   }
-
-  const filterChips = useMemo(() => {
-    const chips = []
-    if (filters.search) chips.push({ key: 'search', label: `البحث: ${filters.search}` })
-    if (filters.service) chips.push({ key: 'service', label: `المصلحة: ${filters.service}` })
-    if (filters.hopital) chips.push({ key: 'hopital', label: `المستشفى: ${filters.hopital}` })
-    if (filters.typeFauteId) {
-      const tf = typesFaute.find((t) => String(t.id) === filters.typeFauteId)
-      chips.push({ key: 'typeFauteId', label: `نوع المخالفة: ${tf ? (typeFauteArabicLabels[tf.code] || tf.nom) : filters.typeFauteId}` })
-    }
-    if (filters.status !== DEFAULT_FILTERS.status) {
-      const opt = STATUS_OPTIONS.find((o) => o.value === filters.status)
-      chips.push({ key: 'status', label: opt?.label || filters.status })
-    }
-    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
-    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
-    return chips
-  }, [filters, typesFaute])
 
   if (loading) {
     return (
@@ -288,22 +256,6 @@ export default function DossiersExplicatifsPage() {
                     <span className="font-semibold">{closedCount}</span>
                     <span className="text-slate-500">مغلق</span>
                   </span>
-                  {aArchiverCount > 0 && (
-                    <>
-                      <span className="text-slate-400">|</span>
-                      <button
-                        type="button"
-                        onClick={() => router.push('/dossiers-explicatifs/a-archiver')}
-                        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
-                      >
-                        <Archive className="size-3" />
-                        في انتظار الأرشفة
-                        <span className="flex size-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
-                          {aArchiverCount}
-                        </span>
-                      </button>
-                    </>
-                  )}
                 </div>
               )}
             </div>
@@ -321,195 +273,19 @@ export default function DossiersExplicatifsPage() {
         </section>
 
         {/* Collapsible filter bar */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {/* Toggle header */}
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((v) => !v)}
-            className="flex w-full items-center justify-between px-5 py-4 sm:px-6"
-          >
-            <div className="flex items-center gap-2.5">
-              <SlidersHorizontal className="size-4 text-slate-500" />
-              <span className="text-sm font-semibold text-slate-800">البحث والتصفية</span>
-              {activeFilterCount > 0 && (
-                <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">
-                  {activeFilterCount}
-                </span>
-              )}
-            </div>
-            {filtersOpen
-              ? <ChevronUp className="size-4 text-slate-400" />
-              : <ChevronDown className="size-4 text-slate-400" />
-            }
-          </button>
-
-          {/* Chips when collapsed */}
-          {!filtersOpen && filterChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 pb-4 pt-3 sm:px-6">
-              {filterChips.map((chip) => (
-                <span
-                  key={chip.key}
-                  className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-blue-700"
-                >
-                  {chip.label}
-                  <button
-                    type="button"
-                    onClick={() => setFilter(chip.key, DEFAULT_FILTERS[chip.key])}
-                    className="flex size-3.5 items-center justify-center rounded-full bg-blue-200 text-blue-700 hover:bg-blue-300"
-                  >
-                    <X className="size-2.5" />
-                  </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-xs text-slate-400 underline hover:text-slate-600"
-              >
-                مسح الكل
-              </button>
-            </div>
-          )}
-
-          {/* Expanded filter form */}
-          {filtersOpen && (
-            <div className="border-t border-slate-100 px-5 pb-5 pt-4 sm:px-6">
-              <div className="space-y-4">
-                {/* Row 1 */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">بحث عام</label>
-                    <Input
-                      value={filters.search}
-                      onChange={(e) => setFilter('search', e.target.value)}
-                      placeholder="الاسم، رقم التأجير، المرجع..."
-                      className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm placeholder:text-slate-400"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">المصلحة</label>
-                    <Select
-                      value={filters.service || '__all__'}
-                      onValueChange={(v) => setFilter('service', v === '__all__' ? '' : v)}
-                    >
-                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
-                        <SelectValue placeholder="كل المصالح" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">كل المصالح</SelectItem>
-                        {uniqueServices.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">المستشفى</label>
-                    <Select
-                      value={filters.hopital || '__all__'}
-                      onValueChange={(v) => setFilter('hopital', v === '__all__' ? '' : v)}
-                    >
-                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
-                        <SelectValue placeholder="كل المستشفيات" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">كل المستشفيات</SelectItem>
-                        {uniqueHopitaux.map((h) => (
-                          <SelectItem key={h} value={h}>{h}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Row 2 */}
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">نوع المخالفة</label>
-                    <Select
-                      value={filters.typeFauteId || '__all__'}
-                      onValueChange={(v) => setFilter('typeFauteId', v === '__all__' ? '' : v)}
-                    >
-                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
-                        <SelectValue placeholder="كل الأنواع" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">كل الأنواع</SelectItem>
-                        {typesFaute.map((tf) => (
-                          <SelectItem key={tf.id} value={String(tf.id)}>
-                            {typeFauteArabicLabels[tf.code] || tf.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">الحالة</label>
-                    <Select value={filters.status} onValueChange={(v) => setFilter('status', v)}>
-                      <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
-                        <SelectValue placeholder="الحالة" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">من تاريخ</label>
-                    <Input
-                      type="date"
-                      value={filters.dateFrom}
-                      onChange={(e) => setFilter('dateFrom', e.target.value)}
-                      className="h-9 rounded-xl border-slate-300 bg-white text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-right text-xs font-semibold text-slate-600">إلى تاريخ</label>
-                    <Input
-                      type="date"
-                      value={filters.dateTo}
-                      onChange={(e) => setFilter('dateTo', e.target.value)}
-                      className="h-9 rounded-xl border-slate-300 bg-white text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
-                  <span className="text-sm text-slate-500">
-                    عرض{' '}
-                    <span className="font-semibold text-slate-800">{filteredDossiers.length}</span>{' '}
-                    نتيجة
-                  </span>
-                  <div className="flex gap-2">
-                    {activeFilterCount > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFilters}
-                        className="h-8 gap-1.5 text-slate-600"
-                      >
-                        <X className="size-3.5" />
-                        مسح الفلاتر
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => setFiltersOpen(false)}
-                    >
-                      عرض النتائج ({filteredDossiers.length})
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <FilterBar
+          filters={filters}
+          defaultFilters={DEFAULT_FILTERS}
+          onFilterChange={setFilter}
+          onClearFilters={clearFilters}
+          isOpen={filtersOpen}
+          onToggle={() => setFiltersOpen((v) => !v)}
+          resultCount={filteredDossiers.length}
+          uniqueServices={uniqueServices}
+          uniqueHopitaux={uniqueHopitaux}
+          typesFaute={typesFaute}
+          statusOptions={STATUS_OPTIONS}
+        />
 
         {/* Results + Table */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

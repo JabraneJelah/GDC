@@ -55,6 +55,18 @@ export async function GET(request, { params }) {
           include: { type_conge: true },
           orderBy: [{ annee: 'desc' }, { type_conge_id: 'asc' }],
         },
+        dossiers_explicatifs: {
+          select: {
+            id: true,
+            reference: true,
+            statut: true,
+            cree_le: true,
+            type_faute: {
+              select: { nom: true, code: true },
+            },
+          },
+          orderBy: { cree_le: 'desc' },
+        },
       },
     })
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { STATUTS_QID_MAALAJA } from '@/lib/dossierStatusGroups'
 
 export async function GET() {
   try {
@@ -22,7 +23,7 @@ export async function GET() {
       congesParType,
       typesConge,
       totalDossiers,
-      dossierEnAttente,
+      dossierEnCours,
       dossierAArchiver,
       dossierEnEvaluation,
     ] = await Promise.all([
@@ -44,7 +45,7 @@ export async function GET() {
       prisma.typeConge.findMany(),
       prisma.dossierExplicatif.count(),
       prisma.dossierExplicatif.count({
-        where: { statut: { in: ['EN_ATTENTE_REPONSE', 'REPONSE_RECUE', 'REPONSE_NON_CONVAINCANTE'] } },
+        where: { statut: { in: STATUTS_QID_MAALAJA } },
       }),
       prisma.dossierExplicatif.count({
         where: { statut: 'A_ARCHIVER' },
@@ -68,7 +69,7 @@ export async function GET() {
       congesCetteAnnee,
       congesParType: congesParTypeNom,
       totalDossiers,
-      dossierEnAttente,
+      dossierEnCours,
       dossierAArchiver,
       dossierEnEvaluation,
     })

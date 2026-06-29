@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server'
+import { mkdir, writeFile } from 'fs/promises'
+import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { rejectIfLecteur } from '@/lib/roles'
+
+const ALLOWED_CORRESPONDANCE_TYPES = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+}
+
+function sanitizeFileNamePart(value) {
+  return String(value || '')
+    .replace(/[^a-zA-Z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
 
 async function generateDossierReference() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -42,6 +57,7 @@ export async function GET() {
         date_faute: true,
         statut: true,
         cree_le: true,
+        date_archivage: true,
         type_faute: {
           select: {
             id: true,
@@ -81,17 +97,16 @@ export async function POST(request) {
     const deny = rejectIfLecteur(currentUser)
     if (deny) return deny
 
-    const body = await request.json()
-    const {
-      professeur_id,
-      date_faute,
-      type_faute_id: typeFauteIdRaw,
-      details,
-    } = body
+    const formData = await request.formData()
+    const professeur_id = formData.get('professeur_id') ?? null
+    const date_faute = formData.get('date_faute') ?? null
+    const typeFauteIdRaw = formData.get('type_faute_id') ?? null
+    const details = formData.get('details') ?? null
+    const correspondanceFile = formData.get('correspondance')
 
     const type_faute_id =
       typeFauteIdRaw != null && typeFauteIdRaw !== ''
-        ? (typeof typeFauteIdRaw === 'number' ? typeFauteIdRaw : parseInt(typeFauteIdRaw, 10))
+        ? parseInt(String(typeFauteIdRaw), 10)
         : null
 
     if (!professeur_id || !date_faute || type_faute_id == null || isNaN(type_faute_id)) {
@@ -188,37 +203,67 @@ export async function POST(request) {
       professeur.categorie_personnel?.nom ||
       ''
 
-    const dossier = await prisma.dossierExplicatif.create({
-      data: {
-        reference,
-        nom_complet: nomComplet,
-        matricule: professeur.ppr || '',
-        profil: profilSnapshot,
-        service: professeur.service?.nom || '',
-        professeur_id: professeur.id,
-        date_faute: parsedDateFaute,
-        details: details || null,
-        statut: 'ENREGISTRE',
-        type_faute_id,
-        cree_par_rh_id: utilisateur.id,
-      },
-      include: {
-        type_faute: {
-          select: {
-            id: true,
-            code: true,
-            nom: true,
-            actif: true,
+    // Save correspondance file to disk before transaction if provided
+    let correspondancePublicPath = null
+    const hasCorrespondance = correspondanceFile instanceof File && correspondanceFile.size > 0
+
+    if (hasCorrespondance) {
+      if (!ALLOWED_CORRESPONDANCE_TYPES[correspondanceFile.type]) {
+        return NextResponse.json(
+          { error: 'صيغة مراسلة المصلحة غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG' },
+          { status: 400 }
+        )
+      }
+      const ext = ALLOWED_CORRESPONDANCE_TYPES[correspondanceFile.type]
+      const safeName = sanitizeFileNamePart(path.parse(correspondanceFile.name || 'correspondance').name) || 'correspondance'
+      const fileName = `${sanitizeFileNamePart(reference)}-${Date.now()}-${safeName}.${ext}`
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'correspondances')
+      await mkdir(uploadDir, { recursive: true })
+      const bytes = Buffer.from(await correspondanceFile.arrayBuffer())
+      await writeFile(path.join(uploadDir, fileName), bytes, { flag: 'wx' })
+      correspondancePublicPath = `/uploads/correspondances/${fileName}`
+    }
+
+    const dossier = await prisma.$transaction(async (tx) => {
+      const created = await tx.dossierExplicatif.create({
+        data: {
+          reference,
+          nom_complet: nomComplet,
+          matricule: professeur.ppr || '',
+          profil: profilSnapshot,
+          service: professeur.service?.nom || '',
+          professeur_id: professeur.id,
+          date_faute: parsedDateFaute,
+          details: details || null,
+          statut: 'ENREGISTRE',
+          type_faute_id,
+          cree_par_rh_id: utilisateur.id,
+        },
+        include: {
+          type_faute: {
+            select: { id: true, code: true, nom: true, actif: true },
+          },
+          cree_par_rh: {
+            select: { id: true, nom_complet: true, username: true },
           },
         },
-        cree_par_rh: {
-          select: {
-            id: true,
-            nom_complet: true,
-            username: true,
+      })
+
+      if (correspondancePublicPath) {
+        await tx.dossierDocument.create({
+          data: {
+            identifiant: `CORR-${created.id}`,
+            titre: `مراسلة المصلحة - ${correspondanceFile.name || 'correspondance'}`,
+            chemin_fichier: correspondancePublicPath,
+            origine: 'TELEVERSE',
+            categorie: 'correspondance_service',
+            dossier_id: created.id,
+            cree_par_rh_id: utilisateur.id,
           },
-        },
-      },
+        })
+      }
+
+      return created
     })
 
     return NextResponse.json(dossier, { status: 201 })

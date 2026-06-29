@@ -3,62 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { readFile, stat } from 'fs/promises'
 import path from 'path'
+import {
+  resolveDocumentFilePath,
+  sanitizeFileName,
+  getContentType,
+} from '@/lib/dossiers-explicatifs/documentPath'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-const ALLOWED_PREFIXES = [
-  '/uploads/generated/',
-  'uploads/generated/',
-  '/uploads/proofs/',
-  'uploads/proofs/',
-  '/uploads/responses/',
-  'uploads/responses/',
-  '/uploads/templates/',
-  'uploads/templates/',
-]
-
-function getContentType(filePath) {
-  const ext = path.extname(filePath).toLowerCase()
-  const types = {
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    '.pdf': 'application/pdf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-  }
-  return types[ext] || 'application/octet-stream'
-}
-
-function sanitizeFileName(fileName) {
-  return path.basename(fileName || 'document').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-')
-}
-
-function resolveDocumentFilePath(storedPath) {
-  const normalizedStoredPath = storedPath.trim().replace(/\\/g, '/')
-
-  if (!normalizedStoredPath) {
-    throw new Error('missing_path')
-  }
-
-  if (normalizedStoredPath.startsWith('pending://')) {
-    throw new Error('pending_file')
-  }
-
-  if (!ALLOWED_PREFIXES.some((prefix) => normalizedStoredPath.startsWith(prefix))) {
-    throw new Error('invalid_path')
-  }
-
-  const relativePath = normalizedStoredPath.replace(/^\/+/, '')
-  const publicDir = path.resolve(process.cwd(), 'public')
-  const filePath = path.resolve(publicDir, relativePath)
-  const relativeToPublic = path.relative(publicDir, filePath)
-
-  if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic)) {
-    throw new Error('invalid_path')
-  }
-
-  return filePath
-}
 
 export async function GET(_request, { params }) {
   try {

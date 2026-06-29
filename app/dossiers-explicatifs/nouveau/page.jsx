@@ -39,6 +39,7 @@ export default function NouveauDossierExplicatifPage() {
   const [formErrors, setFormErrors] = useState({})
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [correspondanceFile, setCorrespondanceFile] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,22 +134,20 @@ export default function NouveauDossierExplicatifPage() {
         ? `${formData.date_faute}T${formData.heure_faute}:00`
         : formData.date_faute
 
-      const payload = {
-        professeur_id: selectedProfesseur.id,
-        type_faute_id: parseInt(formData.type_faute_id, 10),
-        date_faute: dateTimeFaute,
-      }
-
+      const payload = new FormData()
+      payload.append('professeur_id', selectedProfesseur.id)
+      payload.append('type_faute_id', parseInt(formData.type_faute_id, 10))
+      payload.append('date_faute', dateTimeFaute)
       if (formData.details.trim()) {
-        payload.details = formData.details.trim()
+        payload.append('details', formData.details.trim())
+      }
+      if (correspondanceFile) {
+        payload.append('correspondance', correspondanceFile)
       }
 
       const response = await fetch('/api/dossiers-explicatifs', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        body: payload,
       })
 
       if (!response.ok) {
@@ -426,6 +425,28 @@ export default function NouveauDossierExplicatifPage() {
                 disabled={!selectedProfesseur}
                 className="min-h-28 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-right text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
               />
+            </div>
+
+            {/* مراسلة المصلحة */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="correspondance"
+                className="block text-right text-sm font-medium text-slate-700"
+              >
+                مراسلة المصلحة
+                <span className="mr-1.5 text-xs font-normal text-slate-400">(اختياري)</span>
+              </Label>
+              <input
+                id="correspondance"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                disabled={!selectedProfesseur || submitting}
+                onChange={(e) => setCorrespondanceFile(e.target.files?.[0] || null)}
+                className="block w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-800 file:ml-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-blue-700 hover:border-blue-300 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+              />
+              {correspondanceFile && (
+                <p className="text-xs text-slate-500">{correspondanceFile.name}</p>
+              )}
             </div>
 
             {/* Actions */}
