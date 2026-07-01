@@ -1501,7 +1501,7 @@ export default function DossierExplicatifDetailPage() {
                   ? 'في انتظار تسجيل التبليغ'
                   : showResponseForm
                     ? (responseEditMode ? 'تعديل بيانات الجواب المسجل' : 'سجّل تاريخ التوصل والوثيقة المرفقة')
-                    : 'معلومات الجواب المرفوع من طرف المعني بالأمر'}
+                    : ''}
               </p>
             </div>
             {!showResponseForm && !showEvalForm ? (

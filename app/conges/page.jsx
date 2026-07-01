@@ -87,6 +87,186 @@ function getProfLabel(conge) {
   return `${t}${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '—'
 }
 
+// Defined at module scope so React sees a stable component type across renders.
+// If defined inside CongesPage, a new function reference is created on every render,
+// causing React to unmount/remount the component and destroying input focus.
+function ProfesseurDropdown({
+  idPrefix,
+  professeurs,
+  professeurId,
+  professeurSearch,
+  setProfesseurSearch,
+  professeurSearchOpen,
+  setProfesseurSearchOpen,
+  setFormData,
+}) {
+  const selectedProf = professeurId ? professeurs.find(p => p.id === professeurId) : null
+  const selectedLabel = selectedProf
+    ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}`.trim()
+    : null
+  const searchLower = professeurSearch.toLowerCase()
+  const filtered = professeurs.filter((prof) => {
+    const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
+    return nomComplet.includes(searchLower)
+  }).slice(0, 10)
+  return (
+    <div>
+      {selectedLabel && (
+        <div className="flex h-9 items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 mb-1.5">
+          <span className="truncate text-sm font-medium text-blue-900">{selectedLabel}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setFormData(prev => ({ ...prev, professeur_id: '' }))
+              setProfesseurSearch('')
+              setProfesseurSearchOpen(false)
+            }}
+            className="cursor-pointer shrink-0 ms-2 text-blue-400 transition-colors hover:text-blue-700"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <div className="relative">
+        <Input
+          id={`${idPrefix}_professeur_id`}
+          placeholder="البحث عن موظف..."
+          value={professeurSearch}
+          onChange={(e) => {
+            setProfesseurSearch(e.target.value)
+            if (professeurId) setFormData(prev => ({ ...prev, professeur_id: '' }))
+            setProfesseurSearchOpen(true)
+          }}
+          onFocus={() => setProfesseurSearchOpen(true)}
+          onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 150)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setProfesseurSearchOpen(false); e.stopPropagation() } }}
+          autoComplete="off"
+          className="h-10 rounded-xl border-slate-300 text-right text-sm"
+        />
+        {professeurSearchOpen && (
+          <div className="absolute z-[60] w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-right">
+            {filtered.length > 0 ? (
+              filtered.map((prof) => {
+                const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
+                return (
+                  <div
+                    key={prof.id}
+                    className="cursor-pointer px-3 py-2.5 hover:bg-slate-50"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setFormData(prev => ({ ...prev, professeur_id: prof.id }))
+                      setProfesseurSearch('')
+                      setProfesseurSearchOpen(false)
+                    }}
+                  >
+                    <div className="text-sm font-medium text-slate-800">{label}</div>
+                    {prof.ppr && <div className="text-xs text-slate-500">{prof.ppr}</div>}
+                  </div>
+                )
+              })
+            ) : (
+              <div className="px-3 py-2 text-sm text-slate-500">لا توجد نتائج</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function InterimDropdown({
+  idPrefix,
+  professeurs,
+  professeurId,
+  interimSearch,
+  setInterimSearch,
+  interimSearchOpen,
+  setInterimSearchOpen,
+  selectedInterimId,
+  setSelectedInterimId,
+  setFormData,
+  setInterimClearedByConflict,
+}) {
+  const selectedInterim = selectedInterimId ? professeurs.find(p => p.id === selectedInterimId) : null
+  const selectedLabel = selectedInterim
+    ? `${selectedInterim.titre?.nom ? `${selectedInterim.titre.nom} ` : ''}${selectedInterim.prenom} ${selectedInterim.nom}`.trim()
+    : null
+  const searchLower = interimSearch.toLowerCase()
+  const filtered = professeurs.filter((prof) => {
+    if (prof.id === professeurId) return false
+    const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
+    return nomComplet.includes(searchLower)
+  }).slice(0, 10)
+  return (
+    <div>
+      {selectedLabel && (
+        <div className="flex h-9 items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 mb-1.5">
+          <span className="truncate text-sm font-medium text-blue-900">{selectedLabel}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedInterimId('')
+              setInterimSearch('')
+              setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
+            }}
+            className="cursor-pointer shrink-0 ms-2 text-blue-400 transition-colors hover:text-blue-700"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <div className="relative">
+        <Input
+          id={`${idPrefix}_interim`}
+          placeholder="البحث عن موظف..."
+          value={interimSearch}
+          onChange={(e) => {
+            setInterimSearch(e.target.value)
+            if (selectedInterimId) {
+              setSelectedInterimId('')
+              setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
+            }
+            setInterimClearedByConflict(false)
+            setInterimSearchOpen(true)
+          }}
+          onFocus={() => setInterimSearchOpen(true)}
+          onBlur={() => setTimeout(() => setInterimSearchOpen(false), 150)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { setInterimSearchOpen(false); e.stopPropagation() } }}
+          autoComplete="off"
+          className="h-10 rounded-xl border-slate-300 text-right text-sm"
+        />
+        {interimSearchOpen && (
+          <div className="absolute z-[60] mt-1 w-full overflow-auto rounded-xl border border-slate-200 bg-white text-right shadow-lg max-h-60">
+            {filtered.length > 0 ? (
+              filtered.map((prof) => {
+                const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
+                return (
+                  <div
+                    key={prof.id}
+                    className="cursor-pointer px-3 py-2 hover:bg-slate-50"
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      setSelectedInterimId(prof.id)
+                      setInterimSearch('')
+                      setFormData(prev => ({ ...prev, nom_interim: label, prenom_interim: '' }))
+                      setInterimSearchOpen(false)
+                    }}
+                  >
+                    <div className="text-sm font-medium text-slate-800">{label}</div>
+                    {prof.ppr && <div className="text-xs text-slate-500">{prof.ppr}</div>}
+                  </div>
+                )
+              })
+            ) : (
+              <div className="px-3 py-2 text-sm text-slate-500">لا يوجد موظف مطابق</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function CongesPage() {
   const { user } = useCurrentUser()
   const readOnly = isLecteurRH(user)
@@ -613,84 +793,6 @@ export default function CongesPage() {
 
   const hasActiveFilters = filters.professeur_id !== 'all' || filters.type_conge_id !== 'all' || filters.duree !== ''
 
-  // Professor search dropdown — create mode only
-  const ProfesseurDropdown = ({ idPrefix }) => {
-    const selectedProf = formData.professeur_id ? professeurs.find(p => p.id === formData.professeur_id) : null
-    const selectedLabel = selectedProf
-      ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}`.trim()
-      : null
-    const searchLower = professeurSearch.toLowerCase()
-    const filtered = professeurs.filter((prof) => {
-      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
-      return nomComplet.includes(searchLower)
-    }).slice(0, 10)
-    return (
-      <div>
-        {/* Selected employee chip — shown when a selection is confirmed */}
-        {selectedLabel && (
-          <div className="flex h-9 items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 mb-1.5">
-            <span className="truncate text-sm font-medium text-blue-900">{selectedLabel}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData(prev => ({ ...prev, professeur_id: '' }))
-                setProfesseurSearch('')
-                setProfesseurSearchOpen(false)
-              }}
-              className="cursor-pointer shrink-0 ms-2 text-blue-400 transition-colors hover:text-blue-700"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-        {/* Search input — value is always the raw search term, never the selected label */}
-        <div className="relative">
-          <Input
-            id={`${idPrefix}_professeur_id`}
-            placeholder="البحث عن موظف..."
-            value={professeurSearch}
-            onChange={(e) => {
-              setProfesseurSearch(e.target.value)
-              if (formData.professeur_id) setFormData(prev => ({ ...prev, professeur_id: '' }))
-              setProfesseurSearchOpen(true)
-            }}
-            onFocus={() => setProfesseurSearchOpen(true)}
-            onBlur={() => setTimeout(() => setProfesseurSearchOpen(false), 150)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setProfesseurSearchOpen(false); e.stopPropagation() } }}
-            autoComplete="off"
-            className="h-10 rounded-xl border-slate-300 text-right text-sm"
-          />
-          {professeurSearchOpen && (
-            <div className="absolute z-[60] w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-right">
-              {filtered.length > 0 ? (
-                filtered.map((prof) => {
-                  const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
-                  return (
-                    <div
-                      key={prof.id}
-                      className="cursor-pointer px-3 py-2.5 hover:bg-slate-50"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        setFormData(prev => ({ ...prev, professeur_id: prof.id }))
-                        setProfesseurSearch('')
-                        setProfesseurSearchOpen(false)
-                      }}
-                    >
-                      <div className="text-sm font-medium text-slate-800">{label}</div>
-                      {prof.ppr && <div className="text-xs text-slate-500">{prof.ppr}</div>}
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="px-3 py-2 text-sm text-slate-500">لا توجد نتائج</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // Professor read-only display — edit mode only (employee cannot be changed)
   const ProfesseurReadOnly = () => {
     const prof = professeurs.find(p => p.id === formData.professeur_id)
@@ -701,88 +803,6 @@ export default function CongesPage() {
       <div className="flex h-10 items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3">
         <span className="text-sm font-medium text-slate-800">{name}</span>
         {prof?.ppr && <span className="text-xs text-slate-400">{prof.ppr}</span>}
-      </div>
-    )
-  }
-
-  // Shared interim (المعوض) employee selector
-  const InterimDropdown = ({ idPrefix }) => {
-    const selectedInterim = selectedInterimId ? professeurs.find(p => p.id === selectedInterimId) : null
-    const selectedLabel = selectedInterim
-      ? `${selectedInterim.titre?.nom ? `${selectedInterim.titre.nom} ` : ''}${selectedInterim.prenom} ${selectedInterim.nom}`.trim()
-      : null
-    const searchLower = interimSearch.toLowerCase()
-    const filtered = professeurs.filter((prof) => {
-      if (prof.id === formData.professeur_id) return false
-      const nomComplet = `${prof.titre?.nom || ''} ${prof.prenom} ${prof.nom} ${prof.ppr || ''}`.toLowerCase()
-      return nomComplet.includes(searchLower)
-    }).slice(0, 10)
-    return (
-      <div>
-        {selectedLabel && (
-          <div className="flex h-9 items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-3 mb-1.5">
-            <span className="truncate text-sm font-medium text-blue-900">{selectedLabel}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedInterimId('')
-                setInterimSearch('')
-                setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
-              }}
-              className="cursor-pointer shrink-0 ms-2 text-blue-400 transition-colors hover:text-blue-700"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-        <div className="relative">
-          <Input
-            id={`${idPrefix}_interim`}
-            placeholder="البحث عن موظف..."
-            value={interimSearch}
-            onChange={(e) => {
-              setInterimSearch(e.target.value)
-              if (selectedInterimId) {
-                setSelectedInterimId('')
-                setFormData(prev => ({ ...prev, nom_interim: '', prenom_interim: '' }))
-              }
-              setInterimClearedByConflict(false)
-              setInterimSearchOpen(true)
-            }}
-            onFocus={() => setInterimSearchOpen(true)}
-            onBlur={() => setTimeout(() => setInterimSearchOpen(false), 150)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setInterimSearchOpen(false); e.stopPropagation() } }}
-            autoComplete="off"
-            className="h-10 rounded-xl border-slate-300 text-right text-sm"
-          />
-          {interimSearchOpen && (
-            <div className="absolute z-[60] mt-1 w-full overflow-auto rounded-xl border border-slate-200 bg-white text-right shadow-lg max-h-60">
-              {filtered.length > 0 ? (
-                filtered.map((prof) => {
-                  const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
-                  return (
-                    <div
-                      key={prof.id}
-                      className="cursor-pointer px-3 py-2 hover:bg-slate-50"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        setSelectedInterimId(prof.id)
-                        setInterimSearch('')
-                        setFormData(prev => ({ ...prev, nom_interim: label, prenom_interim: '' }))
-                        setInterimSearchOpen(false)
-                      }}
-                    >
-                      <div className="text-sm font-medium text-slate-800">{label}</div>
-                      {prof.ppr && <div className="text-xs text-slate-500">{prof.ppr}</div>}
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="px-3 py-2 text-sm text-slate-500">لا يوجد موظف مطابق</div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     )
   }
@@ -1248,7 +1268,16 @@ export default function CongesPage() {
                 <Label className="text-sm font-medium text-slate-700">
                   الموظف <span className="text-red-500">*</span>
                 </Label>
-                <ProfesseurDropdown idPrefix="create" />
+                <ProfesseurDropdown
+                  idPrefix="create"
+                  professeurs={professeurs}
+                  professeurId={formData.professeur_id}
+                  professeurSearch={professeurSearch}
+                  setProfesseurSearch={setProfesseurSearch}
+                  professeurSearchOpen={professeurSearchOpen}
+                  setProfesseurSearchOpen={setProfesseurSearchOpen}
+                  setFormData={setFormData}
+                />
               </div>
               {/* 4. Type conge */}
               <div className="space-y-1.5">
@@ -1302,7 +1331,19 @@ export default function CongesPage() {
               {/* 8. Interim */}
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-700">المعوض</Label>
-                <InterimDropdown idPrefix="create" />
+                <InterimDropdown
+                  idPrefix="create"
+                  professeurs={professeurs}
+                  professeurId={formData.professeur_id}
+                  interimSearch={interimSearch}
+                  setInterimSearch={setInterimSearch}
+                  interimSearchOpen={interimSearchOpen}
+                  setInterimSearchOpen={setInterimSearchOpen}
+                  selectedInterimId={selectedInterimId}
+                  setSelectedInterimId={setSelectedInterimId}
+                  setFormData={setFormData}
+                  setInterimClearedByConflict={setInterimClearedByConflict}
+                />
                 {interimClearedByConflict && (
                   <p className="text-xs text-amber-600">تم مسح المعوض لأنه لا يمكن أن يكون نفس الموظف.</p>
                 )}
@@ -1428,7 +1469,19 @@ export default function CongesPage() {
               {/* 8. Interim */}
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-slate-700">المعوض</Label>
-                <InterimDropdown idPrefix="edit" />
+                <InterimDropdown
+                  idPrefix="edit"
+                  professeurs={professeurs}
+                  professeurId={formData.professeur_id}
+                  interimSearch={interimSearch}
+                  setInterimSearch={setInterimSearch}
+                  interimSearchOpen={interimSearchOpen}
+                  setInterimSearchOpen={setInterimSearchOpen}
+                  selectedInterimId={selectedInterimId}
+                  setSelectedInterimId={setSelectedInterimId}
+                  setFormData={setFormData}
+                  setInterimClearedByConflict={setInterimClearedByConflict}
+                />
                 {interimClearedByConflict && (
                   <p className="text-xs text-amber-600">تم مسح المعوض لأنه لا يمكن أن يكون نفس الموظف.</p>
                 )}
