@@ -1029,9 +1029,7 @@ export default function DocumentTemplatesPage() {
             <DialogHeader className="border-b border-slate-100 pb-4 text-right">
               <DialogTitle className="text-right text-lg font-bold text-slate-900">دليل المتغيرات</DialogTitle>
               <DialogDescription className="text-right text-sm text-slate-500">
-                استخدم الأقواس المفردة{' '}
-                <span dir="ltr" className="rounded bg-slate-100 px-1 font-mono text-slate-700">{'{ }'}</span>
-                {' '}حول كل متغير في ملف Word الخاص بك
+                هذه المتغيرات تُستبدل تلقائياً بمعلومات الموظف عند توليد وثيقة الملف التوضيحي
               </DialogDescription>
             </DialogHeader>
             <table className="w-full text-sm">
@@ -1057,8 +1055,25 @@ export default function DocumentTemplatesPage() {
                     <td className="py-2.5 ps-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`{${key}}`)
+                        onClick={async () => {
+                          try {
+                            if (navigator.clipboard && window.isSecureContext) {
+                              await navigator.clipboard.writeText(`{${key}}`)
+                            } else {
+                              const textarea = document.createElement('textarea')
+                              textarea.value = `{${key}}`
+                              textarea.style.position = 'fixed'
+                              textarea.style.opacity = '0'
+                              textarea.style.pointerEvents = 'none'
+                              document.body.appendChild(textarea)
+                              textarea.focus()
+                              textarea.select()
+                              document.execCommand('copy')
+                              document.body.removeChild(textarea)
+                            }
+                          } catch (err) {
+                            console.error('Copy failed:', err)
+                          }
                           setCopiedVar(key)
                           setTimeout(() => setCopiedVar(null), 1500)
                         }}
