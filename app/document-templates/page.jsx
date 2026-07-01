@@ -20,8 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronDown, ChevronUp, FileText, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Code2, Copy, FileText, Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { StatusBadge } from '@/components/dossiers-explicatifs/StatusBadge'
+
+const PLACEHOLDER_VARS = [
+  { key: 'nom_complet',             label: 'الاسم الكامل للموظف' },
+  { key: 'matricule',               label: 'رقم التأجير (PPR)' },
+  { key: 'cin',                     label: 'رقم بطاقة الهوية' },
+  { key: 'profil',                  label: 'الدرجة / الرتبة المهنية' },
+  { key: 'date_faute',              label: 'تاريخ المخالفة' },
+  { key: 'type_faute',              label: 'نوع المخالفة' },
+  { key: 'date_certificat_medical', label: 'تاريخ الشهادة الطبية' },
+  { key: 'duree_certificat_medical',label: 'مدة الشهادة الطبية' },
+]
 
 const initialFormData = {
   nom: '',
@@ -131,6 +142,8 @@ export default function DocumentTemplatesPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState(null)
+  const [guideDialogOpen, setGuideDialogOpen] = useState(false)
+  const [copiedVar, setCopiedVar] = useState(null)
 
   const fetchTemplates = async () => {
     try {
@@ -406,16 +419,27 @@ export default function DocumentTemplatesPage() {
               <h1 className="text-2xl font-bold tracking-tight text-slate-950">نماذج الوثائق</h1>
               <p className="mt-0.5 text-sm text-slate-500">إدارة نماذج الوثائق المرتبطة بأنواع المخالفات</p>
             </div>
-            {!readOnly && (
+            <div className="flex shrink-0 items-center gap-2">
               <Button
                 type="button"
-                onClick={() => setDialogOpen(true)}
-                className="shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                variant="outline"
+                onClick={() => setGuideDialogOpen(true)}
+                className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
               >
-                <Plus className="size-4" />
-                إضافة نموذج جديد
+                <Code2 className="size-4" />
+                دليل المتغيرات
               </Button>
-            )}
+              {!readOnly && (
+                <Button
+                  type="button"
+                  onClick={() => setDialogOpen(true)}
+                  className="gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <Plus className="size-4" />
+                  إضافة نموذج جديد
+                </Button>
+              )}
+            </div>
           </div>
           <div className="mt-4 flex items-center gap-6">
             <div>
@@ -996,6 +1020,61 @@ export default function DocumentTemplatesPage() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Placeholder guide dialog */}
+        <Dialog open={guideDialogOpen} onOpenChange={setGuideDialogOpen}>
+          <DialogContent className="max-w-lg rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+            <DialogHeader className="border-b border-slate-100 pb-4 text-right">
+              <DialogTitle className="text-right text-lg font-bold text-slate-900">دليل المتغيرات</DialogTitle>
+              <DialogDescription className="text-right text-sm text-slate-500">
+                استخدم الأقواس المفردة{' '}
+                <span dir="ltr" className="rounded bg-slate-100 px-1 font-mono text-slate-700">{'{ }'}</span>
+                {' '}حول كل متغير في ملف Word الخاص بك
+              </DialogDescription>
+            </DialogHeader>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="pb-2.5 text-right text-xs font-semibold text-slate-500">المتغير</th>
+                  <th className="pb-2.5 text-right text-xs font-semibold text-slate-500">الوصف</th>
+                  <th className="w-9 pb-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {PLACEHOLDER_VARS.map(({ key, label }) => (
+                  <tr key={key}>
+                    <td className="py-2.5 pe-4">
+                      <span
+                        dir="ltr"
+                        className="inline-block rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700"
+                      >
+                        {`{${key}}`}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-right text-slate-600">{label}</td>
+                    <td className="py-2.5 ps-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`{${key}}`)
+                          setCopiedVar(key)
+                          setTimeout(() => setCopiedVar(null), 1500)
+                        }}
+                        title="نسخ"
+                        className="flex size-7 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        {copiedVar === key
+                          ? <Check className="size-3.5 text-emerald-500" />
+                          : <Copy className="size-3.5" />
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </DialogContent>
         </Dialog>
 
