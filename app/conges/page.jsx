@@ -102,7 +102,7 @@ function ProfesseurDropdown({
 }) {
   const selectedProf = professeurId ? professeurs.find(p => p.id === professeurId) : null
   const selectedLabel = selectedProf
-    ? `${selectedProf.titre?.nom ? `${selectedProf.titre.nom} ` : ''}${selectedProf.prenom} ${selectedProf.nom}`.trim()
+    ? `${selectedProf.prenom} ${selectedProf.nom}`.trim()
     : null
   const searchLower = professeurSearch.toLowerCase()
   const filtered = professeurs.filter((prof) => {
@@ -147,7 +147,7 @@ function ProfesseurDropdown({
           <div className="absolute z-[60] w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-auto text-right">
             {filtered.length > 0 ? (
               filtered.map((prof) => {
-                const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
+                const label = `${prof.prenom} ${prof.nom}`.trim()
                 return (
                   <div
                     key={prof.id}
@@ -189,7 +189,7 @@ function InterimDropdown({
 }) {
   const selectedInterim = selectedInterimId ? professeurs.find(p => p.id === selectedInterimId) : null
   const selectedLabel = selectedInterim
-    ? `${selectedInterim.titre?.nom ? `${selectedInterim.titre.nom} ` : ''}${selectedInterim.prenom} ${selectedInterim.nom}`.trim()
+    ? `${selectedInterim.prenom} ${selectedInterim.nom}`.trim()
     : null
   const searchLower = interimSearch.toLowerCase()
   const filtered = professeurs.filter((prof) => {
@@ -239,7 +239,7 @@ function InterimDropdown({
           <div className="absolute z-[60] mt-1 w-full overflow-auto rounded-xl border border-slate-200 bg-white text-right shadow-lg max-h-60">
             {filtered.length > 0 ? (
               filtered.map((prof) => {
-                const label = `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
+                const label = `${prof.prenom} ${prof.nom}`.trim()
                 return (
                   <div
                     key={prof.id}
