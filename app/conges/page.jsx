@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { useCurrentUser, isLecteurRH } from '@/components/UserContext'
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
@@ -20,9 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { CalendarCheck, CalendarDays, FileText, Plus, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, FileText, Plus, SlidersHorizontal, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
+
+const DEFAULT_FILTERS = { search: '', typeCongeId: '', dateFrom: '', dateTo: '' }
 
 /** Étend les plages de jours fériés en ensemble de clés YYYY-MM-DD (dates locales). */
 function expandJourFerieRangesToYmdSet(joursFeries) {
@@ -83,8 +86,7 @@ function formatDate(value) {
 
 function getProfLabel(conge) {
   if (!conge.professeur) return '—'
-  const t = conge.professeur.titre?.nom ? `${conge.professeur.titre.nom} ` : ''
-  return `${t}${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '—'
+  return `${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '—'
 }
 
 // Defined at module scope so React sees a stable component type across renders.
@@ -283,11 +285,8 @@ export default function CongesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [editingConge, setEditingConge] = useState(null)
   const [congeToDelete, setCongeToDelete] = useState(null)
-  const [filters, setFilters] = useState({
-    professeur_id: 'all',
-    type_conge_id: 'all',
-    duree: '',
-  })
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [formData, setFormData] = useState({
     professeur_id: '',
     type_conge_id: '',
@@ -750,6 +749,40 @@ export default function CongesPage() {
     }
   }, [holidayNamesMap])
 
+  // These three useMemo hooks must be above the loading early return (Rules of Hooks)
+  const filteredConges = useMemo(() => {
+    const norm = filters.search.trim().toLowerCase()
+    return conges.filter((conge) => {
+      if (norm) {
+        const prof = conge.professeur
+        const haystack = `${prof?.prenom || ''} ${prof?.nom || ''} ${prof?.ppr || ''}`.toLowerCase()
+        if (!haystack.includes(norm)) return false
+      }
+      if (filters.typeCongeId && conge.type_conge_id.toString() !== filters.typeCongeId) return false
+      const df = conge.date_debut?.slice(0, 10)
+      if (filters.dateFrom && (!df || df < filters.dateFrom)) return false
+      if (filters.dateTo && (!df || df > filters.dateTo)) return false
+      return true
+    })
+  }, [conges, filters])
+
+  const activeFilterCount = useMemo(
+    () => Object.keys(DEFAULT_FILTERS).filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length,
+    [filters],
+  )
+
+  const filterChips = useMemo(() => {
+    const chips = []
+    if (filters.search) chips.push({ key: 'search', label: `البحث: ${filters.search}` })
+    if (filters.typeCongeId) {
+      const tc = typesConge.find((t) => String(t.id) === filters.typeCongeId)
+      chips.push({ key: 'typeCongeId', label: `نوع الرخصة: ${tc?.nom || filters.typeCongeId}` })
+    }
+    if (filters.dateFrom) chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
+    if (filters.dateTo) chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
+    return chips
+  }, [filters, typesConge])
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-3" dir="rtl">
@@ -767,37 +800,28 @@ export default function CongesPage() {
     return Boolean(holidayNamesMap[ymd])
   }
 
-  // Filter conges based on filters
-  const filteredConges = conges.filter((conge) => {
-    if (filters.professeur_id !== 'all' && conge.professeur_id !== filters.professeur_id) {
-      return false
-    }
-    if (filters.type_conge_id !== 'all' && conge.type_conge_id.toString() !== filters.type_conge_id) {
-      return false
-    }
-    if (filters.duree && conge.duree_jours.toString() !== filters.duree) {
-      return false
-    }
-    return true
-  })
-
   const totalPages = Math.ceil(filteredConges.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
   const paginatedConges = filteredConges.slice(startIndex, endIndex)
 
-  const handleClearFilters = () => {
-    setFilters({ professeur_id: 'all', type_conge_id: 'all', duree: '' })
+  const setFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = filters.professeur_id !== 'all' || filters.type_conge_id !== 'all' || filters.duree !== ''
+  const handleClearFilters = () => {
+    setFilters(DEFAULT_FILTERS)
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = activeFilterCount > 0
 
   // Professor read-only display — edit mode only (employee cannot be changed)
   const ProfesseurReadOnly = () => {
     const prof = professeurs.find(p => p.id === formData.professeur_id)
     const name = prof
-      ? `${prof.titre?.nom ? `${prof.titre.nom} ` : ''}${prof.prenom} ${prof.nom}`.trim()
+      ? `${prof.prenom} ${prof.nom}`.trim()
       : formData.professeur_id
     return (
       <div className="flex h-10 items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3">
@@ -986,68 +1010,146 @@ export default function CongesPage() {
         </div>
       </section>
 
-      {/* Filters */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Label className="mb-1.5 block text-xs font-medium text-slate-600">الموظف</Label>
-            <Select
-              value={filters.professeur_id}
-              onValueChange={(value) => { setFilters({ ...filters, professeur_id: value }); setCurrentPage(1) }}
-            >
-              <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900">
-                <SelectValue placeholder="جميع الموظفين" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الموظفين</SelectItem>
-                {professeurs.map((prof) => (
-                  <SelectItem key={prof.id} value={prof.id}>
-                    {prof.prenom} {prof.nom}{prof.ppr ? ` (${prof.ppr})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Filter bar — collapsible, matches dossiers "البحث والتصفية" style */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Toggle header */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-5 py-4 sm:px-6"
+        >
+          <div className="flex items-center gap-2.5">
+            <SlidersHorizontal className="size-4 text-slate-500" />
+            <span className="text-sm font-semibold text-slate-800">البحث والتصفية</span>
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
           </div>
-          <div className="flex-1">
-            <Label className="mb-1.5 block text-xs font-medium text-slate-600">نوع الرخصة</Label>
-            <Select
-              value={filters.type_conge_id}
-              onValueChange={(value) => { setFilters({ ...filters, type_conge_id: value }); setCurrentPage(1) }}
-            >
-              <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-right text-sm text-slate-900">
-                <SelectValue placeholder="جميع الأنواع" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الأنواع</SelectItem>
-                {typesConge.map((type) => (
-                  <SelectItem key={type.id} value={type.id.toString()}>
-                    {type.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full sm:w-36">
-            <Label className="mb-1.5 block text-xs font-medium text-slate-600">المدة (أيام)</Label>
-            <Input
-              type="number"
-              placeholder="المدة..."
-              value={filters.duree}
-              onChange={(e) => { setFilters({ ...filters, duree: e.target.value }); setCurrentPage(1) }}
-              className="h-10 rounded-xl border-slate-300 text-right text-sm"
-            />
-          </div>
-          {hasActiveFilters && (
+          {filtersOpen
+            ? <ChevronUp className="size-4 text-slate-400" />
+            : <ChevronDown className="size-4 text-slate-400" />
+          }
+        </button>
+
+        {/* Active chips when collapsed */}
+        {!filtersOpen && filterChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 pb-4 pt-3 sm:px-6">
+            {filterChips.map((chip) => (
+              <span
+                key={chip.key}
+                className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 py-0.5 pl-2.5 pr-1.5 text-xs font-medium text-blue-700"
+              >
+                {chip.label}
+                <button
+                  type="button"
+                  onClick={() => setFilter(chip.key, DEFAULT_FILTERS[chip.key])}
+                  className="flex size-3.5 items-center justify-center rounded-full bg-blue-200 text-blue-700 hover:bg-blue-300"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            ))}
             <button
               type="button"
               onClick={handleClearFilters}
-              className="cursor-pointer inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              className="text-xs text-slate-400 underline hover:text-slate-600"
             >
-              <X className="size-3.5" />
-              مسح
+              مسح الكل
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Expanded filter form */}
+        {filtersOpen && (
+          <div className="border-t border-slate-100 px-5 pb-5 pt-4 sm:px-6">
+            <div className="space-y-4">
+              {/* Row 1: search + type */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block text-right text-xs font-semibold text-slate-600">بحث عام</label>
+                  <Input
+                    value={filters.search}
+                    onChange={(e) => setFilter('search', e.target.value)}
+                    placeholder="الاسم، رقم التأجير..."
+                    className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm placeholder:text-slate-400"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-right text-xs font-semibold text-slate-600">نوع الرخصة</label>
+                  <Select
+                    value={filters.typeCongeId || '__all__'}
+                    onValueChange={(v) => setFilter('typeCongeId', v === '__all__' ? '' : v)}
+                  >
+                    <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                      <SelectValue placeholder="جميع الأنواع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">جميع الأنواع</SelectItem>
+                      {typesConge.map((type) => (
+                        <SelectItem key={type.id} value={type.id.toString()}>
+                          {type.nom}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {/* Row 2: date range */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block text-right text-xs font-semibold text-slate-600">من تاريخ</label>
+                  <Input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilter('dateFrom', e.target.value)}
+                    className="h-9 rounded-xl border-slate-300 bg-white text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-right text-xs font-semibold text-slate-600">إلى تاريخ</label>
+                  <Input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilter('dateTo', e.target.value)}
+                    className="h-9 rounded-xl border-slate-300 bg-white text-sm"
+                  />
+                </div>
+              </div>
+              {/* Footer */}
+              <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                <span className="text-sm text-slate-500">
+                  عرض{' '}
+                  <span className="font-semibold text-slate-800">{filteredConges.length}</span>{' '}
+                  نتيجة
+                </span>
+                <div className="flex gap-2">
+                  {activeFilterCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearFilters}
+                      className="h-8 gap-1.5 text-slate-600"
+                    >
+                      <X className="size-3.5" />
+                      مسح الفلاتر
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setFiltersOpen(false)}
+                  >
+                    عرض النتائج ({filteredConges.length})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table */}
