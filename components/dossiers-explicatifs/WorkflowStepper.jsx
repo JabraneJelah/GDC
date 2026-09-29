@@ -36,15 +36,15 @@ export function WorkflowStepper({ steps, currentStepIndex, viewedStepIndex, onSt
             const pl = isFirst ? 10 : A + 7
             const pr = isLast  ? 10 : A + 7
 
-            const bg = isCompleted ? '#ecfdf5'   // emerald-50
-                     : isCurrent   ? '#eff6ff'   // blue-50
+            const bg = isCompleted ? '#d1fae5'   // emerald-100
+                     : isCurrent   ? '#dbeafe'   // blue-100
                      :               '#f1f5f9'   // slate-100
 
-            const labelColor = isCompleted ? '#065f46'   // emerald-900
+            const labelColor = isCompleted ? '#065f46'   // emerald-800
                              : isCurrent   ? '#1e40af'   // blue-800
-                             :               '#94a3b8'   // slate-400
+                             :               '#475569'   // slate-600
 
-            const numColor = isCurrent ? '#3b82f6' : '#cbd5e1' // blue-500 / slate-300
+            const numColor = isCurrent ? '#2563eb' : '#94a3b8' // blue-600 / slate-400
 
             return (
               <button
@@ -66,7 +66,7 @@ export function WorkflowStepper({ steps, currentStepIndex, viewedStepIndex, onSt
                 {/* Step icon / number */}
                 <span className="flex size-4 shrink-0 items-center justify-center">
                   {isCompleted ? (
-                    <Check className="size-3.5 stroke-[2.5] text-emerald-500" />
+                    <Check className="size-3.5 stroke-[2.5] text-emerald-600" />
                   ) : (
                     <span
                       style={{ color: numColor }}
@@ -81,7 +81,8 @@ export function WorkflowStepper({ steps, currentStepIndex, viewedStepIndex, onSt
                 <span
                   style={{ color: labelColor }}
                   className={[
-                    'whitespace-nowrap text-[12px] font-semibold leading-none',
+                    'whitespace-nowrap text-[12px] leading-none',
+                    isCurrent ? 'font-bold' : 'font-semibold',
                     isViewed && !isCurrent ? 'underline decoration-dotted underline-offset-2' : '',
                   ].join(' ')}
                 >

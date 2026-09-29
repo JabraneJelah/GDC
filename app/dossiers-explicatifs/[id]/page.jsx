@@ -102,6 +102,12 @@ const responseDocumentMimeTypes = [
   'image/png',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
+const procedureDocumentMimeTypes = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 
 const typeFauteArabicLabels = {
   RETARD: 'التأخر عن العمل',
@@ -248,7 +254,7 @@ function getContextualActionError(status) {
   }
 
   if (status === 'REPONSE_NON_CONVAINCANTE') {
-    return 'تعذر إنشاء طلب استكمال المسطرة التأديبية، المرجو التحقق من المعطيات والمحاولة مرة أخرى'
+    return 'تعذر رفع وثيقة طلب استكمال المسطرة التأديبية، المرجو التحقق من المعطيات والمحاولة مرة أخرى'
   }
 
   if (status === 'REPONSE_CONVAINCANTE' || status === 'PROCEDURE_SUIVANTE_GENEREE') {
@@ -307,6 +313,8 @@ export default function DossierExplicatifDetailPage() {
   const [responseDecision, setResponseDecision] = useState('CONVAINCANTE')
   const [evaluationComment, setEvaluationComment] = useState('')
   const [procedureType, setProcedureType] = useState('AVERTISSEMENT')
+  const [procedureFile, setProcedureFile] = useState(null)
+  const [procedureReplaceFile, setProcedureReplaceFile] = useState(null)
   const [initialConfirmOpen, setInitialConfirmOpen] = useState(false)
   const [procedureConfirmOpen, setProcedureConfirmOpen] = useState(false)
   const [evalConfirmOpen, setEvalConfirmOpen] = useState(false)
@@ -526,8 +534,14 @@ export default function DossierExplicatifDetailPage() {
         if (evaluationComment.trim()) payload.commentaire = evaluationComment.trim()
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
         if (!procedureType) throw new Error('procedure_type_required')
-        endpoint = 'generate-procedure'
-        payload = { type_procedure: procedureType }
+        if (!procedureFile) throw new Error('procedure_file_required')
+        if (!procedureDocumentMimeTypes.includes(procedureFile.type)) {
+          throw new Error('procedure_file_type_invalid')
+        }
+        endpoint = 'update-procedure-document'
+        payload = new FormData()
+        payload.append('type_procedure', procedureType)
+        payload.append('file', procedureFile)
       } else if (dossier.statut === 'REPONSE_CONVAINCANTE' || dossier.statut === 'PROCEDURE_SUIVANTE_GENEREE') {
         endpoint = 'close-dossier'
       }
@@ -551,7 +565,7 @@ export default function DossierExplicatifDetailPage() {
       const responseBody = await response.json().catch(() => null)
 
       if (!response.ok) {
-        throw new Error(responseBody?.error || (dossier.statut === 'REPONSE_NON_CONVAINCANTE' ? 'procedure_generation_failed' : 'Action failed'))
+        throw new Error(responseBody?.error || (dossier.statut === 'REPONSE_NON_CONVAINCANTE' ? 'تعذر رفع وثيقة المسطرة التأديبية' : 'Action failed'))
       }
 
       const prevStatut = dossier.statut
@@ -563,6 +577,7 @@ export default function DossierExplicatifDetailPage() {
       setResponseDate(getTodayInputValue())
       setResponseProofFile(null)
       setEvaluationComment('')
+      setProcedureFile(null)
 
       if (prevStatut === 'ENREGISTRE') {
         setSuccessModal({ title: 'تم إنشاء الوثائق الأولية', description: 'تم إنشاء وثائق التبليغ بنجاح.', hasNextStep: true })
@@ -576,7 +591,7 @@ export default function DossierExplicatifDetailPage() {
           : 'الجواب غير مقنع — يمكنك الانتقال إلى مرحلة المسطرة التأديبية.'
         setSuccessModal({ title: 'تم اعتماد التقييم بنجاح', description: descr, hasNextStep: true })
       } else if (prevStatut === 'REPONSE_NON_CONVAINCANTE') {
-        setSuccessModal({ title: 'تم إنشاء طلب استكمال المسطرة التأديبية', description: 'تم توليد الوثيقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
+        setSuccessModal({ title: 'تم رفع وثيقة طلب استكمال المسطرة التأديبية', description: 'تم حفظ الوثيقة. يمكنك الانتقال إلى مرحلة الإغلاق.', hasNextStep: true })
       } else if (prevStatut === 'REPONSE_CONVAINCANTE' || prevStatut === 'PROCEDURE_SUIVANTE_GENEREE') {
         setSuccessModal({ title: 'تم إغلاق الملف بنجاح', description: 'تم إغلاق الملف التوضيحي.', hasNextStep: true })
       }
@@ -596,10 +611,12 @@ export default function DossierExplicatifDetailPage() {
         setActionError('صيغة وثيقة الجواب غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX')
       } else if (actionErrorValue.message === 'procedure_type_required') {
         setProcedureError('المرجو اختيار نوع المسطرة')
-      } else if (actionErrorValue.message === 'procedure_generation_failed') {
-        setProcedureError('تعذر إنشاء طلب استكمال المسطرة التأديبية')
+      } else if (actionErrorValue.message === 'procedure_file_required') {
+        setProcedureError('المرجو رفع وثيقة المسطرة التأديبية')
+      } else if (actionErrorValue.message === 'procedure_file_type_invalid') {
+        setProcedureError('صيغة الملف غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX')
       } else if (dossier.statut === 'REPONSE_NON_CONVAINCANTE') {
-        setProcedureError(actionErrorValue.message || 'تعذر إنشاء طلب استكمال المسطرة التأديبية')
+        setProcedureError(actionErrorValue.message || 'تعذر رفع وثيقة المسطرة التأديبية')
       } else {
         setActionError(translateApiError(actionErrorValue.message, dossier.statut))
       }
@@ -777,37 +794,52 @@ export default function DossierExplicatifDetailPage() {
     }
   }
 
-  const handleGenerateProcedureFromEval = async () => {
+  const handleReplaceProcedureDocument = async () => {
     if (!dossier || procedureLoading) return
+
+    if (!procedureType) {
+      setProcedureError('المرجو اختيار نوع المسطرة')
+      return
+    }
+
+    if (!procedureReplaceFile) {
+      setProcedureError('المرجو رفع وثيقة المسطرة التأديبية')
+      return
+    }
+
+    if (!procedureDocumentMimeTypes.includes(procedureReplaceFile.type)) {
+      setProcedureError('صيغة الملف غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG أو DOCX')
+      return
+    }
+
     setProcedureLoading(true)
     setProcedureError(null)
     setSuccessModal(null)
     setErrorModal(null)
 
     try {
-      const response = await fetch(`/api/dossiers-explicatifs/${dossierId}/generate-procedure`, {
+      const formData = new FormData()
+      formData.append('type_procedure', procedureType)
+      formData.append('file', procedureReplaceFile)
+
+      const response = await fetch(`/api/dossiers-explicatifs/${dossierId}/update-procedure-document`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type_procedure: procedureType }),
+        body: formData,
       })
 
       const responseBody = await response.json().catch(() => null)
 
       if (!response.ok) {
-        const errorMsg = responseBody?.error || ''
-        if (errorMsg.includes('لا يوجد نموذج')) {
-          setProcedureError('لا يوجد نموذج خاص باستكمال المسطرة التأديبية لهذا النوع من المخالفة. يرجى إضافته من صفحة نماذج الوثائق.')
-        } else {
-          setProcedureError(errorMsg || 'حدث خطأ أثناء إنشاء طلب المسطرة التأديبية.')
-        }
+        setProcedureError(responseBody?.error || 'حدث خطأ أثناء رفع وثيقة المسطرة التأديبية.')
         return
       }
 
       setProcedureError(null)
+      setProcedureReplaceFile(null)
       await fetchDossier({ showLoading: false })
       setSuccessModal({
-        title: 'تم إنشاء طلب استكمال المسطرة التأديبية',
-        description: 'تم توليد الوثيقة وإضافتها إلى الوثائق المرتبطة بالملف.',
+        title: 'تم رفع وثيقة طلب استكمال المسطرة التأديبية',
+        description: 'تم حفظ الوثيقة وإضافتها إلى الوثائق المرتبطة بالملف.',
         hasNextStep: true,
       })
     } catch {
@@ -1081,14 +1113,23 @@ export default function DossierExplicatifDetailPage() {
               </SelectContent>
             </Select>
           </div>
+          <UploadField
+            id="procedure_file"
+            label="وثيقة طلب استكمال المسطرة التأديبية"
+            accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            selectedFile={procedureFile}
+            onChange={(event) => { setProcedureFile(event.target.files?.[0] || null); setProcedureError(null) }}
+            helperText="PDF أو JPG أو PNG أو DOCX"
+            disabled={actionLoading}
+          />
           {procedureFeedback}
           <Button
             type="button"
             onClick={handlePrimaryActionClick}
-            disabled={actionLoading}
+            disabled={actionLoading || !procedureType || !procedureFile}
             className="w-full sm:w-auto"
           >
-            {actionLoading ? 'جاري الإنشاء...' : 'إنشاء طلب استكمال المسطرة التأديبية'}
+            {actionLoading ? 'جاري الرفع...' : 'رفع وثيقة طلب استكمال المسطرة التأديبية'}
           </Button>
         </div>
       )
@@ -1203,9 +1244,10 @@ export default function DossierExplicatifDetailPage() {
       case 3: {
         const isFinalState = ['CLOTURE', 'A_ARCHIVER', 'ARCHIVE'].includes(dossier.statut)
         const procedureDoc = procedureDocuments[0] || null
+        const procedureDocReady = procedureDoc ? isDocumentReady(procedureDoc) : false
 
         if (!procedureDoc) {
-          return <p className="text-sm text-slate-600">لم يتم إنشاء وثيقة المسطرة التأديبية</p>
+          return <p className="text-sm text-slate-600">لم يتم رفع وثيقة المسطرة التأديبية بعد</p>
         }
 
         return (
@@ -1215,40 +1257,49 @@ export default function DossierExplicatifDetailPage() {
               <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                 <FileText className="size-4 shrink-0 text-slate-500" />
                 <span className="flex-1 truncate text-sm font-medium text-slate-700">{getDocumentName(procedureDoc)}</span>
-                {isDocumentReady(procedureDoc) ? (
+                {procedureDocReady ? (
                   <a href={getDocumentDownloadUrl(dossier.id, procedureDoc.id)} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800">
                     <Download className="size-3" />
                     تحميل
                   </a>
-                ) : null}
+                ) : (
+                  <span className="shrink-0 text-xs font-medium text-amber-600">لم يتم رفع الوثيقة بعد</span>
+                )}
               </div>
             </div>
             {!isFinalState ? (
               <div className="space-y-3 border-t border-slate-100 pt-4">
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="min-w-[160px] flex-1 max-w-xs space-y-1.5">
-                    <p className="text-sm font-medium text-slate-600">نوع المسطرة</p>
-                    <Select value={procedureType} onValueChange={(v) => { setProcedureType(v); setProcedureError(null) }} disabled={procedureLoading}>
-                      <SelectTrigger className={selectTriggerClassName}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
-                        <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleGenerateProcedureFromEval}
-                    disabled={procedureLoading}
-                    className="sm:w-auto"
-                  >
-                    {procedureLoading ? 'جاري إعادة التوليد...' : 'إعادة توليد طلب استكمال المسطرة التأديبية'}
-                  </Button>
+                <div className="max-w-xs space-y-1.5">
+                  <p className="text-sm font-medium text-slate-600">نوع المسطرة</p>
+                  <Select value={procedureType} onValueChange={(v) => { setProcedureType(v); setProcedureError(null) }} disabled={procedureLoading}>
+                    <SelectTrigger className={selectTriggerClassName}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AVERTISSEMENT">{procedureLabels.AVERTISSEMENT}</SelectItem>
+                      <SelectItem value="RETENUE">{procedureLabels.RETENUE}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+                <UploadField
+                  id="procedure_replace_file"
+                  label={procedureDocReady ? 'استبدال وثيقة المسطرة (اختر ملفا جديدا)' : 'رفع وثيقة المسطرة'}
+                  accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  selectedFile={procedureReplaceFile}
+                  onChange={(event) => { setProcedureReplaceFile(event.target.files?.[0] || null); setProcedureError(null) }}
+                  helperText="PDF أو JPG أو PNG أو DOCX"
+                  disabled={procedureLoading}
+                />
                 {procedureFeedback}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleReplaceProcedureDocument}
+                  disabled={procedureLoading || !procedureType || !procedureReplaceFile}
+                  className="sm:w-auto"
+                >
+                  {procedureLoading ? 'جاري الرفع...' : procedureDocReady ? 'استبدال الوثيقة' : 'رفع الوثيقة'}
+                </Button>
               </div>
             ) : null}
           </div>
@@ -1678,13 +1729,13 @@ export default function DossierExplicatifDetailPage() {
           </div>
         ) : null}
 
-        {/* ═══ Block 3: الإجراء التالي — only when procedure not yet generated ═══ */}
+        {/* ═══ Block 3: الإجراء التالي — only when procedure document not yet uploaded ═══ */}
         {!showEvalForm && hasEvalData && dossier.decision_reponse === 'NON_CONVAINCANTE' && !isFinal && procedureDocuments.length === 0 ? (
           <div className={block}>
             <div className={blockHeader}>
               <div>
                 <p className="text-sm font-semibold text-slate-900">الإجراء التالي</p>
-                <p className={blockSubtitle}>إنشاء طلب استكمال المسطرة التأديبية حسب نوع المخالفة</p>
+                <p className={blockSubtitle}>رفع وثيقة طلب استكمال المسطرة التأديبية حسب نوع المخالفة</p>
               </div>
             </div>
             <div className={blockBody}>
@@ -1694,7 +1745,7 @@ export default function DossierExplicatifDetailPage() {
                   <Select
                     value={procedureType}
                     onValueChange={(v) => { setProcedureType(v); setProcedureError(null) }}
-                    disabled={procedureLoading}
+                    disabled={actionLoading}
                   >
                     <SelectTrigger className={selectTriggerClassName}>
                       <SelectValue />
@@ -1705,14 +1756,23 @@ export default function DossierExplicatifDetailPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <UploadField
+                  id="procedure_file_eval"
+                  label="وثيقة طلب استكمال المسطرة التأديبية"
+                  accept="application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  selectedFile={procedureFile}
+                  onChange={(event) => { setProcedureFile(event.target.files?.[0] || null); setProcedureError(null) }}
+                  helperText="PDF أو JPG أو PNG أو DOCX"
+                  disabled={actionLoading}
+                />
                 {procedureFeedback}
                 <Button
                   type="button"
-                  onClick={handleGenerateProcedureFromEval}
-                  disabled={procedureLoading}
+                  onClick={handlePrimaryActionClick}
+                  disabled={actionLoading || !procedureType || !procedureFile}
                   className="w-full transition-colors sm:w-auto"
                 >
-                  {procedureLoading ? 'جاري الإنشاء...' : 'إنشاء طلب استكمال المسطرة التأديبية'}
+                  {actionLoading ? 'جاري الرفع...' : 'رفع وثيقة طلب استكمال المسطرة التأديبية'}
                 </Button>
               </div>
             </div>
@@ -1811,9 +1871,8 @@ export default function DossierExplicatifDetailPage() {
               {!readOnly && (dossier.statut === 'REPONSE_CONVAINCANTE' || dossier.statut === 'PROCEDURE_SUIVANTE_GENEREE') && (
                 <Button
                   type="button"
-                  variant="outline"
                   disabled={actionLoading || !canRunCurrentAction}
-                  className="gap-2 border-green-200 text-green-700 transition-colors hover:bg-green-50 hover:text-green-800 sm:w-auto"
+                  className="gap-2 sm:w-auto"
                   onClick={handlePrimaryActionClick}
                 >
                   <CheckCircle2 className="size-4" />
@@ -1836,7 +1895,7 @@ export default function DossierExplicatifDetailPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-2 border-red-200 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 sm:w-auto"
+                  className="gap-2 border-red-200 text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 sm:w-auto"
                   onClick={() => { setCancelError(''); setCancelMotif(''); setCancelDialogOpen(true) }}
                 >
                   <Ban className="size-4" />
@@ -1845,8 +1904,8 @@ export default function DossierExplicatifDetailPage() {
               )}
               <Button
                 type="button"
-                variant="outline"
-                className="gap-2 border-slate-200 text-slate-700 transition-colors hover:bg-slate-50 sm:w-auto"
+                variant="ghost"
+                className="gap-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 sm:w-auto"
                 onClick={() => router.push('/dossiers-explicatifs')}
               >
                 <ArrowRight className="size-4" />
@@ -1970,9 +2029,9 @@ export default function DossierExplicatifDetailPage() {
         <Dialog open={procedureConfirmOpen} onOpenChange={setProcedureConfirmOpen}>
           <DialogContent className="max-w-xl" dir="rtl">
             <DialogHeader className="text-right sm:text-right">
-              <DialogTitle className="text-right">تأكيد إنشاء طلب المسطرة التأديبية</DialogTitle>
+              <DialogTitle className="text-right">تأكيد رفع وثيقة المسطرة التأديبية</DialogTitle>
               <DialogDescription className="text-right">
-                سيتم إنشاء طلب استكمال المسطرة التأديبية اعتمادًا على نموذج نوع المخالفة
+                سيتم حفظ الوثيقة المرفوعة كطلب استكمال المسطرة التأديبية لهذا الملف
               </DialogDescription>
             </DialogHeader>
 
@@ -1986,6 +2045,10 @@ export default function DossierExplicatifDetailPage() {
                   <div className="flex items-center justify-between gap-3">
                     <dt className="font-medium text-slate-500">نوع المخالفة</dt>
                     <dd className="max-w-[220px] text-left font-semibold text-slate-800">{getTypeFauteLabel(dossier.type_faute) || '-'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="font-medium text-slate-500">الملف</dt>
+                    <dd className="max-w-[220px] truncate text-left font-semibold text-slate-800" dir="ltr">{procedureFile?.name || '-'}</dd>
                   </div>
                 </dl>
               </div>
@@ -2006,7 +2069,7 @@ export default function DossierExplicatifDetailPage() {
                   disabled={actionLoading}
                   className="w-full sm:w-auto"
                 >
-                  {actionLoading ? 'جاري الإنشاء...' : 'إنشاء طلب المسطرة'}
+                  {actionLoading ? 'جاري الرفع...' : 'رفع الوثيقة'}
                 </Button>
               </div>
             </div>

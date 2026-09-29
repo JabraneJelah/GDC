@@ -20,6 +20,27 @@ import { AlertTriangle, Archive, ArrowRight, FolderOpen, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
+const typeFauteArabicLabels = {
+  RETARD: 'التأخر عن العمل',
+  ABSENCE_NON_JUSTIFIEE: 'الغياب غير المبرر',
+  DEPART_AVANT_HEURE: 'مغادرة العمل قبل الوقت',
+  NON_RESPECT_PAUSE: 'عدم احترام أوقات الاستراحة',
+  MAUVAISE_CONDUITE_PATIENTS: 'سوء التعامل مع المرضى',
+  NON_RESPECT_COLLEGUES: 'عدم احترام الرؤساء أو الزملاء',
+  ALTERCATION_TRAVAIL: 'الشجار داخل العمل',
+  NON_RESPECT_ETHIQUE: 'عدم الالتزام بآداب المهنة',
+  TENUE_PROFESSIONNELLE: 'الهندام المهني',
+  ABANDON_POSTE: 'التخلي عن الوظيفة',
+  CERTIFICAT_MEDICAL_HORS_DELAI: 'الإدلاء بشهادة طبية خارج الآجال',
+  AZS: 'عطلة مرضية غير مبررة',
+  CONGE_MALADIE_NON_JUSTIFIE: 'عطلة مرضية غير مبررة',
+}
+
+function getFaultLabel(typeFaute) {
+  if (!typeFaute) return null
+  return typeFauteArabicLabels[typeFaute.code] || typeFaute.nom || null
+}
+
 const DEFAULT_FILTERS = {
   search: '',
   service: '',
@@ -200,6 +221,7 @@ export default function ArchivePage() {
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الاسم الكامل</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">رقم التأجير</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المصلحة</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">نوع المخالفة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">تاريخ الأرشفة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الإجراءات</TableHead>
                     </TableRow>
@@ -207,7 +229,7 @@ export default function ArchivePage() {
                   <TableBody>
                     {filteredDossiers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="px-5 py-16 text-center">
+                        <TableCell colSpan={7} className="px-5 py-16 text-center">
                           <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
                             <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
                             <div className="space-y-1">
@@ -252,6 +274,9 @@ export default function ArchivePage() {
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {dossier.service || '—'}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                            {getFaultLabel(dossier.type_faute) || '—'}
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
                             {formatDate(dossier.date_archivage)}
