@@ -1,6 +1,6 @@
 # API reference
 
-Inventory verified from the current `app/api/**/route.js` tree on 2026-09-15.
+Inventory verified from the current `app/api/**/route.js` tree at commit `3ba4298` on 2026-09-30.
 
 ## Authentication notation
 
@@ -77,8 +77,7 @@ There is no DELETE handler for `/api/utilisateurs/[id]`; UI deactivation is the 
 |---|---|---|---|
 | `/api/conges` | GET | Explicit | List leave records and related identity/type/creator data. |
 | `/api/conges` | POST | Explicit; reader blocked | Create leave, compute end date, and consume balances unless `hors_solde`. |
-| `/api/conges/[id]` | PUT | Explicit; reader blocked | Full edit; restores and reconsumes balances when relevant; cannot change `hors_solde` mode. |
-| `/api/conges/[id]` | PATCH | Explicit; reader blocked | Replace or clear supporting-document metadata with optimistic prior-value check. |
+| `/api/conges/[id]` | PUT | Explicit; reader blocked | Full edit, including `reference_doc`; restores and reconsumes balances when relevant; cannot change `hors_solde` mode. |
 | `/api/conges/[id]` | DELETE | Explicit; reader blocked | Restore balance for normal leave, then delete; direct delete for `hors_solde`. |
 | `/api/conges/upload` | POST | Explicit; reader blocked | Upload JPEG/PNG/PDF supporting file, maximum 8 MiB. |
 | `/api/conges/[id]/decision` | POST | Explicit; reader blocked | Upload/replace JPEG/PNG/PDF official decision, maximum 8 MiB. |
@@ -92,7 +91,7 @@ See [Congés and soldes](conges-soldes.md) for balance order and transactional l
 
 | Route | Method | Auth | Purpose / restrictions |
 |---|---|---|---|
-| `/api/dossiers-explicatifs` | GET | Explicit | List dossiers with fault type and current professor hospital summary. |
+| `/api/dossiers-explicatifs` | GET | Explicit | List dossiers with fault type and current professor hospital summary. The dossier list page and the archive page (`/dossiers-explicatifs/a-archiver`) both filter this same response client-side, including by `type_faute`; there is no separate archive-specific endpoint. |
 | `/api/dossiers-explicatifs` | POST | Explicit; reader blocked | Multipart creation; active fault type; optional correspondence; writes `ENREGISTRE`. |
 | `/api/dossiers-explicatifs/[id]` | GET | Explicit | Dossier detail and ordered document records; history is not included. |
 | `/api/dossiers-explicatifs/[id]` | PATCH | Explicit; reader blocked | Merge allowlisted supplemental metadata; rejects `CLOTURE`, `A_ARCHIVER`, `ARCHIVE` but not `ANNULE`. |

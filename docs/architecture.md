@@ -1,6 +1,6 @@
 # Technical architecture
 
-Verified against the repository on 2026-09-15 at commit `f0d5573`, including the working-tree files present at verification time.
+Verified against the repository on 2026-09-30 at commit `3ba4298`.
 
 ## Runtime shape
 

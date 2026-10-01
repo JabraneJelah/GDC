@@ -1,5 +1,7 @@
 # Dossiers explicatifs
 
+Verified against the repository at commit `3ba4298` on 2026-09-30.
+
 This document describes the current implementation, not an idealized workflow. Database statuses, permitted API corrections, and five UI steps are distinct concepts.
 
 ## Core record design
@@ -207,6 +209,15 @@ It does not write a closure date or history row. It accepts an optional `comment
 
 Archive is a manual transition. The archive queue page loads the dossier collection and presents pending archive records. Archive does not delete database rows or files and does not create history.
 
+### Archive list: fault-type column and filter
+
+`/dossiers-explicatifs/a-archiver` (`app/dossiers-explicatifs/a-archiver/page.jsx`) displays a `نوع المخالفة` column and a fault-type filter for the already-archived list. Both reuse existing data with no schema or API change:
+
+- the column reads `dossier.type_faute` from the same `GET /api/dossiers-explicatifs` response already used to build the list (which already included `type_faute`);
+- the filter options come from `GET /api/type-faute` (the same referential endpoint used elsewhere), not a hardcoded list;
+- filtering is client-side, composed with the page's other existing filters (search, service, hospital, date range) as an intersection — selecting a fault type narrows within whatever the other filters already selected, it does not replace them;
+- a deactivated (`actif: false`) `TypeFaute` still displays correctly by name, since `TypeFaute` rows are never hard-deleted while referenced (`onDelete: Restrict`) — only ever deactivated.
+
 ## Cancellation
 
 `POST /api/dossiers-explicatifs/[id]/annuler` requires non-empty `motif_annulation`.
@@ -261,6 +272,8 @@ The detail page maps database statuses to five display steps:
 
 The step index represents the UI phase, not a complete status machine. Historical `BROUILLON`, `EN_ATTENTE_REPONSE`, and `EN_EVALUATION` are absent from this mapping and fall back to step zero.
 
+`components/dossiers-explicatifs/WorkflowStepper.jsx` renders these five steps with three visual states: completed (emerald), current (blue), upcoming (neutral slate) — geometry, click behavior, and step logic are unchanged from prior versions; only the color/weight tokens were strengthened for contrast. The dossier detail page's top action buttons (`إغلاق الملف`, `إلغاء الملف`, `رجوع`) follow the same primary/destructive/navigation color hierarchy described in [UI system](ui-system.md#buttons). Neither change altered any status transition, permission check, or API call.
+
 ## Documents and downloads
 
 Individual download:
@@ -278,6 +291,8 @@ ZIP download:
 - de-duplicates filenames;
 - builds the ZIP in memory with `pizzip`;
 - returns 404 when no file can be included.
+
+The shared allowlist in `lib/dossiers-explicatifs/documentPath.js` (`ALLOWED_PREFIXES`) includes `/uploads/procedures/` (both `/`-prefixed and bare forms), alongside `generated`, `proofs`, `responses`, `templates`, and `correspondances`. Both download endpoints use this same allowlist, so manually uploaded (`TELEVERSE`) `procedure_suivante` documents download individually and appear in the ZIP exactly like every other document category — this was verified end-to-end (upload, single download, ZIP contents) against a throwaway test dossier before this behavior shipped.
 
 Both endpoints allow authenticated readers. Direct URLs under `public/uploads` are also covered by the current middleware matcher.
 

@@ -1,6 +1,6 @@
 # Verified current technical debt
 
-Verified on 2026-09-15. This file records present issues supported by current code. It intentionally excludes resolved historical items such as missing initial-document categories, placeholder-only procedure generation, and page-local `PageShell` implementations.
+Verified at commit `3ba4298` on 2026-09-30. This file records present issues supported by current code. It intentionally excludes resolved historical items such as missing initial-document categories, placeholder-only procedure generation, and page-local `PageShell` implementations.
 
 Severity indicates potential impact, not a remediation commitment.
 
@@ -41,6 +41,14 @@ Consequences:
 - deactivated users can continue using an existing token;
 - role changes may not affect backend authorization until re-login;
 - frontend and backend can temporarily disagree on role.
+
+### Insecure hardcoded JWT fallback secret
+
+**Area:** authentication
+
+Both `lib/auth.js` and `middleware.js` independently fall back to the literal string `'your-secret-key-change-in-production'` when the `JWT_SECRET` environment variable is unset. Anyone who knows this fallback (it is visible in this public/shared repository) could forge a valid token for any user/role if a deployment ever runs without `JWT_SECRET` set.
+
+Docker's `entrypoint.sh` blocks this fallback in its production startup path (length ≥32 and forbidden-substring checks), but any other launch method — local `npm run start`/`next dev`, a non-Docker deployment, or a misconfigured environment — is not protected by that check.
 
 ### Login cookie is not secure in production
 
@@ -220,11 +228,11 @@ Earlier leave/balance indexes were dropped by a historical migration and not res
 
 Download-all reads every available dossier document and generates the complete ZIP in memory. No total size/file-count bound is enforced.
 
-### Missing automated tests
+### Missing automated tests and lint script
 
 **Area:** quality assurance
 
-No automated unit, integration, API, migration, or UI test suite is present in the repository. `package.json` has no test script. High-risk behavior currently relies on manual inspection/build validation.
+No automated unit, integration, API, migration, or UI test suite is present in the repository. `package.json` has no `test` script and no `lint` script (only `dev`, `build`, `start`, and `db:seed`). High-risk behavior currently relies on manual inspection/build validation.
 
 Priority candidates for future tests include:
 
