@@ -41,11 +41,38 @@ function getFaultLabel(typeFaute) {
   return typeFauteArabicLabels[typeFaute.code] || typeFaute.nom || null
 }
 
+const procedureTypeArabicLabels = {
+  AVERTISSEMENT: 'تنبيه',
+  RETENUE: 'اقتطاع',
+}
+
+const PROCEDURE_TYPE_FILTER_OPTIONS = [
+  { value: 'AVERTISSEMENT', label: 'تنبيه' },
+  { value: 'RETENUE', label: 'اقتطاع' },
+  { value: 'NONE', label: 'بدون مسطرة' },
+]
+
+function getProcedureTypeLabel(typeProcedureSelectionne) {
+  if (!typeProcedureSelectionne) return null
+  return procedureTypeArabicLabels[typeProcedureSelectionne] || null
+}
+
+// Prefers the live professor's split name fields (Arabic first, matching the
+// dossier-creation snapshot convention); falls back to the stored snapshot
+// string for historical dossiers or professors no longer linked.
+function getDossierFullName(dossier) {
+  const p = dossier.professeur
+  if (p?.nom_ar && p?.prenom_ar) return `${p.nom_ar} ${p.prenom_ar}`.trim()
+  if (p?.nom || p?.prenom) return `${p.prenom || ''} ${p.nom || ''}`.trim()
+  return dossier.nom_complet || null
+}
+
 const DEFAULT_FILTERS = {
   search: '',
   service: '',
   hopital: '',
   typeFauteId: '',
+  procedureType: '',
   dateFrom: '',
   dateTo: '',
 }
@@ -111,6 +138,13 @@ export default function ArchivePage() {
       if (filters.service && d.service !== filters.service) return false
       if (filters.hopital && d.professeur?.hopital?.nom !== filters.hopital) return false
       if (filters.typeFauteId && String(d.type_faute?.id) !== filters.typeFauteId) return false
+      if (filters.procedureType) {
+        if (filters.procedureType === 'NONE') {
+          if (d.type_procedure_selectionne) return false
+        } else if (d.type_procedure_selectionne !== filters.procedureType) {
+          return false
+        }
+      }
       const df = d.date_faute?.slice(0, 10)
       if (filters.dateFrom && df && df < filters.dateFrom) return false
       if (filters.dateTo && df && df > filters.dateTo) return false
@@ -180,6 +214,7 @@ export default function ArchivePage() {
           uniqueHopitaux={uniqueHopitaux}
           typesFaute={typesFaute}
           statusOptions={null}
+          procedureTypeOptions={PROCEDURE_TYPE_FILTER_OPTIONS}
         />
 
         {/* Content */}
@@ -222,6 +257,7 @@ export default function ArchivePage() {
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">رقم التأجير</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المصلحة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">نوع المخالفة</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">نوع المسطرة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">تاريخ الأرشفة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الإجراءات</TableHead>
                     </TableRow>
@@ -229,7 +265,7 @@ export default function ArchivePage() {
                   <TableBody>
                     {filteredDossiers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="px-5 py-16 text-center">
+                        <TableCell colSpan={8} className="px-5 py-16 text-center">
                           <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
                             <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
                             <div className="space-y-1">
@@ -267,7 +303,7 @@ export default function ArchivePage() {
                             </span>
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
-                            {dossier.nom_complet || '—'}
+                            {getDossierFullName(dossier) || '—'}
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {dossier.matricule || '—'}
@@ -277,6 +313,9 @@ export default function ArchivePage() {
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {getFaultLabel(dossier.type_faute) || '—'}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                            {getProcedureTypeLabel(dossier.type_procedure_selectionne) || '—'}
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
                             {formatDate(dossier.date_archivage)}

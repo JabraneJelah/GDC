@@ -218,6 +218,14 @@ Archive is a manual transition. The archive queue page loads the dossier collect
 - filtering is client-side, composed with the page's other existing filters (search, service, hospital, date range) as an intersection — selecting a fault type narrows within whatever the other filters already selected, it does not replace them;
 - a deactivated (`actif: false`) `TypeFaute` still displays correctly by name, since `TypeFaute` rows are never hard-deleted while referenced (`onDelete: Restrict`) — only ever deactivated.
 
+### Archive list: professor name display
+
+The archive list's name column shows the linked professor's first and last name from the live `Professeur` relation (`nom_ar`/`prenom_ar` when both exist, otherwise `prenom`/`nom`) instead of the dossier's `nom_complet` string directly. This intentionally reads the professor's **current** name, which can differ from the dossier's historical identity snapshot if the professor was renamed after the dossier was created — unlike the rest of this document's snapshot-preservation model (see "Core record design" above), the archive list's name column is a deliberate exception that favors showing the up-to-date name. When a dossier has no linked professor (`professeur_id: null` — historical dossier, or the professor was later deleted), the column falls back to the unmodified `nom_complet` snapshot string; it is never split or reconstructed.
+
+### Archive list: procedure-type column and filter
+
+The archive list also displays a `نوع المسطرة` column and filter, reusing `dossier.type_procedure_selectionne` already returned by `GET /api/dossiers-explicatifs` — no schema or new API field. Values: `AVERTISSEMENT` → `تنبيه`, `RETENUE` → `اقتطاع`, and no value (dossiers closed directly from a convincing response, which never reach the procedure step) → `—` in the column and a dedicated `بدون مسطرة` filter option. This filter composes with the fault-type filter and the page's other existing filters as an intersection, the same way the fault-type filter does.
+
 ## Cancellation
 
 `POST /api/dossiers-explicatifs/[id]/annuler` requires non-empty `motif_annulation`.

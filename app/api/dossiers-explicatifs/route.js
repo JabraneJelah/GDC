@@ -58,6 +58,7 @@ export async function GET() {
         statut: true,
         cree_le: true,
         date_archivage: true,
+        type_procedure_selectionne: true,
         type_faute: {
           select: {
             id: true,
@@ -68,6 +69,10 @@ export async function GET() {
         },
         professeur: {
           select: {
+            nom: true,
+            prenom: true,
+            nom_ar: true,
+            prenom_ar: true,
             hopital: {
               select: { nom: true },
             },

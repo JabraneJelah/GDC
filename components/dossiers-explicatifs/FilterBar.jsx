@@ -43,6 +43,7 @@ const typeFauteArabicLabels = {
  *  uniqueHopitaux – string[]
  *  typesFaute     – { id, code, nom }[]
  *  statusOptions  – array of { value, label } | null (null = hide status filter entirely)
+ *  procedureTypeOptions – array of { value, label } | null/undefined (omit = hide procedure-type filter entirely)
  */
 export function FilterBar({
   filters,
@@ -56,8 +57,10 @@ export function FilterBar({
   uniqueHopitaux = [],
   typesFaute = [],
   statusOptions,
+  procedureTypeOptions,
 }) {
   const showStatus = statusOptions != null
+  const showProcedureType = procedureTypeOptions != null
 
   const activeFilterCount = useMemo(
     () => Object.keys(defaultFilters).filter((k) => filters[k] !== defaultFilters[k]).length,
@@ -80,12 +83,16 @@ export function FilterBar({
       const opt = (statusOptions || []).find((o) => o.value === filters.status)
       chips.push({ key: 'status', label: opt?.label || filters.status })
     }
+    if ('procedureType' in defaultFilters && filters.procedureType) {
+      const opt = (procedureTypeOptions || []).find((o) => o.value === filters.procedureType)
+      chips.push({ key: 'procedureType', label: `نوع المسطرة: ${opt?.label || filters.procedureType}` })
+    }
     if ('dateFrom' in defaultFilters && filters.dateFrom)
       chips.push({ key: 'dateFrom', label: `من: ${filters.dateFrom}` })
     if ('dateTo' in defaultFilters && filters.dateTo)
       chips.push({ key: 'dateTo', label: `إلى: ${filters.dateTo}` })
     return chips
-  }, [filters, defaultFilters, typesFaute, statusOptions])
+  }, [filters, defaultFilters, typesFaute, statusOptions, procedureTypeOptions])
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -189,8 +196,12 @@ export function FilterBar({
               </div>
             </div>
 
-            {/* Row 2: typeFaute, (status), dateFrom, dateTo */}
-            <div className={`grid gap-3 ${showStatus ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+            {/* Row 2: typeFaute, (status), (procedureType), dateFrom, dateTo */}
+            <div className={`grid gap-3 ${
+              showStatus && showProcedureType ? 'sm:grid-cols-5'
+              : showStatus || showProcedureType ? 'sm:grid-cols-4'
+              : 'sm:grid-cols-3'
+            }`}>
               <div className="space-y-1.5">
                 <label className="block text-right text-xs font-semibold text-slate-600">نوع المخالفة</label>
                 <Select
@@ -219,6 +230,25 @@ export function FilterBar({
                     </SelectTrigger>
                     <SelectContent>
                       {statusOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {showProcedureType && (
+                <div className="space-y-1.5">
+                  <label className="block text-right text-xs font-semibold text-slate-600">نوع المسطرة</label>
+                  <Select
+                    value={filters.procedureType || '__all__'}
+                    onValueChange={(v) => onFilterChange('procedureType', v === '__all__' ? '' : v)}
+                  >
+                    <SelectTrigger className="h-9 rounded-xl border-slate-300 bg-white text-right text-sm">
+                      <SelectValue placeholder="كل الأنواع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">كل الأنواع</SelectItem>
+                      {procedureTypeOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
