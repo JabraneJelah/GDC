@@ -83,7 +83,7 @@ Only two role values are meaningful in current code: `UTILISATEUR_RH` (normal re
 3. An optional pre-migration `pg_dump` (`AUTO_BACKUP_BEFORE_MIGRATE=true`) is available but disabled by default and has no automatic retention, encryption, or restore test.
 4. The migration history contains real historical destructive operations (whole-table drops later recreated, required columns added without backfill) — see [Database](docs/database.md) and [Technical debt](docs/technical-debt.md). A clean fresh-database bootstrap is not evidence that those historical operations were safe for a populated database at the time.
 5. **Application rollback is not database rollback.** Redeploying a previous application version does not undo an already-applied migration or already-mutated data/files.
-6. Two endpoints — `/api/migrate-services` and `/api/migrate-indexes` — are explicitly exempt from authentication middleware and execute raw, unauthenticated DDL. This is a live, currently-reachable risk, not only historical debt.
+6. Two formerly unauthenticated raw-DDL endpoints, `/api/migrate-services` and `/api/migrate-indexes`, have been deleted along with their middleware exemptions; see [Technical debt](docs/technical-debt.md).
 
 ## Critical invariants
 

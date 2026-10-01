@@ -197,9 +197,8 @@ The repository has a gitignored `.env` but no `.env.example` at verification tim
 
 ## Operational bypasses and non-guarantees
 
-- `/api/migrate-services` and `/api/migrate-indexes` execute raw DDL outside Prisma migration tracking and are middleware-exempt.
-- The scanner does not run for those endpoints.
-- Manual database operations can make schema and migration history diverge.
+- `/api/migrate-services` and `/api/migrate-indexes`, which executed raw DDL outside Prisma migration tracking and were middleware-exempt, have been deleted; see [Technical debt](technical-debt.md). The scanner never covered them regardless, since they bypassed `prisma migrate deploy` entirely.
+- Manual database operations (any remaining raw-SQL route, or direct database access) can still make schema and migration history diverge; the scanner only covers `prisma migrate deploy`'s own pending migrations.
 - A named volume is not an off-host backup.
 - Successful `pg_dump` does not prove successful restoration.
 - Persistent uploads do not make database rows and file content atomic or mutually consistent.

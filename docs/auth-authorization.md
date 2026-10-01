@@ -47,8 +47,8 @@ Explicit exemptions:
 - `/login`
 - every path beginning `/api/auth`
 - every path beginning `/api/init`
-- every path beginning `/api/migrate-services`
-- every path beginning `/api/migrate-indexes`
+
+The former exemptions for `/api/migrate-services` and `/api/migrate-indexes` were removed, along with the two route files themselves, after a security review found them unauthenticated, executing raw unaudited DDL outside Prisma migration tracking, and called by no application or deployment code. See [Technical debt](technical-debt.md).
 
 For other paths:
 
@@ -154,9 +154,9 @@ All `/api/auth/**` paths bypass middleware, so each handler must enforce its own
 - POST reactivates by username or email without a role check.
 - GET lists user identifiers and active states without handler-level authentication.
 
-### Migration endpoints
+### Migration endpoints (removed)
 
-`/api/migrate-services` and `/api/migrate-indexes` are explicitly exempt from middleware and execute raw DDL. They are a production-security and database-safety concern; see [Deployment and operations](deployment-operations.md) and [Technical debt](technical-debt.md).
+`/api/migrate-services` and `/api/migrate-indexes`, which were explicitly exempt from middleware and executed raw DDL, have been deleted along with their middleware exemptions. See [Technical debt](technical-debt.md).
 
 ## Current security inconsistencies
 
@@ -166,9 +166,8 @@ All `/api/auth/**` paths bypass middleware, so each handler must enforce its own
 4. `/api/auth/me` reads the database role, while backend mutation authorization generally uses the possibly stale token role.
 5. `LECTEUR_RH` enforcement is duplicated and incomplete.
 6. No administrator role separates user/settings administration from ordinary RH work.
-7. Middleware-exempt raw migration endpoints exist.
-8. The first-user initializer’s count condition appears reversed.
-9. Legacy create/emergency endpoints have behavior inconsistent with their names, comments, or current login model.
-10. Invalid API tokens produce redirects while missing tokens produce JSON 401.
+7. The first-user initializer’s count condition appears reversed.
+8. Legacy create/emergency endpoints have behavior inconsistent with their names, comments, or current login model.
+9. Invalid API tokens produce redirects while missing tokens produce JSON 401.
 
 These are verified current issues, not instructions to depend on the behavior.

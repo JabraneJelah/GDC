@@ -1,24 +1,10 @@
 # Verified current technical debt
 
-Verified at commit `3ba4298` on 2026-09-30. This file records present issues supported by current code. It intentionally excludes resolved historical items such as missing initial-document categories, placeholder-only procedure generation, and page-local `PageShell` implementations.
+Verified at commit `3ba4298` on 2026-09-30. This file records present issues supported by current code. It intentionally excludes resolved historical items such as missing initial-document categories, placeholder-only procedure generation, page-local `PageShell` implementations, and the formerly middleware-exempt `/api/migrate-services`/`/api/migrate-indexes` raw-DDL endpoints (deleted, along with their middleware exemptions, after a dedicated security review found them unauthenticated and unused by any caller; see [Authentication and authorization](auth-authorization.md)).
 
 Severity indicates potential impact, not a remediation commitment.
 
 ## Critical
-
-### Middleware-exempt raw migration endpoints
-
-**Area:** database, security, deployment
-
-`/api/migrate-services` and `/api/migrate-indexes` are explicitly exempted by middleware and execute `$executeRawUnsafe` DDL.
-
-Risks:
-
-- unauthenticated schema changes;
-- bypass of `_prisma_migrations` and the pending migration scanner;
-- live schema drift;
-- `/api/migrate-services` attempts to make `service_id` required, conflicting with the current nullable Prisma field;
-- data and availability impact from unexpected invocation.
 
 ### Non-transactional leave/balance mutations
 
@@ -220,7 +206,7 @@ User-visible errors mix Arabic and French. Several source files display mojibake
 
 **Area:** database performance
 
-Earlier leave/balance indexes were dropped by a historical migration and not restored through later Prisma migrations. A legacy raw endpoint can add some indexes, making deployed performance dependent on out-of-band history.
+Earlier leave/balance indexes were dropped by a historical migration and not restored through later Prisma migrations. The unauthenticated `/api/migrate-indexes` endpoint that could add some of them out-of-band has been removed (see above); restoring these indexes now requires a proper tracked Prisma migration, which has not yet been created.
 
 ### In-memory ZIP generation
 

@@ -164,11 +164,6 @@ The UI path is `/types-fautes`; the API base is singular `/api/type-faute`.
 | `/api/app-settings` | GET | Explicit | Read merged file-backed settings/defaults. |
 | `/api/app-settings` | PUT | Explicit; reader blocked | Merge and write submitted JSON; no strict key allowlist in the save helper. |
 
-## Legacy raw migration endpoints
+## Legacy raw migration endpoints (removed)
 
-| Route | Method | Auth | Behavior |
-|---|---|---|---|
-| `/api/migrate-services` | POST | **Exempt** | Executes raw SQL to create/backfill/require services and add FK. This conflicts with current nullable schema intent. |
-| `/api/migrate-indexes` | POST | **Exempt** | Executes raw `CREATE INDEX IF NOT EXISTS` statements outside Prisma migration tracking. |
-
-These endpoints bypass the normal pending-migration scanner and must not be treated as ordinary operational APIs.
+`/api/migrate-services` (POST) and `/api/migrate-indexes` (POST) previously existed as middleware-exempt, unauthenticated routes executing raw SQL (`$executeRawUnsafe`) outside Prisma migration tracking — `migrate-services` created/backfilled the `services` table and added a `professeurs.service_id` foreign key conflicting with the current nullable schema; `migrate-indexes` created several `CREATE INDEX IF NOT EXISTS` statements. Both route files and their middleware exemptions have been deleted after a security review found them unauthenticated and unused by any application or deployment code. See [Technical debt](technical-debt.md).

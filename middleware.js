@@ -9,9 +9,7 @@ export async function middleware(request) {
   if (
     pathname === '/login' ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/init') ||
-    pathname.startsWith('/api/migrate-services') ||
-    pathname.startsWith('/api/migrate-indexes')
+    pathname.startsWith('/api/init')
   ) {
     return NextResponse.next()
   }
