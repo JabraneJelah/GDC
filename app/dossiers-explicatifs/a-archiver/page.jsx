@@ -134,7 +134,15 @@ export default function ArchivePage() {
   const filteredDossiers = useMemo(() => {
     const norm = filters.search.trim().toLowerCase()
     return dossiers.filter((d) => {
-      if (norm && ![d.reference, d.nom_complet, d.matricule].filter(Boolean).some((v) => v.toLowerCase().includes(norm))) return false
+      if (norm && ![
+        d.reference,
+        d.nom_complet,
+        d.matricule,
+        d.professeur?.nom,
+        d.professeur?.prenom,
+        d.professeur?.nom_ar,
+        d.professeur?.prenom_ar,
+      ].filter(Boolean).some((v) => v.toLowerCase().includes(norm))) return false
       if (filters.service && d.service !== filters.service) return false
       if (filters.hopital && d.professeur?.hopital?.nom !== filters.hopital) return false
       if (filters.typeFauteId && String(d.type_faute?.id) !== filters.typeFauteId) return false
