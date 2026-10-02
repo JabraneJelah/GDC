@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import Link from 'next/link'
-import { Download, FileText, Pencil, Trash2, Plus, Upload, ArrowRight, Users } from 'lucide-react'
+import { Download, FileText, Pencil, Trash2, Plus, Upload, ArrowRight } from 'lucide-react'
 import { Pagination } from '@/components/ui/pagination'
 import {
   getListStatusLabel,
@@ -440,8 +440,6 @@ export default function ProfesseurDetailsPage() {
   const historiqueCongesPageRows = congesList.slice(historiqueStart, historiqueStart + HISTORIQUE_CONGES_PAGE_SIZE)
   const showHistoriquePagination = congesList.length > HISTORIQUE_CONGES_PAGE_SIZE
 
-  const fullName = `${professeur.titre?.nom ? `${professeur.titre.nom} ` : ''}${professeur.prenom} ${professeur.nom}`.trim()
-
   const totalSoldeDisponible = soldes
     .filter(s => new Date(s.expire_le) >= new Date() && s.jours_restants > 0)
     .filter(s => {
@@ -453,20 +451,10 @@ export default function ProfesseurDetailsPage() {
   return (
     <div className="space-y-5" dir="rtl">
 
-      {/* Header */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          {/* Identity */}
-          <div className="space-y-3 text-right">
-            <div className="flex items-center gap-2">
-              <Users className="size-5 text-blue-600 shrink-0" />
-              <h1 className="text-2xl font-bold text-slate-950">{fullName}</h1>
-            </div>
-            {professeur.ppr && (
-              <p className="text-sm text-slate-500">رقم التأجير: <span className="font-semibold text-slate-700" dir="ltr">{professeur.ppr}</span></p>
-            )}
-          </div>
-          {/* Actions */}
+      {/* Unified employee info card */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-3">
+          <h2 className="text-sm font-semibold text-slate-800">معلومات الموظف</h2>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <Link
               href="/professeurs"
@@ -484,13 +472,6 @@ export default function ProfesseurDetailsPage() {
               تعديل المعلومات
             </button>
           </div>
-        </div>
-      </section>
-
-      {/* Unified employee info card */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
-          <h2 className="text-sm font-semibold text-slate-800">معلومات الموظف</h2>
         </div>
         <div className="divide-y divide-slate-100">
 
@@ -539,7 +520,7 @@ export default function ProfesseurDetailsPage() {
 
       {/* Soldes section */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3 sm:px-6">
           <h2 className="text-sm font-semibold text-slate-800">تدبير أرصدة الرخص</h2>
           <button
             type="button"
@@ -634,7 +615,7 @@ export default function ProfesseurDetailsPage() {
 
       {/* Congé history section */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+        <div className="border-b border-slate-200 bg-white px-5 py-3 sm:px-6">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">سجل الرخص</h2>
             <span className="text-xs text-slate-500">{congesList.length} رخصة</span>
@@ -825,7 +806,7 @@ export default function ProfesseurDetailsPage() {
 
       {/* Dossiers explicatifs section */}
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 sm:px-6">
+        <div className="border-b border-slate-200 bg-white px-5 py-3 sm:px-6">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">الملفات التوضيحية</h2>
             <span className="text-xs text-slate-500">{dossiersList.length} ملف</span>
