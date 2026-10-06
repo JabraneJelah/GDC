@@ -35,6 +35,9 @@ export async function GET(request) {
             nom: true,
             prenom: true,
             ppr: true,
+            cin: true,
+            nom_ar: true,
+            prenom_ar: true,
             titre: {
               select: {
                 id: true,

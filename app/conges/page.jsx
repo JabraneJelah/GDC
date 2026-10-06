@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, FileText, Plus, SlidersHorizontal, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChevronDown, ChevronUp, FileSpreadsheet, FileText, Plus, SlidersHorizontal, X } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 8
 
@@ -792,6 +792,96 @@ export default function CongesPage() {
     )
   }
 
+  // Exports exactly the currently filtered rows (same filteredConges array the
+  // table renders from, one row per Congé record — not deduplicated by employee)
+  // as an .xlsx file, generated client-side so it can never drift from what's on screen.
+  const handleExportExcel = async () => {
+    if (filteredConges.length === 0) {
+      setErrorMessage('لا توجد نتائج مطابقة للفلتر الحالي لتصديرها.')
+      setErrorDialogOpen(true)
+      return
+    }
+    const XLSX = await import('xlsx')
+    const headerRow = [
+      'CIN',
+      'PPR',
+      'Nom',
+      'Prenom',
+      'النسب',
+      'الاسم',
+      'نوع الرخصة',
+      'تاريخ المغادرة',
+      'تاريخ النهاية',
+      'المدة (أيام)',
+      'المعوض',
+      'أنشئ من قبل',
+    ]
+    const numCols = headerRow.length
+    const rows = []
+    const merges = []
+
+    // Banner rows (title / active filter / export date) are merged across all
+    // columns for a polished look. Only !merges and !cols are used below —
+    // the installed xlsx version (0.18.5) does not reliably support writing
+    // freeze panes, so that is intentionally left out rather than hacked in.
+    // No autofilter: the sheet already only contains the filtered rows, so
+    // Excel's filter-arrow dropdowns would be redundant and overlap the
+    // Arabic header text.
+    rows.push(['Liste des congés'])
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: numCols - 1 } })
+
+    if (filters.typeCongeId) {
+      const tc = typesConge.find((t) => String(t.id) === filters.typeCongeId)
+      rows.push([`Type de congé : ${tc?.nom || filters.typeCongeId}`])
+      merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: numCols - 1 } })
+    }
+
+    rows.push([`Date d'export : ${new Date().toLocaleDateString('fr-FR')}`])
+    merges.push({ s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: numCols - 1 } })
+
+    rows.push([])
+
+    rows.push(headerRow)
+
+    filteredConges.forEach((conge) => {
+      rows.push([
+        conge.professeur?.cin || '',
+        conge.professeur?.ppr || '',
+        conge.professeur?.nom || '',
+        conge.professeur?.prenom || '',
+        conge.professeur?.nom_ar || '',
+        conge.professeur?.prenom_ar || '',
+        conge.type_conge?.nom || '',
+        formatDate(conge.date_debut),
+        formatDate(conge.date_fin),
+        conge.duree_jours ?? '',
+        conge.nom_interim || '',
+        conge.cree_par_rh?.nom_complet || '',
+      ])
+    })
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows)
+    worksheet['!merges'] = merges
+    worksheet['!cols'] = [
+      { wch: 14 }, // CIN
+      { wch: 12 }, // PPR
+      { wch: 16 }, // Nom
+      { wch: 16 }, // Prenom
+      { wch: 16 }, // النسب
+      { wch: 16 }, // الاسم
+      { wch: 20 }, // نوع الرخصة
+      { wch: 14 }, // تاريخ المغادرة
+      { wch: 14 }, // تاريخ النهاية
+      { wch: 12 }, // المدة
+      { wch: 18 }, // المعوض
+      { wch: 18 }, // أنشئ من قبل
+    ]
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Liste des congés')
+    XLSX.writeFile(workbook, `conges-filtres-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
   // Returns true if a YYYY-MM-DD string is a weekend or active holiday
   const isNonWorkingDay = (ymd) => {
     if (!ymd) return false
@@ -1154,15 +1244,27 @@ export default function CongesPage() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-right text-xs font-medium text-slate-600 sm:px-6">
-          عرض{' '}
-          <span className="font-bold text-slate-900">{filteredConges.length}</span>{' '}
-          رخصة
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-2.5 sm:px-6">
+          <span className="text-right text-xs font-medium text-slate-600">
+            عرض{' '}
+            <span className="font-bold text-slate-900">{filteredConges.length}</span>{' '}
+            رخصة
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="h-8 gap-1.5 text-slate-700"
+          >
+            <FileSpreadsheet className="size-3.5" />
+            تنزيل
+          </Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-[#F1F5F9]">
+              <tr className="border-b border-slate-200 bg-white">
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الموظف</th>
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع الرخصة</th>
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ المغادرة</th>
