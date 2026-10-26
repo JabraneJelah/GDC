@@ -3,6 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { rejectIfLecteur } from '@/lib/roles'
 import { getExtraFieldsForCode } from '@/lib/dossiers-explicatifs/extraFields'
+import {
+  deriveOrdreRetenuePolicy,
+  isOrdreRetenueTimestampConsistent,
+} from '@/lib/dossiers-explicatifs/ordreRetenuePolicy'
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -72,6 +76,18 @@ export async function GET(_request, { params }) {
             },
           },
         },
+        historique: {
+          where: { action: 'ORDRE_RETENUE_TELEVERSE' },
+          orderBy: [{ cree_le: 'asc' }, { id: 'asc' }],
+          take: 1,
+          select: {
+            id: true,
+            action: true,
+            ancien_statut: true,
+            nouveau_statut: true,
+            cree_le: true,
+          },
+        },
       },
     })
 
@@ -82,13 +98,49 @@ export async function GET(_request, { params }) {
       )
     }
 
+    const mappedDocuments = dossier.documents.map((document) => ({
+      ...document,
+      nom: document.titre,
+      created_at: document.cree_le,
+    }))
+    const ordreRetenueDocuments = mappedDocuments.filter(
+      (document) => document.categorie === 'ordre_retenue',
+    )
+    const hasMultipleOrdreRetenueDocuments = ordreRetenueDocuments.length > 1
+    const ordreRetenueDocument = ordreRetenueDocuments.length === 1
+      ? ordreRetenueDocuments[0]
+      : null
+    const firstUploadHistory = dossier.historique[0] || null
+    const ordreRetenuePolicy = deriveOrdreRetenuePolicy({
+      statut: dossier.statut,
+      typeProcedure: dossier.type_procedure_selectionne,
+      document: ordreRetenueDocument,
+      firstUploadHistory,
+      hasMultipleDocuments: hasMultipleOrdreRetenueDocuments,
+    })
+
+    if (ordreRetenueDocument && !isOrdreRetenueTimestampConsistent({
+      documentCreatedAt: ordreRetenueDocument.cree_le,
+      archiveDate: dossier.date_archivage,
+      firstUploadPhase: ordreRetenuePolicy.firstUploadPhase,
+    })) {
+      console.warn(`Incoherence temporelle ordre_retenue pour le dossier ${id}`)
+    }
+
+    const { historique: _historique, ...publicDossier } = dossier
+
     return NextResponse.json({
-      ...dossier,
-      documents: dossier.documents.map((document) => ({
-        ...document,
-        nom: document.titre,
-        created_at: document.cree_le,
-      })),
+      ...publicDossier,
+      documents: mappedDocuments,
+      ordre_retenue: {
+        document: ordreRetenueDocument,
+        firstUploadPhase: ordreRetenuePolicy.firstUploadPhase,
+        canUpload: ordreRetenuePolicy.canUpload,
+        canReplace: ordreRetenuePolicy.canReplace,
+        lockedAfterArchive:
+          ordreRetenuePolicy.lockedAfterArchive || hasMultipleOrdreRetenueDocuments,
+        ambiguous: hasMultipleOrdreRetenueDocuments,
+      },
     })
   } catch (error) {
     console.error('Erreur lors de la recuperation du dossier explicatif:', error)

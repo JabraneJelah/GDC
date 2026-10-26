@@ -4,6 +4,7 @@ import { FileText, Download, CheckCircle2, Clock } from 'lucide-react'
 
 const categoryLabels = {
   procedure_suivante:       'طلب استكمال المسطرة التأديبية',
+  ordre_retenue:            'أمر اقتطاع',
   lettre_explicative:       'رسالة توضيحية',
   bordereau_notification:   'إشعار / جدول إرسال',
   preuve_notification:      'وصل الاستلام',

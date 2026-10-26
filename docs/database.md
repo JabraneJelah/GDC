@@ -124,7 +124,7 @@ There is no `date_cloture`, persisted evaluation comment, or persisted closure c
 | `template_id` | String | yes | `SetNull` |
 | `cree_par_rh_id` | String | yes | `SetNull` |
 
-Current categories include `correspondance_service`, `lettre_explicative`, `bordereau_notification`, `preuve_notification`, `reponse_agent`, and `procedure_suivante`. The database does not constrain category strings.
+Current categories include `correspondance_service`, `lettre_explicative`, `bordereau_notification`, `preuve_notification`, `reponse_agent`, `procedure_suivante`, and the optional final document `ordre_retenue`. The database does not constrain category strings. Application logic maintains one logical `ordre_retenue` row per dossier and updates that row on replacement; there is no database uniqueness constraint for this convention.
 
 ### `DossierHistory` → `dossiers_historique`
 
@@ -139,7 +139,7 @@ Current categories include `correspondance_service`, `lettre_explicative`, `bord
 | `cree_le` | DateTime | no | `now()` |
 | `effectue_par_rh_id` | String | no | required RH actor, `Restrict` |
 
-Only cancellation currently creates a history row consistently.
+Cancellation and `ordre_retenue` upload/replacement create history rows consistently. The latter uses `ORDRE_RETENUE_TELEVERSE` for the first upload and `ORDRE_RETENUE_REMPLACE` for replacement, with both status fields set to the dossier's unchanged status at the time of the action. The first-upload event is the authoritative pre-/post-archive phase marker.
 
 ### Personnel referentials
 
