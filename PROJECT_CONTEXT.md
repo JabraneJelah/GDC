@@ -98,7 +98,7 @@ These are current architectural or business constraints. They are not guarantees
 7. From a non-convincing response, RH manually selects `AVERTISSEMENT`/تنبيه or `RETENUE`/اقتطاع and uploads the corresponding document (`update-procedure-document`); this is the normal-workflow path to `PROCEDURE_SUIVANTE_GENEREE`. Automatic DOCX generation (`generate-procedure`) still exists in the codebase for backward compatibility and historical documents, but is not called from any current UI path.
 8. Closure moves eligible dossiers to `A_ARCHIVER`; archive is a separate manual transition to `ARCHIVE`. The archive list additionally supports filtering by fault type (`TypeFaute`), reusing the existing relation with no schema change.
 9. `ANNULE` exists and requires an entered cancellation reason through the cancellation endpoint.
-10. Dossier documents are database records whose content is held on the local filesystem. `procedure_suivante` documents may have `origine: GENERE` (historical, template-based) or `origine: TELEVERSE` (current manual upload) — both remain valid and downloadable, including through the ZIP download, via the shared `/uploads/procedures/`-aware path allowlist in `lib/dossiers-explicatifs/documentPath.js`.
+10. Dossier documents are database records whose content is held on the local filesystem. `procedure_suivante` documents may have `origine: GENERE` (historical, template-based) or `origine: TELEVERSE` (current manual upload). A `RETENUE` dossier may have one optional `TELEVERSE` / `ordre_retenue` document. It may be uploaded or replaced in `PROCEDURE_SUIVANTE_GENEREE` and `A_ARCHIVER`; it is never required for closure. After archive, a missing document may be added, a document first added after archive may be replaced, and a document added before archive is locked. These actions never reopen or otherwise update the dossier. The current document remains downloadable individually and through ZIP via the shared `/uploads/procedures/`-aware path allowlist in `lib/dossiers-explicatifs/documentPath.js`.
 11. Active templates can be fault-specific or generic (`type_faute_id = null`).
 12. Generated initial documents prefer fault-specific templates and fall back to generic templates.
 13. Leave end dates are calculated server-side in working days, excluding weekends and active holiday ranges.
@@ -113,7 +113,7 @@ These are current architectural or business constraints. They are not guarantees
 - PostgreSQL holds business records and document metadata; it does not hold uploaded file bytes.
 - `public/uploads/` is operational data and must be backed up together with PostgreSQL for a coherent recovery point.
 - Application settings are JSON-file-backed and are not part of database backups.
-- `DossierHistory` exists but is not a complete workflow audit log; cancellation is the only transition that currently writes it consistently.
+- `DossierHistory` exists but is not a complete workflow audit log; cancellation and retention-order upload/replacement currently write it consistently.
 - `ARCHIVE` and `ANNULE` are presented as terminal states, but terminal write protection is not centralized and has documented gaps.
 - `date_limite_reponse` and `en_retard` exist in the dossier schema but are not actively calculated by current routes.
 - `date_cloture` does not exist in the schema, despite remaining UI references (those UI branches never render).

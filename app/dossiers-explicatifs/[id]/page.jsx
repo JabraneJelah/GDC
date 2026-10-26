@@ -48,6 +48,7 @@ import {
   CheckCircle2,
   Lock,
   Pencil,
+  Upload,
 } from 'lucide-react'
 
 const statusBadgeStyles = {
@@ -108,6 +109,8 @@ const procedureDocumentMimeTypes = [
   'image/png',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
+const ordreRetenueMimeTypes = ['application/pdf', 'image/jpeg', 'image/png']
+const ordreRetenueMaxFileSize = 8 * 1024 * 1024
 
 const typeFauteArabicLabels = {
   RETARD: 'التأخر عن العمل',
@@ -338,6 +341,9 @@ export default function DossierExplicatifDetailPage() {
   const [cancelError, setCancelError] = useState('')
   const [cancelMotif, setCancelMotif] = useState('')
   const [downloadAllLoading, setDownloadAllLoading] = useState(false)
+  const [ordreRetenueFile, setOrdreRetenueFile] = useState(null)
+  const [ordreRetenueLoading, setOrdreRetenueLoading] = useState(false)
+  const [ordreRetenueError, setOrdreRetenueError] = useState('')
 
   const fetchDossier = useCallback(async ({ showLoading = true } = {}) => {
     if (!dossierId) return null
@@ -408,6 +414,18 @@ export default function DossierExplicatifDetailPage() {
   const notificationProofDocument = documents.find((document) => document.categorie === 'preuve_notification')
   const responseProofDocument = [...documents].reverse().find((document) => document.categorie === 'reponse_agent')
   const procedureDocuments = documents.filter((document) => document.categorie === 'procedure_suivante')
+  const ordreRetenuePolicy = dossier?.ordre_retenue || {}
+  const currentOrdreRetenueDocument = ordreRetenuePolicy.document || null
+  const canMutateOrdreRetenue = !readOnly && (
+    ordreRetenuePolicy.canUpload || ordreRetenuePolicy.canReplace
+  )
+  const showOrdreRetenueCard = dossier?.type_procedure_selectionne === 'RETENUE' && (
+    currentOrdreRetenueDocument ||
+    ordreRetenuePolicy.canUpload ||
+    ordreRetenuePolicy.canReplace ||
+    ordreRetenuePolicy.lockedAfterArchive ||
+    ordreRetenuePolicy.ambiguous
+  )
   const canGenerateProcedure = true
   const canRegisterNotification =
     dossier?.statut !== 'DOCUMENTS_INITIAUX_GENERES' ||
@@ -846,6 +864,63 @@ export default function DossierExplicatifDetailPage() {
       setProcedureError('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.')
     } finally {
       setProcedureLoading(false)
+    }
+  }
+
+  const handleOrdreRetenueUpload = async () => {
+    if (!dossier || ordreRetenueLoading || !canMutateOrdreRetenue) return
+
+    if (!ordreRetenueFile) {
+      setOrdreRetenueError('المرجو اختيار ملف أمر الاقتطاع')
+      return
+    }
+
+    if (!ordreRetenueMimeTypes.includes(ordreRetenueFile.type)) {
+      setOrdreRetenueError('صيغة الملف غير مقبولة. الصيغ المقبولة: PDF أو JPG أو PNG')
+      return
+    }
+
+    if (ordreRetenueFile.size > ordreRetenueMaxFileSize) {
+      setOrdreRetenueError('حجم الملف يتجاوز الحد الأقصى المسموح به (8 ميغابايت)')
+      return
+    }
+
+    setOrdreRetenueLoading(true)
+    setOrdreRetenueError('')
+    setSuccessModal(null)
+    setErrorModal(null)
+
+    try {
+      const isReplacement = Boolean(ordreRetenuePolicy.canReplace)
+      const formData = new FormData()
+      formData.append('file', ordreRetenueFile)
+
+      const response = await fetch(`/api/dossiers-explicatifs/${dossierId}/ordre-retenue`, {
+        method: 'POST',
+        body: formData,
+      })
+      const responseBody = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        setOrdreRetenueError(responseBody?.error || 'تعذر رفع أمر الاقتطاع')
+        return
+      }
+
+      setOrdreRetenueFile(null)
+      await fetchDossier({ showLoading: false })
+      setSuccessModal({
+        title: isReplacement ? 'تم استبدال أمر الاقتطاع' : 'تمت إضافة أمر الاقتطاع',
+        description: `${isReplacement
+          ? 'تم استبدال الملف الحالي مع إبقاء وثيقة واحدة ظاهرة ضمن وثائق الملف.'
+          : 'تم حفظ أمر الاقتطاع ضمن الوثائق المرتبطة بالملف.'}${
+          responseBody?.warning ? ` ${responseBody.warning}.` : ''
+        }`,
+        hasNextStep: false,
+      })
+    } catch {
+      setOrdreRetenueError('حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.')
+    } finally {
+      setOrdreRetenueLoading(false)
     }
   }
 
@@ -1955,6 +2030,97 @@ export default function DossierExplicatifDetailPage() {
             </StepActionPanel>
           </div>
         </AppCard>
+
+        {showOrdreRetenueCard && (
+          <AppCard title="أمر اقتطاع" icon={FileText}>
+            <div className="space-y-4" dir="rtl">
+              <div className={`rounded-xl border px-4 py-3 text-sm ${
+                ordreRetenuePolicy.ambiguous
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : ordreRetenuePolicy.lockedAfterArchive
+                    ? 'border-slate-200 bg-slate-50 text-slate-700'
+                    : 'border-blue-100 bg-blue-50 text-blue-800'
+              }`}>
+                <p className="font-semibold">
+                  {ordreRetenuePolicy.ambiguous
+                    ? 'يتطلب أمر الاقتطاع مراجعة تقنية'
+                    : ordreRetenuePolicy.lockedAfterArchive
+                      ? 'أمر الاقتطاع مقفل بعد الأرشفة'
+                      : ordreRetenuePolicy.canReplace
+                        ? 'استبدال أمر الاقتطاع'
+                        : 'إضافة أمر الاقتطاع'}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed">
+                  {ordreRetenuePolicy.ambiguous
+                    ? 'توجد أكثر من وثيقة من هذا النوع، لذلك أُوقفت عملية الرفع أو الاستبدال لحماية البيانات.'
+                    : ordreRetenuePolicy.lockedAfterArchive
+                      ? 'رُفعت هذه الوثيقة قبل الأرشفة، لذلك لا يمكن استبدالها بعد الأرشفة.'
+                      : dossier.statut === 'ARCHIVE' && ordreRetenuePolicy.canReplace
+                        ? 'رُفعت الوثيقة لأول مرة بعد الأرشفة، ويمكن استبدال الملف الحالي عند الضرورة دون تغيير حالة الملف.'
+                        : dossier.statut === 'ARCHIVE'
+                          ? 'يمكن إضافة الوثيقة الناقصة دون إعادة فتح الملف أو تغيير حالة الأرشفة.'
+                          : 'الوثيقة اختيارية ويمكن إضافتها أو استبدالها قبل إغلاق الملف دون التأثير في مساره.'}
+                </p>
+              </div>
+
+              {currentOrdreRetenueDocument && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <FileText className="size-4 shrink-0 text-slate-500" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
+                    {getDocumentName(currentOrdreRetenueDocument)}
+                  </span>
+                  <a
+                    href={getDocumentDownloadUrl(dossier.id, currentOrdreRetenueDocument.id)}
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    <Download className="size-3" />
+                    تحميل أمر الاقتطاع
+                  </a>
+                </div>
+              )}
+
+              {canMutateOrdreRetenue ? (
+                <>
+                  <UploadField
+                    id="ordre_retenue_file"
+                    label={ordreRetenuePolicy.canReplace ? 'اختر الملف البديل' : 'اختر أمر الاقتطاع'}
+                    accept="application/pdf,image/jpeg,image/png"
+                    selectedFile={ordreRetenueFile}
+                    onChange={(event) => {
+                      setOrdreRetenueFile(event.target.files?.[0] || null)
+                      setOrdreRetenueError('')
+                    }}
+                    helperText="PDF أو JPG أو PNG — الحجم الأقصى 8 ميغابايت"
+                    disabled={ordreRetenueLoading}
+                  />
+
+                  {ordreRetenueError && (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-500" />
+                      <span>{ordreRetenueError}</span>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={handleOrdreRetenueUpload}
+                    disabled={ordreRetenueLoading || !ordreRetenueFile}
+                    className="gap-2 sm:w-auto"
+                  >
+                    <Upload className="size-4" />
+                    {ordreRetenueLoading
+                      ? 'جاري الرفع...'
+                      : ordreRetenuePolicy.canReplace
+                        ? 'استبدال أمر الاقتطاع'
+                        : 'إضافة أمر الاقتطاع'}
+                  </Button>
+                </>
+              ) : readOnly && (ordreRetenuePolicy.canUpload || ordreRetenuePolicy.canReplace) ? (
+                <p className="text-sm text-slate-500">يمكن لمستخدم الموارد البشرية إضافة هذه الوثيقة أو استبدالها.</p>
+              ) : null}
+            </div>
+          </AppCard>
+        )}
 
         {/* Documents Table */}
         <AppCard

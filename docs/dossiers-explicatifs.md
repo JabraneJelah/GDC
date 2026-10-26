@@ -209,6 +209,16 @@ It does not write a closure date or history row. It accepts an optional `comment
 
 Archive is a manual transition. The archive queue page loads the dossier collection and presents pending archive records. Archive does not delete database rows or files and does not create history.
 
+### Optional final retention order
+
+An authenticated active database user whose current role is exactly `UTILISATEUR_RH` may manage the optional final `أمر اقتطاع` through `POST /api/dossiers-explicatifs/[id]/ordre-retenue` only when `type_procedure_selectionne` is `RETENUE`. In the active workflow, create and replacement are allowed only in `PROCEDURE_SUIVANTE_GENEREE` and `A_ARCHIVER`. The document is not a prerequisite for close or archive, and those routes are unchanged.
+
+After `ARCHIVE`, a missing document may be uploaded. An existing document is replaceable only when its first `ORDRE_RETENUE_TELEVERSE` history event records `ARCHIVE` as both the old and new status, proving that the first upload occurred after archive. A document first uploaded in either allowed pre-archive status is locked after archive. Missing or ambiguous first-upload history fails closed. `LECTEUR_RH`, inactive or missing users, other procedure types, and every other status are rejected. The detail endpoint returns the server-derived policy used by the UI.
+
+Files are limited to PDF, JPEG, or PNG and 8 MiB. The server derives the stored extension from the accepted MIME type and writes a unique new file below `public/uploads/procedures/ordres-retenue`. A first upload creates one `TELEVERSE` / `ordre_retenue` `DossierDocument`; replacement updates that same row, preserving its ID, identifier, category, and creation timestamp. Only the current document is visible.
+
+The handler writes the new physical file before entering a transaction. While holding a row lock on the dossier, it rechecks the current database user, type, status, document count, and first-upload history; then it creates or updates the document and writes history in one transaction. First upload uses `ORDRE_RETENUE_TELEVERSE`; replacement uses `ORDRE_RETENUE_REMPLACE`, with both history status fields set to the dossier's unchanged current status. On transaction failure only the newly written file is removed. After a successful replacement, the old file is removed only when its path is inside the dedicated retention-order storage subtree; cleanup failure is logged and returned as a warning without undoing the committed current document. The endpoint never updates `DossierExplicatif`.
+
 ### Archive list: fault-type column and filter
 
 `/dossiers-explicatifs/a-archiver` (`app/dossiers-explicatifs/a-archiver/page.jsx`) displays a `نوع المخالفة` column and a fault-type filter for the already-archived list. Both reuse existing data with no schema or API change:
@@ -300,7 +310,7 @@ ZIP download:
 - builds the ZIP in memory with `pizzip`;
 - returns 404 when no file can be included.
 
-The shared allowlist in `lib/dossiers-explicatifs/documentPath.js` (`ALLOWED_PREFIXES`) includes `/uploads/procedures/` (both `/`-prefixed and bare forms), alongside `generated`, `proofs`, `responses`, `templates`, and `correspondances`. Both download endpoints use this same allowlist, so manually uploaded (`TELEVERSE`) `procedure_suivante` documents download individually and appear in the ZIP exactly like every other document category — this was verified end-to-end (upload, single download, ZIP contents) against a throwaway test dossier before this behavior shipped.
+The shared allowlist in `lib/dossiers-explicatifs/documentPath.js` (`ALLOWED_PREFIXES`) includes `/uploads/procedures/` (both `/`-prefixed and bare forms), alongside `generated`, `proofs`, `responses`, `templates`, and `correspondances`. Both download endpoints use this same allowlist, so manually uploaded (`TELEVERSE`) `procedure_suivante` documents and the current `ordre_retenue` document download individually and appear in the ZIP exactly like every other document category.
 
 Both endpoints allow authenticated readers. Direct URLs under `public/uploads` are also covered by the current middleware matcher.
 
@@ -310,7 +320,7 @@ All dossier reads require authentication. Dossier mutations call `rejectIfLecteu
 
 ## History behavior
 
-`DossierHistory` is not a general audit trail in the current implementation. Creation, generation, notification, response, evaluation, procedure, closure, and archive do not write history. Cancellation does. The dossier detail GET does not include `historique`, and the UI does not display a complete audit timeline.
+`DossierHistory` is not a general audit trail in the current implementation. Creation, generation, notification, response, evaluation, procedure, closure, and archive do not write history. Cancellation and `ordre_retenue` upload/replacement do. The dossier detail GET uses the first retention-order upload event to derive policy but does not expose the full `historique`, and the UI does not display a complete audit timeline.
 
 ## Terminal-state enforcement gaps
 

@@ -111,6 +111,8 @@ Most current mutation routes explicitly call:
 
 This includes current professor, leave, balance, dossier, template, settings, and most referential mutations.
 
+The retention-order route (`POST /api/dossiers-explicatifs/[id]/ordre-retenue`) applies a stricter local check: after verifying the JWT, it reloads the user from PostgreSQL and permits the mutation only when that record exists, is active, and has the current role `UTILISATEUR_RH`. It therefore does not rely only on a potentially stale JWT role claim. Its additional status/type/history policy is enforced from database state while holding a dossier row lock.
+
 Known inconsistency: legacy `POST /api/utilisateurs-rh` checks authentication but does not reject `LECTEUR_RH`. Route-by-route verification is required; there is no centralized mutation policy.
 
 Because backend role checks use the JWT payload, changing a user’s role in PostgreSQL does not change authorization for an already-issued token. `/api/auth/me` may show the new role while a mutation route still sees the old one.
