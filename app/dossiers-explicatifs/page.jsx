@@ -101,6 +101,16 @@ function getFaultDisplay(typeFaute) {
   return { label, color: faultTextColor[severity] || 'text-slate-700' }
 }
 
+// Preserves this page's pre-existing Arabic binding convention: النسب -> nom_ar,
+// الاسم -> prenom_ar. French nom/prenom remain available for search only.
+function getDossierLastName(dossier) {
+  return dossier.professeur?.nom_ar || null
+}
+
+function getDossierFirstName(dossier) {
+  return dossier.professeur?.prenom_ar || null
+}
+
 function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
@@ -163,7 +173,15 @@ export default function DossiersExplicatifsPage() {
   const filteredDossiers = useMemo(() => {
     const norm = filters.search.trim().toLowerCase()
     return dossiers.filter((d) => {
-      if (norm && ![d.reference, d.nom_complet, d.matricule].filter(Boolean).some((v) => v.toLowerCase().includes(norm))) return false
+      if (norm && ![
+        d.reference,
+        d.nom_complet,
+        d.matricule,
+        d.professeur?.nom,
+        d.professeur?.prenom,
+        d.professeur?.nom_ar,
+        d.professeur?.prenom_ar,
+      ].filter(Boolean).some((v) => v.toLowerCase().includes(norm))) return false
       if (filters.service && d.service !== filters.service) return false
       if (filters.hopital && d.professeur?.hopital?.nom !== filters.hopital) return false
       if (filters.typeFauteId && String(d.type_faute?.id) !== filters.typeFauteId) return false
@@ -310,7 +328,8 @@ export default function DossiersExplicatifsPage() {
               <TableHeader className="bg-[#F1F5F9]">
                 <TableRow className="border-b border-slate-200 hover:bg-[#F1F5F9]">
                   <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">المرجع</TableHead>
-                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الاسم الكامل</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">النسب</TableHead>
+                  <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">الاسم</TableHead>
                   <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">رقم التأجير</TableHead>
                   <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">المصلحة</TableHead>
                   <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-700">نوع المخالفة</TableHead>
@@ -323,7 +342,7 @@ export default function DossiersExplicatifsPage() {
               <TableBody>
                 {filteredDossiers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="px-5 py-16 text-center">
+                    <TableCell colSpan={10} className="px-5 py-16 text-center">
                       <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
                         <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
                         <div className="space-y-1">
@@ -362,9 +381,20 @@ export default function DossiersExplicatifsPage() {
                             {dossier.reference || '—'}
                           </span>
                         </TableCell>
-                        <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
-                          {dossier.nom_complet || '—'}
-                        </TableCell>
+                        {dossier.professeur ? (
+                          <>
+                            <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                              {getDossierLastName(dossier) || '—'}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
+                              {getDossierFirstName(dossier) || '—'}
+                            </TableCell>
+                          </>
+                        ) : (
+                          <TableCell colSpan={2} className="px-4 py-3 text-right text-sm text-slate-600">
+                            {dossier.nom_complet || '—'}
+                          </TableCell>
+                        )}
                         <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                           {dossier.matricule || '—'}
                         </TableCell>

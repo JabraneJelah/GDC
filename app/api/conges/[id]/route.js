@@ -4,6 +4,40 @@ import { getCurrentUser } from '@/lib/auth'
 import { rejectIfLecteur } from '@/lib/roles'
 import { getDateFinFromDuree, isWorkingDay } from '@/lib/working-days'
 import { getAppSettings } from '@/lib/app-settings'
+import { unlink } from 'fs/promises'
+import { join } from 'path'
+
+function parseReferenceMetadata(value) {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function filenameFromReferenceUrl(fileUrl) {
+  if (!fileUrl || typeof fileUrl !== 'string') return null
+  const markers = ['/api/uploads/conges/', '/uploads/conges/']
+  const marker = markers.find((candidate) => fileUrl.startsWith(candidate))
+  if (!marker) return null
+  const filename = fileUrl.slice(fileUrl.indexOf(marker) + marker.length).split('?')[0]
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) return null
+  return filename
+}
+
+async function deleteReferenceFileFromDisk(fileUrl) {
+  const filename = filenameFromReferenceUrl(fileUrl)
+  if (!filename) return
+  try {
+    await unlink(join(process.cwd(), 'public', 'uploads', 'conges', filename))
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      console.error('Erreur nettoyage ancienne pièce justificative:', error)
+    }
+  }
+}
 
 // PUT - Mettre à jour un congé
 export async function PUT(request, { params }) {
@@ -335,6 +369,85 @@ export async function PUT(request, { params }) {
   }
 }
 
+// PATCH - Mettre à jour uniquement la pièce justificative, sans recalculer le congé
+export async function PATCH(request, { params }) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+    const deny = rejectIfLecteur(currentUser)
+    if (deny) return deny
+
+    const resolvedParams = params instanceof Promise ? await params : params
+    const id = resolvedParams?.id
+    if (!id) {
+      return NextResponse.json({ error: 'ID du congé manquant' }, { status: 400 })
+    }
+
+    const body = await request.json()
+    if (!Object.prototype.hasOwnProperty.call(body, 'reference_doc')) {
+      return NextResponse.json({ error: 'La pièce justificative est manquante' }, { status: 400 })
+    }
+
+    let nextReference = null
+    if (body.reference_doc !== null && body.reference_doc !== '') {
+      if (typeof body.reference_doc !== 'string') {
+        return NextResponse.json({ error: 'Format de pièce justificative invalide' }, { status: 400 })
+      }
+      const metadata = parseReferenceMetadata(body.reference_doc)
+      if (!metadata) {
+        return NextResponse.json({ error: 'Métadonnées de pièce justificative invalides' }, { status: 400 })
+      }
+      const referenceNumber = typeof metadata.referenceNumber === 'string' ? metadata.referenceNumber.trim() : ''
+      const fileUrl = typeof metadata.fileUrl === 'string' ? metadata.fileUrl : ''
+      const fileName = typeof metadata.fileName === 'string' ? metadata.fileName : ''
+      const fileType = typeof metadata.fileType === 'string' ? metadata.fileType : ''
+      if (fileUrl && !filenameFromReferenceUrl(fileUrl)) {
+        return NextResponse.json({ error: 'Chemin de pièce justificative invalide' }, { status: 400 })
+      }
+      if (fileUrl && !['image/jpeg', 'image/png', 'application/pdf'].includes(fileType)) {
+        return NextResponse.json({ error: 'Type de pièce justificative invalide' }, { status: 400 })
+      }
+      nextReference = JSON.stringify({ referenceNumber, fileUrl, fileName, fileType })
+    }
+
+    const existing = await prisma.conge.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Congé non trouvé' }, { status: 404 })
+    }
+
+    const updated = await prisma.conge.updateMany({
+      where: { id, reference_doc: existing.reference_doc },
+      data: { reference_doc: nextReference },
+    })
+    if (updated.count !== 1) {
+      return NextResponse.json(
+        { error: 'La pièce justificative a été modifiée par un autre utilisateur. Veuillez réessayer.' },
+        { status: 409 }
+      )
+    }
+
+    const previousFileUrl = parseReferenceMetadata(existing.reference_doc)?.fileUrl || ''
+    const nextFileUrl = parseReferenceMetadata(nextReference)?.fileUrl || ''
+    if (previousFileUrl && previousFileUrl !== nextFileUrl) {
+      await deleteReferenceFileFromDisk(previousFileUrl)
+    }
+
+    const conge = await prisma.conge.findUnique({
+      where: { id },
+      include: {
+        type_conge: true,
+        cree_par_rh: { select: { nom_complet: true } },
+      },
+    })
+    return NextResponse.json(conge)
+  } catch (error) {
+    console.error('Erreur mise à jour pièce justificative du congé:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
 // DELETE - Supprimer un congé
 export async function DELETE(request, { params }) {
   try {
@@ -481,4 +594,3 @@ export async function DELETE(request, { params }) {
     )
   }
 }
-

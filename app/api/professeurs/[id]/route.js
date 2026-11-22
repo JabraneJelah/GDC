@@ -61,6 +61,7 @@ export async function GET(request, { params }) {
             reference: true,
             statut: true,
             cree_le: true,
+            type_procedure_selectionne: true,
             type_faute: {
               select: { nom: true, code: true },
             },

@@ -166,6 +166,23 @@ function formatExtraFieldDisplay(field, value) {
     const d = new Date(value + 'T00:00:00')
     if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('ar-MA')
   }
+  if (field.type === 'time') {
+    return value
+  }
+  if (field.type === 'datetime-local') {
+    // Handle both datetime-local ("2026-11-20T08:00") and legacy time-only ("08:00") values
+    const d = new Date(value)
+    if (!Number.isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0')
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const yyyy = d.getFullYear()
+      const hh = String(d.getHours()).padStart(2, '0')
+      const min = String(d.getMinutes()).padStart(2, '0')
+      return `${dd}/${mm}/${yyyy} - ${hh}:${min}`
+    }
+    // Legacy time-only value — display as-is
+    return value
+  }
   return value || '-'
 }
 
@@ -1078,7 +1095,7 @@ export default function DossierExplicatifDetailPage() {
                 className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900"
               >
                 <Pencil className="size-3.5" />
-                تعديل معطيات الشهادة الطبية
+                تعديل المعطيات الإضافية
               </button>
               {extraFieldsSuccess && (
                 <span className="text-sm font-medium text-green-700">✓ تم الحفظ بنجاح</span>
@@ -1096,7 +1113,7 @@ export default function DossierExplicatifDetailPage() {
                       {field.required && <span className="mr-1 text-red-500">*</span>}
                     </Label>
                     <Input
-                      type={field.type === 'date' ? 'date' : 'text'}
+                      type={['date', 'time', 'datetime-local'].includes(field.type) ? field.type : 'text'}
                       value={extraFieldsData[field.key] || ''}
                       onChange={(e) => {
                         setExtraFieldsData((prev) => ({ ...prev, [field.key]: e.target.value }))

@@ -89,6 +89,16 @@ function getProfLabel(conge) {
   return `${conge.professeur.prenom || ''} ${conge.professeur.nom || ''}`.trim() || '—'
 }
 
+// Congés only ever has a live professeur relation (required, non-nullable
+// in the schema), so no historical nom_complet-style fallback is needed here.
+function getProfLastName(conge) {
+  return conge.professeur?.nom || null
+}
+
+function getProfFirstName(conge) {
+  return conge.professeur?.prenom || null
+}
+
 // Defined at module scope so React sees a stable component type across renders.
 // If defined inside CongesPage, a new function reference is created on every render,
 // causing React to unmount/remount the component and destroying input focus.
@@ -1265,7 +1275,8 @@ export default function CongesPage() {
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-slate-200 bg-white">
-                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الموظف</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">النسب</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الاسم</th>
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع الرخصة</th>
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ المغادرة</th>
                 <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ النهاية</th>
@@ -1279,7 +1290,7 @@ export default function CongesPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredConges.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-16 text-center">
+                  <td colSpan={10} className="px-5 py-16 text-center">
                     <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
                       <CalendarCheck className="size-9 text-slate-300" strokeWidth={1.5} />
                       <p className="text-sm font-medium text-slate-700">
@@ -1302,10 +1313,18 @@ export default function CongesPage() {
                   <tr key={conge.id} className="bg-white transition-colors hover:bg-[#F8FAFC]">
                     <td className="px-4 py-3.5 text-right">
                       <span
-                        className="block max-w-[180px] truncate text-sm font-medium text-slate-900"
-                        title={getProfLabel(conge)}
+                        className="block max-w-[140px] truncate text-sm font-medium text-slate-900"
+                        title={getProfLastName(conge) || '—'}
                       >
-                        {getProfLabel(conge)}
+                        {getProfLastName(conge) || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <span
+                        className="block max-w-[140px] truncate text-sm text-slate-700"
+                        title={getProfFirstName(conge) || '—'}
+                      >
+                        {getProfFirstName(conge) || '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">

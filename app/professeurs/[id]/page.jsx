@@ -99,6 +99,16 @@ const typeFauteArabicLabels = {
   CONGE_MALADIE_NON_JUSTIFIE: 'عطلة مرضية غير مبررة',
 }
 
+const procedureTypeArabicLabels = {
+  AVERTISSEMENT: 'تنبيه',
+  RETENUE: 'اقتطاع',
+}
+
+function getProcedureTypeLabel(typeProcedureSelectionne) {
+  if (!typeProcedureSelectionne) return null
+  return procedureTypeArabicLabels[typeProcedureSelectionne] || null
+}
+
 function formatDossierDate(value) {
   if (!value) return '—'
   const d = new Date(value)
@@ -144,6 +154,11 @@ export default function ProfesseurDetailsPage() {
   const [grades, setGrades] = useState([])
   const [historiqueCongesPage, setHistoriqueCongesPage] = useState(1)
   const [dossierPage, setDossierPage] = useState(1)
+  const documentFileInputRef = useRef(null)
+  const documentTargetCongeIdRef = useRef(null)
+  const [documentBusyCongeId, setDocumentBusyCongeId] = useState(null)
+  const [deleteDocumentDialogOpen, setDeleteDocumentDialogOpen] = useState(false)
+  const [deleteDocumentTargetId, setDeleteDocumentTargetId] = useState(null)
   const decisionFileInputRef = useRef(null)
   const decisionTargetCongeIdRef = useRef(null)
   const [decisionBusyCongeId, setDecisionBusyCongeId] = useState(null)
@@ -250,6 +265,101 @@ export default function ProfesseurDetailsPage() {
   const openDecisionPicker = (congeId) => {
     decisionTargetCongeIdRef.current = congeId
     decisionFileInputRef.current?.click()
+  }
+
+  const openDocumentPicker = (congeId) => {
+    documentTargetCongeIdRef.current = congeId
+    documentFileInputRef.current?.click()
+  }
+
+  const handleDocumentFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    const targetId = documentTargetCongeIdRef.current
+    documentTargetCongeIdRef.current = null
+    e.target.value = ''
+    if (!file || !targetId) return
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf']
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage('نوع الملف غير مدعوم. الصيغ المقبولة: JPEG وPNG وPDF.')
+      setErrorDialogOpen(true)
+      return
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage('حجم الملف كبير جداً. الحد الأقصى هو 8 ميغابايت.')
+      setErrorDialogOpen(true)
+      return
+    }
+
+    setDocumentBusyCongeId(targetId)
+    try {
+      const uploadData = new FormData()
+      uploadData.append('file', file)
+      const uploadRes = await fetch('/api/conges/upload', { method: 'POST', body: uploadData })
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}))
+        throw new Error(err.error || 'فشل رفع الوثيقة')
+      }
+      const uploadedFile = await uploadRes.json()
+      const currentConge = professeur?.conges?.find((conge) => conge.id === targetId)
+      const currentReference = parseReferenceDoc(currentConge?.reference_doc)
+      const referenceDoc = JSON.stringify({
+        referenceNumber: currentReference.referenceNumber || '',
+        fileUrl: uploadedFile.fileUrl,
+        fileName: uploadedFile.fileName || '',
+        fileType: uploadedFile.fileType || '',
+      })
+      const updateRes = await fetch(`/api/conges/${targetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference_doc: referenceDoc }),
+      })
+      if (!updateRes.ok) {
+        const err = await updateRes.json().catch(() => ({}))
+        throw new Error(err.error || 'فشل حفظ الوثيقة')
+      }
+      await fetchProfesseur()
+    } catch (error) {
+      setErrorMessage(error.message || 'فشل رفع الوثيقة')
+      setErrorDialogOpen(true)
+    } finally {
+      setDocumentBusyCongeId(null)
+    }
+  }
+
+  const handleDeleteDocument = async () => {
+    const congeId = deleteDocumentTargetId
+    if (!congeId) return
+    setDeleteDocumentDialogOpen(false)
+    setDeleteDocumentTargetId(null)
+    setDocumentBusyCongeId(congeId)
+    try {
+      const currentConge = professeur?.conges?.find((conge) => conge.id === congeId)
+      const currentReference = parseReferenceDoc(currentConge?.reference_doc)
+      const referenceDoc = currentReference.referenceNumber
+        ? JSON.stringify({
+            referenceNumber: currentReference.referenceNumber,
+            fileUrl: '',
+            fileName: '',
+            fileType: '',
+          })
+        : null
+      const res = await fetch(`/api/conges/${congeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference_doc: referenceDoc }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'فشل حذف الوثيقة')
+      }
+      await fetchProfesseur()
+    } catch (error) {
+      setErrorMessage(error.message || 'فشل حذف الوثيقة')
+      setErrorDialogOpen(true)
+    } finally {
+      setDocumentBusyCongeId(null)
+    }
   }
 
   const handleDecisionFileChange = async (e) => {
@@ -665,9 +775,23 @@ export default function ProfesseurDetailsPage() {
                     <td className="px-4 py-3.5 text-right">
                       {(() => {
                         const ref = parseReferenceDoc(conge.reference_doc)
-                        if (!ref.referenceNumber && !ref.fileUrl) return <span className="text-sm text-slate-400">—</span>
+                        const busy = documentBusyCongeId === conge.id
+                        if (!ref.referenceNumber && !ref.fileUrl) {
+                          return (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => openDocumentPicker(conge.id)}
+                              className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              <Upload className="h-3 w-3" />
+                              إضافة
+                            </button>
+                          )
+                        }
+                        const apiUrl = toCongesUploadApiUrl(ref.fileUrl)
                         return (
-                          <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-1">
                             {ref.referenceNumber && (
                               <div className="max-w-[120px] truncate text-xs text-slate-700" title={ref.referenceNumber}>
                                 {ref.referenceNumber}
@@ -675,17 +799,11 @@ export default function ProfesseurDetailsPage() {
                             )}
                             {ref.fileUrl && (
                               ref.fileType?.startsWith('image/') ? (
-                                <div className="flex items-center gap-1.5">
-                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer">
-                                    <img src={toCongesUploadApiUrl(ref.fileUrl)} alt={ref.fileName || 'وثيقة'} className="h-9 w-9 rounded-lg border border-slate-200 object-cover" />
-                                  </a>
-                                  <a href={toCongesUploadApiUrl(ref.fileUrl)} download={ref.fileName || true} className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                                    <Download className="h-3 w-3" />
-                                    تحميل
-                                  </a>
-                                </div>
+                                <a href={apiUrl} target="_blank" rel="noreferrer" title={ref.fileName || 'وثيقة'}>
+                                  <img src={apiUrl} alt={ref.fileName || 'وثيقة'} className="h-9 w-9 rounded-lg border border-slate-200 object-cover" />
+                                </a>
                               ) : (
-                                <a href={toCongesUploadApiUrl(ref.fileUrl)} target="_blank" rel="noreferrer" download={ref.fileName || true}
+                                <a href={apiUrl} target="_blank" rel="noreferrer" download={ref.fileName || true}
                                   className="inline-flex max-w-[120px] items-center gap-1 overflow-hidden text-xs text-blue-600 hover:underline"
                                   title={ref.fileName || 'فتح PDF'}
                                 >
@@ -694,6 +812,36 @@ export default function ProfesseurDetailsPage() {
                                 </a>
                               )
                             )}
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => openDocumentPicker(conge.id)}
+                                className="cursor-pointer flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                                title={ref.fileUrl ? 'استبدال الوثيقة' : 'إضافة الوثيقة'}
+                              >
+                                <Upload className="h-3 w-3" />
+                              </button>
+                              {ref.fileUrl && (
+                                <>
+                                  <a href={apiUrl} download={ref.fileName || true}
+                                    className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                    title="تحميل"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => { setDeleteDocumentTargetId(conge.id); setDeleteDocumentDialogOpen(true) }}
+                                    className="cursor-pointer flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                    title="حذف الوثيقة"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         )
                       })()}
@@ -796,6 +944,13 @@ export default function ProfesseurDetailsPage() {
           </div>
         )}
         <input
+          ref={documentFileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/jpeg,image/png,application/pdf,.pdf,.png,.jpg,.jpeg"
+          onChange={handleDocumentFileChange}
+        />
+        <input
           ref={decisionFileInputRef}
           type="file"
           className="hidden"
@@ -818,6 +973,7 @@ export default function ProfesseurDetailsPage() {
               <tr className="border-b border-slate-200 bg-[#F1F5F9]">
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">المرجع</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع المخالفة</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">نوع المسطرة</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">الحالة</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">تاريخ التسجيل</th>
               </tr>
@@ -825,7 +981,7 @@ export default function ProfesseurDetailsPage() {
             <tbody className="divide-y divide-slate-100">
               {dossiersList.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-12 text-center">
+                  <td colSpan={5} className="px-5 py-12 text-center">
                     <p className="text-sm text-slate-500">لا يوجد ملف توضيحي مسجل</p>
                   </td>
                 </tr>
@@ -835,7 +991,7 @@ export default function ProfesseurDetailsPage() {
                     <td className="px-4 py-3.5 text-right">
                       <Link
                         href={`/dossiers-explicatifs/${d.id}`}
-                        className="font-mono text-sm font-semibold text-blue-600 hover:underline"
+                        className="rounded font-mono text-sm font-medium text-slate-900 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                         dir="ltr"
                       >
                         {d.reference}
@@ -845,6 +1001,9 @@ export default function ProfesseurDetailsPage() {
                       {d.type_faute
                         ? (typeFauteArabicLabels[d.type_faute.code] || d.type_faute.nom || '—')
                         : '—'}
+                    </td>
+                    <td className="px-4 py-3.5 text-right text-sm text-slate-700">
+                      {getProcedureTypeLabel(d.type_procedure_selectionne) || '—'}
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <StatusBadge variant={getListStatusColor(d.statut)}>
@@ -1033,6 +1192,22 @@ export default function ProfesseurDetailsPage() {
           <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
             <button type="button" onClick={() => { setDeleteSoldeDialogOpen(false); setSoldeToDelete(null) }} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
             <button type="button" onClick={handleDeleteSoldeConfirm} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto">حذف</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete document confirm dialog */}
+      <Dialog open={deleteDocumentDialogOpen} onOpenChange={(v) => { setDeleteDocumentDialogOpen(v); if (!v) setDeleteDocumentTargetId(null) }}>
+        <DialogContent className="max-w-md rounded-2xl border-slate-200 shadow-xl" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right text-lg font-bold text-slate-900">حذف الوثيقة</DialogTitle>
+            <DialogDescription className="text-right text-sm text-slate-700">
+              هل تريد إزالة الوثيقة المرفقة بهذه الرخصة؟
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-start">
+            <button type="button" onClick={() => { setDeleteDocumentDialogOpen(false); setDeleteDocumentTargetId(null) }} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto">إلغاء</button>
+            <button type="button" onClick={handleDeleteDocument} className="cursor-pointer inline-flex w-full items-center justify-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 sm:w-auto">حذف</button>
           </div>
         </DialogContent>
       </Dialog>

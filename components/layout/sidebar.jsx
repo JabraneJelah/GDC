@@ -67,7 +67,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onCloseMo
     { href: '/dossiers-explicatifs', label: 'الملفات التوضيحية', icon: FileText },
     { href: '/document-templates', label: 'نماذج الوثائق', icon: FileText },
     {
-      label: 'المرجعيات',
+      label: 'الاعدادات',
       icon: Settings,
       children: [
         { href: '/services', label: 'المصالح' },

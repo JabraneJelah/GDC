@@ -56,7 +56,7 @@ export function Pagination({
   }
 
   return (
-    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-4 px-2 sm:px-4 py-4", className)}>
+    <div className={cn("flex flex-col sm:flex-row-reverse items-center justify-between gap-4 px-2 sm:px-4 py-4", className)}>
       <div className="flex items-center gap-2">
         <p className="text-xs sm:text-sm text-slate-700">
           Page {currentPage} sur {totalPages}

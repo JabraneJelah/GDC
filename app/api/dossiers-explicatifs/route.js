@@ -108,6 +108,7 @@ export async function POST(request) {
     const typeFauteIdRaw = formData.get('type_faute_id') ?? null
     const details = formData.get('details') ?? null
     const correspondanceFile = formData.get('correspondance')
+    const donneesSupplementairesRaw = formData.get('donnees_supplementaires') ?? null
 
     const type_faute_id =
       typeFauteIdRaw != null && typeFauteIdRaw !== ''
@@ -198,6 +199,19 @@ export async function POST(request) {
       )
     }
 
+    // Parse optional donnees_supplementaires (JSON string from FormData)
+    let parsedDonneesSupplementaires = null
+    if (donneesSupplementairesRaw && typeof donneesSupplementairesRaw === 'string') {
+      try {
+        const parsed = JSON.parse(donneesSupplementairesRaw)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          parsedDonneesSupplementaires = parsed
+        }
+      } catch {
+        // Ignore invalid JSON — donnees_supplementaires stays null
+      }
+    }
+
     const reference = await generateDossierReference()
     const nomComplet = (professeur.nom_ar && professeur.prenom_ar)
       ? `${professeur.nom_ar} ${professeur.prenom_ar}`.trim()
@@ -240,6 +254,7 @@ export async function POST(request) {
           professeur_id: professeur.id,
           date_faute: parsedDateFaute,
           details: details || null,
+          donnees_supplementaires: parsedDonneesSupplementaires,
           statut: 'ENREGISTRE',
           type_faute_id,
           cree_par_rh_id: utilisateur.id,

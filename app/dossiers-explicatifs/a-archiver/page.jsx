@@ -57,14 +57,14 @@ function getProcedureTypeLabel(typeProcedureSelectionne) {
   return procedureTypeArabicLabels[typeProcedureSelectionne] || null
 }
 
-// Prefers the live professor's split name fields (Arabic first, matching the
-// dossier-creation snapshot convention); falls back to the stored snapshot
-// string for historical dossiers or professors no longer linked.
-function getDossierFullName(dossier) {
-  const p = dossier.professeur
-  if (p?.nom_ar && p?.prenom_ar) return `${p.nom_ar} ${p.prenom_ar}`.trim()
-  if (p?.nom || p?.prenom) return `${p.prenom || ''} ${p.nom || ''}`.trim()
-  return dossier.nom_complet || null
+// Preserves this page's pre-existing Arabic binding convention: النسب -> nom_ar,
+// الاسم -> prenom_ar. French nom/prenom remain available for search only.
+function getDossierLastName(dossier) {
+  return dossier.professeur?.nom_ar || null
+}
+
+function getDossierFirstName(dossier) {
+  return dossier.professeur?.prenom_ar || null
 }
 
 const DEFAULT_FILTERS = {
@@ -261,10 +261,12 @@ export default function ArchivePage() {
                   <TableHeader className="bg-slate-50">
                     <TableRow className="border-b border-slate-200 hover:bg-slate-50">
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المرجع</TableHead>
-                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الاسم الكامل</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">النسب</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الاسم</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">رقم التأجير</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">المصلحة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">نوع المخالفة</TableHead>
+                      <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">تاريخ المخالفة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">نوع المسطرة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">تاريخ الأرشفة</TableHead>
                       <TableHead className="px-4 py-3 text-right text-sm font-semibold text-slate-600">الإجراءات</TableHead>
@@ -273,7 +275,7 @@ export default function ArchivePage() {
                   <TableBody>
                     {filteredDossiers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="px-5 py-16 text-center">
+                        <TableCell colSpan={10} className="px-5 py-16 text-center">
                           <div className="mx-auto flex max-w-xs flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
                             <FolderOpen className="size-10 text-slate-300" strokeWidth={1.5} />
                             <div className="space-y-1">
@@ -310,9 +312,20 @@ export default function ArchivePage() {
                               {dossier.reference || '—'}
                             </span>
                           </TableCell>
-                          <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
-                            {getDossierFullName(dossier) || '—'}
-                          </TableCell>
+                          {dossier.professeur ? (
+                            <>
+                              <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                                {getDossierLastName(dossier) || '—'}
+                              </TableCell>
+                              <TableCell className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                                {getDossierFirstName(dossier) || '—'}
+                              </TableCell>
+                            </>
+                          ) : (
+                            <TableCell colSpan={2} className="px-4 py-3 text-right text-sm font-semibold text-slate-900">
+                              {dossier.nom_complet || '—'}
+                            </TableCell>
+                          )}
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {dossier.matricule || '—'}
                           </TableCell>
@@ -321,6 +334,9 @@ export default function ArchivePage() {
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {getFaultLabel(dossier.type_faute) || '—'}
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-right text-sm text-slate-500">
+                            {formatDate(dossier.date_faute)}
                           </TableCell>
                           <TableCell className="px-4 py-3 text-right text-sm text-slate-600">
                             {getProcedureTypeLabel(dossier.type_procedure_selectionne) || '—'}

@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Search, User } from 'lucide-react'
+import { getExtraFieldsForCode } from '@/lib/dossiers-explicatifs/extraFields'
 
 const initialFormData = {
   type_faute_id: '',
@@ -40,6 +41,7 @@ export default function NouveauDossierExplicatifPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [correspondanceFile, setCorrespondanceFile] = useState(null)
+  const [extraFieldsData, setExtraFieldsData] = useState({})
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,6 +98,18 @@ export default function NouveauDossierExplicatifPage() {
       .slice(0, 12)
   }, [professeurs, professeurSearch])
 
+  // Extra fields config for the currently selected fault type
+  const selectedTypeFauteCode = useMemo(() => {
+    if (!formData.type_faute_id) return null
+    const found = typesFaute.find((t) => t.id.toString() === formData.type_faute_id)
+    return found?.code || null
+  }, [formData.type_faute_id, typesFaute])
+
+  const extraFieldsConfig = useMemo(
+    () => getExtraFieldsForCode(selectedTypeFauteCode),
+    [selectedTypeFauteCode],
+  )
+
   const handleSelectProfesseur = (professeur) => {
     setSelectedProfesseur(professeur)
     setProfesseurSearch('')
@@ -107,6 +121,10 @@ export default function NouveauDossierExplicatifPage() {
     setFormData((current) => ({ ...current, [field]: value }))
     setFormErrors((current) => ({ ...current, [field]: '' }))
     setErrorMessage('')
+    // Reset extra fields data when fault type changes
+    if (field === 'type_faute_id') {
+      setExtraFieldsData({})
+    }
   }
 
   const validateForm = () => {
@@ -115,6 +133,13 @@ export default function NouveauDossierExplicatifPage() {
     if (!selectedProfesseur) errors.professeur_id = 'المرجو اختيار الموظف'
     if (!formData.type_faute_id) errors.type_faute_id = 'المرجو اختيار نوع المخالفة'
     if (!formData.date_faute) errors.date_faute = 'المرجو إدخال تاريخ المخالفة'
+
+    // Validate required extra fields
+    for (const field of extraFieldsConfig) {
+      if (field.required && !extraFieldsData[field.key]?.toString().trim()) {
+        errors[field.key] = `المرجو إدخال ${field.label}`
+      }
+    }
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -143,6 +168,10 @@ export default function NouveauDossierExplicatifPage() {
       }
       if (correspondanceFile) {
         payload.append('correspondance', correspondanceFile)
+      }
+      // Send extra fields as JSON in donnees_supplementaires
+      if (extraFieldsConfig.length > 0 && Object.keys(extraFieldsData).length > 0) {
+        payload.append('donnees_supplementaires', JSON.stringify(extraFieldsData))
       }
 
       const response = await fetch('/api/dossiers-explicatifs', {
@@ -408,6 +437,38 @@ export default function NouveauDossierExplicatifPage() {
                 />
               </div>
             </div>
+
+            {/* Extra fields conditional on fault type (e.g. absence duration) */}
+            {extraFieldsConfig.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {extraFieldsConfig.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <Label
+                      htmlFor={field.key}
+                      className="block text-right text-sm font-medium text-slate-700"
+                    >
+                      {field.label}
+                      {field.required && <span className="text-red-500"> *</span>}
+                    </Label>
+                    <Input
+                      id={field.key}
+                      type={['date', 'time', 'datetime-local'].includes(field.type) ? field.type : 'text'}
+                      value={extraFieldsData[field.key] || ''}
+                      onChange={(event) => {
+                        setExtraFieldsData((prev) => ({ ...prev, [field.key]: event.target.value }))
+                        setFormErrors((prev) => ({ ...prev, [field.key]: '' }))
+                      }}
+                      placeholder={field.placeholder}
+                      disabled={!selectedProfesseur}
+                      className="h-11 rounded-xl border-slate-300 bg-white text-right"
+                    />
+                    {formErrors[field.key] ? (
+                      <p className="text-sm text-red-600">{formErrors[field.key]}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* تفاصيل */}
             <div className="space-y-2">
